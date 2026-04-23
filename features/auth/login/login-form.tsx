@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { loginUser } from "./login.service"
@@ -12,6 +13,7 @@ type LoginFormProps = {
 }
 
 export function LoginForm({ apiUrl }: LoginFormProps) {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -24,6 +26,7 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
     setLoading(true)
     setError("")
     setMessage("")
+    let shouldRedirect = false
 
     try {
       const payload = await loginUser({ apiUrl, email, password })
@@ -48,11 +51,15 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
       setLoggedInUser(payload.data?.user ?? null)
       setMessage(payload.message || "Login successful")
       setPassword("")
+      shouldRedirect = true
+      router.push("/home")
     } catch (error) {
       const fallback = "Login failed. Please check your credentials."
       setError(error instanceof Error ? error.message : fallback)
     } finally {
-      setLoading(false)
+      if (!shouldRedirect) {
+        setLoading(false)
+      }
     }
   }
 

@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
+import { DEFAULT_GENDER_OPTIONS } from "./register.constants"
+import { GenderCombobox } from "./gender-combobox"
 import { fetchGenderOptions, registerUser } from "./register.service"
 import type { GenderOption, RegisterFormValues } from "./register.types"
 
@@ -26,7 +28,9 @@ export function RegisterForm({ apiUrl }: RegisterFormProps) {
   const [values, setValues] = useState<RegisterFormValues>(initialValues)
   const [loading, setLoading] = useState(false)
   const [genderLoading, setGenderLoading] = useState(true)
-  const [genderOptions, setGenderOptions] = useState<GenderOption[]>([])
+  const [genderOptions, setGenderOptions] = useState<GenderOption[]>(
+    DEFAULT_GENDER_OPTIONS,
+  )
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
@@ -70,7 +74,7 @@ export function RegisterForm({ apiUrl }: RegisterFormProps) {
         }
       } catch {
         if (isActive) {
-          setGenderOptions([])
+          setGenderOptions(DEFAULT_GENDER_OPTIONS)
         }
       } finally {
         if (isActive) {
@@ -188,21 +192,13 @@ export function RegisterForm({ apiUrl }: RegisterFormProps) {
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 Gender
               </span>
-              <select
+              <GenderCombobox
                 name="gender"
                 value={values.gender}
-                onChange={(event) => updateField("gender", event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-white/20 dark:focus:ring-white/10"
-              >
-                <option value="">
-                  {genderLoading ? "Loading..." : "Select gender"}
-                </option>
-                {genderOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={genderOptions}
+                loading={genderLoading}
+                onChange={(nextValue) => updateField("gender", nextValue)}
+              />
             </label>
 
             <label className="block space-y-2">

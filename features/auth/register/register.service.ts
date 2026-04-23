@@ -1,4 +1,8 @@
-import { GENDER_OPTIONS_ROUTE, REGISTER_ROUTE } from "./register.constants"
+import {
+  DEFAULT_GENDER_OPTIONS,
+  GENDER_OPTIONS_ROUTE,
+  REGISTER_ROUTE,
+} from "./register.constants"
 import type {
   GenderOption,
   GenderResponse,
@@ -52,11 +56,13 @@ export async function fetchGenderOptions(
   const payload = (await response.json()) as GenderResponse
 
   if (!response.ok || !payload.success) {
-    throw new Error(payload.message || "Unable to load gender options")
+    return DEFAULT_GENDER_OPTIONS
   }
 
-  return (payload.data ?? []).map((value) => ({
+  const options = (payload.data ?? []).map((value) => ({
     value,
     label: value.charAt(0).toUpperCase() + value.slice(1),
   }))
+
+  return options.length > 0 ? options : DEFAULT_GENDER_OPTIONS
 }
