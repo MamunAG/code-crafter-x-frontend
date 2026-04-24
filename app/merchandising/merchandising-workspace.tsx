@@ -239,19 +239,21 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
   return (
     <div
       className={cn(
-        "relative flex h-full w-full min-h-0 flex-1 flex-col px-3 py-4 sm:px-4 sm:py-6 lg:flex-row",
+        "relative flex h-full w-full min-h-0 flex-1 flex-col px-3 pt-0 pb-4 sm:px-4 sm:py-6 lg:flex-row",
         collapsed ? "lg:gap-0" : "lg:gap-4",
       )}
     >
-        <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-            {app_module.label}
-          </p>
-          <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-300 sm:block">
-            {app_module.description}
-          </p>
-        </div>
+      <button
+        type="button"
+        onClick={() => setMobileOpenPathname(pathname)}
+        className="fixed right-3 top-20 z-30 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-lg transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:bg-slate-900 dark:hover:text-white lg:hidden"
+        aria-label="Open merchandising navigation"
+      >
+        <PanelLeftOpen className="h-4 w-4" />
+        Menu
+      </button>
+
+      <div className="hidden items-center justify-between gap-3 lg:hidden">
         <button
           type="button"
           onClick={() => setMobileOpenPathname(pathname)}
