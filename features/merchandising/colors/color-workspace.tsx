@@ -942,9 +942,9 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
           <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-3">
+            <CardContent className="p-6 sm:p-8 sm:py-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1.5">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     Merchandising master data
                   </p>
@@ -1022,30 +1022,30 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           ) : null}
 
           <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-            <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardHeader className="border-b border-slate-200/70 py-0 dark:border-white/10">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <CardTitle className="text-lg">Filters</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-base">Filters</CardTitle>
+                  <CardDescription className="text-xs">
                     Search by color name, display name, or description.
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
+                <Badge variant="outline" className="w-fit rounded-full px-2.5 py-0.5 text-[11px]">
                   {filterCount} active filter{filterCount === 1 ? "" : "s"}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6">
+            <CardContent className="p-2 sm:p-0 sm:px-2">
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
                   setActiveFilters(draftFilters)
                   setPage(1)
                 }}
-                className="flex flex-wrap gap-3"
+                className="flex flex-wrap gap-2.5"
               >
-                <div className="min-w-[12rem] flex-1 space-y-1">
-                  <label htmlFor="filterColorName" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-44 flex-1 space-y-1">
+                  <label htmlFor="filterColorName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Color name
                   </label>
                   <Input
@@ -1061,8 +1061,8 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Blue"
                   />
                 </div>
-                <div className="min-w-[12rem] flex-1 space-y-1">
-                  <label htmlFor="filterColorDisplayName" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-44 flex-1 space-y-1">
+                  <label htmlFor="filterColorDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Display name
                   </label>
                   <Input
@@ -1078,8 +1078,8 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Ocean Blue"
                   />
                 </div>
-                <div className="min-w-[16rem] flex-[1.4] space-y-1">
-                  <label htmlFor="filterColorDescription" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-56 flex-[1.3] space-y-1">
+                  <label htmlFor="filterColorDescription" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Description
                   </label>
                   <Input
@@ -1095,7 +1095,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Deep blue shade used for denim."
                   />
                 </div>
-                <div className="flex min-w-[10rem] items-end justify-end gap-2">
+                <div className="flex min-w-38 items-end justify-end gap-2">
                   <Button type="submit" className="w-24 rounded-xl">
                     <Search className="size-3.5" />
                     Search
@@ -1155,10 +1155,10 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     onAction={
                       activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription
                         ? () => {
-                            setDraftFilters(DEFAULT_FILTERS)
-                            setActiveFilters(DEFAULT_FILTERS)
-                            setPage(1)
-                          }
+                          setDraftFilters(DEFAULT_FILTERS)
+                          setActiveFilters(DEFAULT_FILTERS)
+                          setPage(1)
+                        }
                         : openCreateDialog
                     }
                   />
