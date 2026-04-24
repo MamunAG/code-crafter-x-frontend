@@ -253,18 +253,6 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
         Menu
       </button>
 
-      <div className="hidden items-center justify-between gap-3 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileOpenPathname(pathname)}
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:bg-slate-900 dark:hover:text-white"
-          aria-label="Open merchandising navigation"
-        >
-          <PanelLeftOpen className="h-4 w-4" />
-          Menu
-        </button>
-      </div>
-
       {collapsed ? (
         <button
           type="button"
