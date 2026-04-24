@@ -44,23 +44,27 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
   return (
     <header className="fixed inset-x-0 top-0 z-20 border-b border-white/70 bg-white/85 px-3 py-2 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur dark:border-white/10 dark:bg-slate-950/80 dark:shadow-[0_12px_32px_rgba(0,0,0,0.24)] sm:px-4">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
-            CX
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
+              CX
+            </div>
+            <div className="hidden leading-tight sm:block">
+              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                Code Crafter X
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Workspace
+              </p>
+            </div>
+          </Link>
+          <div className="lg:hidden">
+            <ModuleNavMenu current={current} />
           </div>
-          <div className="hidden leading-tight sm:block">
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Code Crafter X
-            </p>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Workspace
-            </p>
-          </div>
-        </Link>
+        </div>
 
         {isAuthenticated ? (
           <div className="flex items-center gap-2">
-            <ModuleNavMenu current={current} />
             <Link
               href="/"
               className={cn(
@@ -72,6 +76,9 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
             >
               Home
             </Link>
+            <div className="hidden lg:block">
+              <ModuleNavMenu current={current} />
+            </div>
             <Link
               href="/account"
               aria-label="Notifications"
