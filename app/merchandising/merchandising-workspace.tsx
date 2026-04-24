@@ -243,12 +243,12 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
         collapsed ? "lg:gap-0" : "lg:gap-4",
       )}
     >
-      <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
+        <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
             {app_module.label}
           </p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-300 sm:block">
             {app_module.description}
           </p>
         </div>
