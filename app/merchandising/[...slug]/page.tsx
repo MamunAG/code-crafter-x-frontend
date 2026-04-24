@@ -1,6 +1,6 @@
 import { ModuleRoutePage } from "@/components/module-route-page"
 
-function titleizeSlug(slug: string[]) {
+function titleizeSlug(slug: string[] = []) {
   return slug
     .map((segment) =>
       segment
@@ -11,20 +11,24 @@ function titleizeSlug(slug: string[]) {
     .join(" / ")
 }
 
-export default function Page({
+export default async function Page({
   params,
 }: {
-  params: { slug: string[] }
+  params: Promise<{ slug?: string[] }>
 }) {
-  const pathLabel = `/merchandising/${params.slug.join("/")}`
+  const resolvedParams = await params
+  const slug = resolvedParams.slug ?? []
+  const pathLabel = slug.length ? `/merchandising/${slug.join("/")}` : "/merchandising"
 
   return (
     <ModuleRoutePage
       current="merchandising"
       eyebrow="Merchandising"
-      title={titleizeSlug(params.slug)}
+      title={titleizeSlug(slug)}
       description="This nested merchandising route is ready for sourcing, master data, and production screens."
       pathLabel={pathLabel}
+      showModuleNavigation={false}
+      withShell={false}
     />
   )
 }

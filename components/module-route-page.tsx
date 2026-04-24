@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { EntryTopNav } from "@/components/entry-top-nav"
+import { ModuleNavMenu } from "@/components/module-nav-menu"
 
 type ModuleRoutePageProps = {
   current: "app-config" | "merchandising" | "iam"
@@ -9,6 +10,8 @@ type ModuleRoutePageProps = {
   eyebrow: string
   description: string
   pathLabel: string
+  showModuleNavigation?: boolean
+  withShell?: boolean
 }
 
 export function ModuleRoutePage({
@@ -17,12 +20,31 @@ export function ModuleRoutePage({
   eyebrow,
   description,
   pathLabel,
+  showModuleNavigation = true,
+  withShell = true,
 }: ModuleRoutePageProps) {
-  return (
-    <main className="min-h-svh bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_48%,_#ffffff_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.22),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#111827_48%,_#020617_100%)] dark:text-slate-100">
-      <EntryTopNav current={current} />
+  const content = (
+    <div className={withShell ? "mx-auto flex min-h-svh w-full max-w-6xl flex-col px-3 pt-16 sm:px-4 sm:pt-16" : "flex min-h-full w-full flex-col"}>
+      {showModuleNavigation ? (
+        <div className="pb-4 pt-4">
+          <div className="rounded-2xl border border-white/60 bg-white/80 px-3 py-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Module navigation
+                </p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Open a module to see its submenus and nested items.
+                </p>
+              </div>
+              <div className="ml-auto">
+                <ModuleNavMenu current={current} variant="subnav" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-      <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-3 pt-16 sm:px-4 sm:pt-16">
         <section className="flex flex-1 items-center py-5 sm:py-6">
           <div className="w-full rounded-3xl border border-white/60 bg-white/80 p-8 shadow-[0_20px_80px_rgba(15,23,42,0.12)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_20px_80px_rgba(0,0,0,0.35)] sm:p-10">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
@@ -48,7 +70,17 @@ export function ModuleRoutePage({
             </div>
           </div>
         </section>
-      </div>
+    </div>
+  )
+
+  if (!withShell) {
+    return content
+  }
+
+  return (
+    <main className="min-h-svh bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_48%,_#ffffff_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.22),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#111827_48%,_#020617_100%)] dark:text-slate-100">
+      <EntryTopNav current={current} />
+      {content}
     </main>
   )
 }

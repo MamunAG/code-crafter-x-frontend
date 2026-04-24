@@ -36,6 +36,7 @@ import {
 
 type ModuleNavMenuProps = {
   current: ModuleNavigationItem["key"] | "home" | "account" | "profile" | "register" | "sign-in"
+  variant?: "header" | "subnav"
 }
 
 function renderLeafLink(
@@ -59,7 +60,32 @@ function renderLeafLink(
   )
 }
 
-export function ModuleNavMenu({ current }: ModuleNavMenuProps) {
+export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProps) {
+  if (variant === "header") {
+    return (
+      <nav className="hidden items-center gap-1 lg:flex" aria-label="Modules">
+        {MODULE_NAVIGATION.map((module) => {
+          const isActive = current === module.key
+
+          return (
+            <Link
+              key={module.key}
+              href={module.href}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                isActive
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
+              )}
+            >
+              {module.label}
+            </Link>
+          )
+        })}
+      </nav>
+    )
+  }
+
   return (
     <>
       <div className="hidden items-center lg:flex">

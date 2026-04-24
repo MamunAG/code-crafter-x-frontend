@@ -1,6 +1,6 @@
 import { ModuleRoutePage } from "@/components/module-route-page"
 
-function titleizeSlug(slug: string[]) {
+function titleizeSlug(slug: string[] = []) {
   return slug
     .map((segment) =>
       segment
@@ -11,18 +11,20 @@ function titleizeSlug(slug: string[]) {
     .join(" / ")
 }
 
-export default function Page({
+export default async function Page({
   params,
 }: {
-  params: { slug: string[] }
+  params: Promise<{ slug?: string[] }>
 }) {
-  const pathLabel = `/iam/${params.slug.join("/")}`
+  const resolvedParams = await params
+  const slug = resolvedParams.slug ?? []
+  const pathLabel = slug.length ? `/iam/${slug.join("/")}` : "/iam"
 
   return (
     <ModuleRoutePage
       current="iam"
       eyebrow="IAM"
-      title={titleizeSlug(params.slug)}
+      title={titleizeSlug(slug)}
       description="This nested IAM route is ready for identity, access control, and security management screens."
       pathLabel={pathLabel}
     />

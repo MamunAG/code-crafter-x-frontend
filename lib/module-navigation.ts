@@ -4,14 +4,14 @@ export type ModuleLeafItem = {
   description?: string
 }
 
+export type ModuleNavItem = ModuleLeafItem & {
+  children?: ModuleNavItem[]
+}
+
 export type ModuleGroup = {
   label: string
   description?: string
-  items: Array<
-    ModuleLeafItem & {
-      children?: ModuleLeafItem[]
-    }
-  >
+  items: ModuleNavItem[]
 }
 
 export type ModuleNavigationItem = {
@@ -153,15 +153,52 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Colors",
             href: "/merchandising/masters/colors",
             children: [
-              { label: "Palettes", href: "/merchandising/masters/colors/palettes" },
-              { label: "Swatches", href: "/merchandising/masters/colors/swatches" },
+              {
+                label: "Palettes",
+                href: "/merchandising/masters/colors/palettes",
+                children: [
+                  {
+                    label: "Warm palettes",
+                    href: "/merchandising/masters/colors/palettes/warm",
+                  },
+                  {
+                    label: "Cool palettes",
+                    href: "/merchandising/masters/colors/palettes/cool",
+                  },
+                ],
+              },
+              {
+                label: "Swatches",
+                href: "/merchandising/masters/colors/swatches",
+                children: [
+                  {
+                    label: "Fabric swatches",
+                    href: "/merchandising/masters/colors/swatches/fabric",
+                  },
+                  {
+                    label: "Print swatches",
+                    href: "/merchandising/masters/colors/swatches/print",
+                  },
+                ],
+              },
             ],
           },
           {
             label: "Sizes",
             href: "/merchandising/masters/sizes",
             children: [
-              { label: "Size charts", href: "/merchandising/masters/sizes/charts" },
+              {
+                label: "Size charts", href: "/merchandising/masters/sizes/charts", children: [
+                  {
+                    label: "Warm palettes",
+                    href: "/merchandising/masters/colors/palettes/warm",
+                  },
+                  {
+                    label: "Cool palettes",
+                    href: "/merchandising/masters/colors/palettes/cool",
+                  },
+                ],
+              },
               { label: "Grading", href: "/merchandising/masters/sizes/grading" },
             ],
           },

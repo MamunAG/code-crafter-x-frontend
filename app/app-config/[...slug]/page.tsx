@@ -1,6 +1,6 @@
 import { ModuleRoutePage } from "@/components/module-route-page"
 
-function titleizeSlug(slug: string[]) {
+function titleizeSlug(slug: string[] = []) {
   return slug
     .map((segment) =>
       segment
@@ -11,18 +11,20 @@ function titleizeSlug(slug: string[]) {
     .join(" / ")
 }
 
-export default function Page({
+export default async function Page({
   params,
 }: {
-  params: { slug: string[] }
+  params: Promise<{ slug?: string[] }>
 }) {
-  const pathLabel = `/app-config/${params.slug.join("/")}`
+  const resolvedParams = await params
+  const slug = resolvedParams.slug ?? []
+  const pathLabel = slug.length ? `/app-config/${slug.join("/")}` : "/app-config"
 
   return (
     <ModuleRoutePage
       current="app-config"
       eyebrow="App Confi"
-      title={titleizeSlug(params.slug)}
+      title={titleizeSlug(slug)}
       description="This nested module route is ready to host app configuration screens and settings workflows."
       pathLabel={pathLabel}
     />
