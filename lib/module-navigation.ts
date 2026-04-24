@@ -150,133 +150,91 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
         description: "Foundational product attributes.",
         items: [
           {
-            label: "Colors",
-            href: "/merchandising/masters/colors",
+            label: "Config",
+            href: "",
             children: [
               {
-                label: "Palettes",
-                href: "/merchandising/masters/colors/palettes",
-                children: [
-                  {
-                    label: "Warm palettes",
-                    href: "/merchandising/masters/colors/palettes/warm",
-                  },
-                  {
-                    label: "Cool palettes",
-                    href: "/merchandising/masters/colors/palettes/cool",
-                  },
-                ],
+                label: "Color",
+                href: "/merchandising/masters/colors",
               },
               {
-                label: "Swatches",
-                href: "/merchandising/masters/colors/swatches",
-                children: [
-                  {
-                    label: "Fabric swatches",
-                    href: "/merchandising/masters/colors/swatches/fabric",
-                  },
-                  {
-                    label: "Print swatches",
-                    href: "/merchandising/masters/colors/swatches/print",
-                  },
-                ],
+                label: "Sizes",
+                href: "/merchandising/masters/sizes",
               },
-            ],
-          },
-          {
-            label: "Sizes",
-            href: "/merchandising/masters/sizes",
-            children: [
               {
-                label: "Size charts", href: "/merchandising/masters/sizes/charts", children: [
-                  {
-                    label: "Warm palettes",
-                    href: "/merchandising/masters/colors/palettes/warm",
-                  },
-                  {
-                    label: "Cool palettes",
-                    href: "/merchandising/masters/colors/palettes/cool",
-                  },
-                ],
+                label: "Embellishments",
+                href: "/merchandising/masters/embellishments",
               },
-              { label: "Grading", href: "/merchandising/masters/sizes/grading" },
-            ],
-          },
-          {
-            label: "Embellishments",
-            href: "/merchandising/masters/embellishments",
-            children: [
-              { label: "Artwork", href: "/merchandising/masters/embellishments/artwork" },
-              { label: "Trims", href: "/merchandising/masters/embellishments/trims" },
             ],
           },
         ],
       },
-      {
-        label: "Sourcing",
-        description: "Buyers, styles, and costing.",
-        items: [
-          {
-            label: "Buyers",
-            href: "/merchandising/sourcing/buyers",
-            children: [
-              { label: "Contacts", href: "/merchandising/sourcing/buyers/contacts" },
-              { label: "Regions", href: "/merchandising/sourcing/buyers/regions" },
-            ],
-          },
-          {
-            label: "Styles",
-            href: "/merchandising/sourcing/styles",
-            children: [
-              { label: "Tech packs", href: "/merchandising/sourcing/styles/tech-packs" },
-              { label: "Samples", href: "/merchandising/sourcing/styles/samples" },
-            ],
-          },
-          {
-            label: "Cost sheets",
-            href: "/merchandising/sourcing/cost-sheets",
-            children: [
-              { label: "BOM", href: "/merchandising/sourcing/cost-sheets/bom" },
-              { label: "Pricing", href: "/merchandising/sourcing/cost-sheets/pricing" },
-            ],
-          },
-        ],
-      },
+
+      // {
+      //   label: "Sourcing",
+      //   description: "Buyers, styles, and costing.",
+      //   items: [
+      //     {
+      //       label: "Buyers",
+      //       href: "/merchandising/sourcing/buyers",
+      //       children: [
+      //         { label: "Contacts", href: "/merchandising/sourcing/buyers/contacts" },
+      //         { label: "Regions", href: "/merchandising/sourcing/buyers/regions" },
+      //       ],
+      //     },
+      //     {
+      //       label: "Styles",
+      //       href: "/merchandising/sourcing/styles",
+      //       children: [
+      //         { label: "Tech packs", href: "/merchandising/sourcing/styles/tech-packs" },
+      //         { label: "Samples", href: "/merchandising/sourcing/styles/samples" },
+      //       ],
+      //     },
+      //     {
+      //       label: "Cost sheets",
+      //       href: "/merchandising/sourcing/cost-sheets",
+      //       children: [
+      //         { label: "BOM", href: "/merchandising/sourcing/cost-sheets/bom" },
+      //         { label: "Pricing", href: "/merchandising/sourcing/cost-sheets/pricing" },
+      //       ],
+      //     },
+      //   ],
+      // },
       {
         label: "Production",
         description: "Orders, tracking, and execution.",
         items: [
-          {
-            label: "Seasons",
-            href: "/merchandising/production/seasons",
-            children: [
-              { label: "Planning", href: "/merchandising/production/seasons/planning" },
-              { label: "Closures", href: "/merchandising/production/seasons/closures" },
-            ],
-          },
+          //     {
+          //       label: "Seasons",
+          //       href: "/merchandising/production/seasons",
+          //       children: [
+          //         { label: "Planning", href: "/merchandising/production/seasons/planning" },
+          //         { label: "Closures", href: "/merchandising/production/seasons/closures" },
+          //       ],
+          //     },
           {
             label: "Orders",
-            href: "/merchandising/production/orders",
+            href: "/merchandising/production",
             children: [
               { label: "Work orders", href: "/merchandising/production/orders/work-orders" },
               { label: "Status", href: "/merchandising/production/orders/status" },
             ],
           },
-          {
-            label: "Dummy merchandising",
-            href: "/merchandising/production/dummy-merchandising",
-            description: "Temporary placeholder submenu for menu depth testing.",
-            children: [
-              {
-                label: "Dummy child A",
-                href: "/merchandising/production/dummy-merchandising/dummy-child-a",
-              },
-              {
-                label: "Dummy child B",
-                href: "/merchandising/production/dummy-merchandising/dummy-child-b",
-              },
-            ],
-          },
+          //     {
+          //       label: "Dummy merchandising",
+          //       href: "/merchandising/production/dummy-merchandising",
+          //       description: "Temporary placeholder submenu for menu depth testing.",
+          //       children: [
+          //         {
+          //           label: "Dummy child A",
+          //           href: "/merchandising/production/dummy-merchandising/dummy-child-a",
+          //         },
+          //         {
+          //           label: "Dummy child B",
+          //           href: "/merchandising/production/dummy-merchandising/dummy-child-b",
+          //         },
+          //       ],
+          //     },
         ],
       },
     ],

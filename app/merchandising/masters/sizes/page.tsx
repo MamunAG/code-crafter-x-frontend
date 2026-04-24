@@ -3,7 +3,7 @@ import { ModuleRoutePage } from "@/components/module-route-page"
 
 export default function Page() {
   return (
-    <AppContainer title="Colors">
+    <AppContainer title="Sizes">
       <ModuleRoutePage
         current="merchandising"
         eyebrow="Merchandising"

@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils"
 import { getModuleNavigation, type ModuleNavItem } from "@/lib/module-navigation"
 
 function isPathActive(pathname: string, href: string) {
+  if (!href) {
+    return false
+  }
+
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -23,6 +27,18 @@ function getItemDepthClass(depth: number) {
   if (depth === 0) return "text-sm"
   if (depth === 1) return "text-xs"
   return "text-[11px]"
+}
+
+function getNavItemStateClass(isActive: boolean, isExactActive: boolean) {
+  if (isExactActive) {
+    return "bg-slate-200 text-slate-950 font-medium hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/10"
+  }
+
+  if (isActive) {
+    return "bg-slate-100 text-slate-900 hover:bg-slate-100 dark:bg-white/[0.07] dark:text-slate-100 dark:hover:bg-white/[0.07]"
+  }
+
+  return "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
 }
 
 function getActiveParentHrefs(items: ModuleNavItem[], pathname: string): string[] {
@@ -56,8 +72,10 @@ function renderNavItem({
   depth: number
 }) {
   const itemActive = isPathActive(pathname, item.href)
+  const itemExactActive = pathname === item.href
   const isOpen = openItems.includes(item.href)
   const hasChildren = Boolean(item.children?.length)
+  const shouldHighlightItem = hasChildren ? itemExactActive : itemActive
 
   return (
     <div key={item.href} className="space-y-1">
@@ -74,9 +92,7 @@ function renderNavItem({
           className={cn(
             "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition",
             getItemDepthClass(depth),
-            itemActive
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-              : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white",
+            getNavItemStateClass(shouldHighlightItem, itemExactActive),
           )}
         >
           <span className="truncate">{collapsed ? item.label.charAt(0) : item.label}</span>
@@ -95,9 +111,7 @@ function renderNavItem({
           className={cn(
             "block rounded-lg px-3 py-2 transition",
             getItemDepthClass(depth),
-            itemActive
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-              : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white",
+            getNavItemStateClass(itemActive, itemExactActive),
           )}
         >
           <span>{collapsed ? item.label.charAt(0) : item.label}</span>
@@ -192,7 +206,7 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
 
       <aside
         className={cn(
-          "flex h-full w-full min-h-0 shrink-0 flex-col border-b border-slate-200 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 lg:border-b-0 lg:border-r",
+          "flex h-full w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 lg:rounded-r-lg",
           collapsed ? "lg:w-0 lg:overflow-hidden lg:pointer-events-none lg:border-r-0" : "lg:w-64",
         )}
       >
@@ -252,8 +266,8 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
         </div>
       </aside>
 
-      <section className="min-w-0 flex-1 py-4 sm:py-6 lg:py-0">
-        {children ?? <MerchandisingOverview />}
+      <section className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white/75 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_20px_80px_rgba(0,0,0,0.28)]">
+        {children}
       </section>
     </div>
   )
