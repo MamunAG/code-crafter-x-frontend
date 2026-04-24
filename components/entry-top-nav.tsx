@@ -60,6 +60,7 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
 
         {isAuthenticated ? (
           <div className="flex items-center gap-2">
+            <ModuleNavMenu current={current} />
             <Link
               href="/"
               className={cn(
@@ -71,7 +72,6 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
             >
               Home
             </Link>
-            <ModuleNavMenu current={current} />
             <Link
               href="/account"
               aria-label="Notifications"

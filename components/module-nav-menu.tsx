@@ -63,26 +63,127 @@ function renderLeafLink(
 export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProps) {
   if (variant === "header") {
     return (
-      <nav className="hidden items-center gap-1 lg:flex" aria-label="Modules">
-        {MODULE_NAVIGATION.map((module) => {
-          const isActive = current === module.key
+      <>
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Modules">
+          {MODULE_NAVIGATION.map((module) => {
+            const isActive = current === module.key
 
-          return (
-            <Link
-              key={module.key}
-              href={module.href}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium transition",
-                isActive
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
-              )}
-            >
-              {module.label}
-            </Link>
-          )
-        })}
-      </nav>
+            return (
+              <Link
+                key={module.key}
+                href={module.href}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                  isActive
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
+                )}
+              >
+                {module.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="lg:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                aria-label="Open modules"
+                title="Open modules"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+
+            <SheetContent side="left" className="w-[min(88vw,420px)] p-0">
+              <div className="flex h-full flex-col">
+                <SheetHeader className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+                  <SheetTitle className="text-base">Modules</SheetTitle>
+                </SheetHeader>
+
+                <ScrollArea className="flex-1">
+                  <div className="p-4">
+                    <Accordion type="single" collapsible className="border-none">
+                      {MODULE_NAVIGATION.map((module) => (
+                        <AccordionItem
+                          key={module.key}
+                          value={module.key}
+                          className="border-b border-slate-200 dark:border-white/10"
+                        >
+                          <AccordionTrigger
+                            className={cn(
+                              "rounded-xl px-3 py-2 text-sm font-medium text-slate-900 hover:no-underline dark:text-slate-100",
+                              current === module.key &&
+                                "bg-slate-100 dark:bg-white/10",
+                            )}
+                          >
+                            {module.label}
+                          </AccordionTrigger>
+                          <AccordionContent className="px-1 pb-4">
+                            <div className="space-y-3 pt-1">
+                              <Link
+                                href={module.href}
+                                className="block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
+                              >
+                                Open overview
+                              </Link>
+
+                              {module.groups.map((group) => (
+                                <div
+                                  key={group.label}
+                                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5"
+                                >
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                    {group.label}
+                                  </p>
+                                  <div className="mt-2 space-y-1">
+                                    {group.items.map((item) => (
+                                      <div
+                                        key={item.href}
+                                        className="rounded-xl bg-white/80 p-2 dark:bg-slate-950/60"
+                                      >
+                                        <Link
+                                          href={item.href}
+                                          className="block rounded-lg px-2 py-1 text-sm font-medium text-slate-900 transition hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10"
+                                        >
+                                          {item.label}
+                                        </Link>
+
+                                        {item.children?.length ? (
+                                          <div className="mt-2 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
+                                            {item.children.map((child) => (
+                                              <Link
+                                                key={child.href}
+                                                href={child.href}
+                                                className="block rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                                              >
+                                                {child.label}
+                                              </Link>
+                                            ))}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                </ScrollArea>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </>
     )
   }
 
