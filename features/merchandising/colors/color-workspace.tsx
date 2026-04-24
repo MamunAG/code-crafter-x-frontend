@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Loader2,
@@ -456,6 +456,63 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [recentAction, setRecentAction] = useState<PendingDeleteMode | null>(null)
   const [recentActionWorking, setRecentActionWorking] = useState(false)
 
+  const handleAuthFailure = useCallback((message: string) => {
+    if (!normalizeAuthFailure(message)) {
+      return false
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("access_token")
+      window.localStorage.removeItem("refresh_token")
+      window.localStorage.removeItem("auth_user")
+    }
+
+    router.replace("/sign-in")
+    return true
+  }, [router])
+
+  const openEditDialog = useCallback(async (colorId: number) => {
+    setEditorMode("edit")
+    setEditingId(colorId)
+    setEditorError("")
+    setEditorSubmitting(false)
+    setEditorLoading(true)
+    setEditorOpen(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const record = await fetchColor({
+        apiUrl,
+        accessToken: token,
+        id: colorId,
+      })
+
+      setEditorValues({
+        colorName: record.colorName ?? "",
+        colorDisplayName: record.colorDisplayName ?? "",
+        colorDescription: record.colorDescription ?? "",
+        isActive: record.isActive !== false,
+      })
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to load the color record right now."
+
+      if (!handleAuthFailure(message)) {
+        setEditorError(message)
+        toast.error(message)
+      }
+    } finally {
+      setEditorLoading(false)
+    }
+  }, [apiUrl, handleAuthFailure])
+
   const columns = useMemo<ColumnDef<ColorRecord>[]>(
     () => [
       {
@@ -685,21 +742,6 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     setRefreshVersion((current) => current + 1)
   }
 
-  function handleAuthFailure(message: string) {
-    if (!normalizeAuthFailure(message)) {
-      return false
-    }
-
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("access_token")
-      window.localStorage.removeItem("refresh_token")
-      window.localStorage.removeItem("auth_user")
-    }
-
-    router.replace("/sign-in")
-    return true
-  }
-
   function openCreateDialog() {
     setEditorMode("create")
     setEditingId(null)
@@ -708,48 +750,6 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
-  }
-
-  async function openEditDialog(colorId: number) {
-    setEditorMode("edit")
-    setEditingId(colorId)
-    setEditorError("")
-    setEditorSubmitting(false)
-    setEditorLoading(true)
-    setEditorOpen(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const record = await fetchColor({
-        apiUrl,
-        accessToken: token,
-        id: colorId,
-      })
-
-      setEditorValues({
-        colorName: record.colorName ?? "",
-        colorDisplayName: record.colorDisplayName ?? "",
-        colorDescription: record.colorDescription ?? "",
-        isActive: record.isActive !== false,
-      })
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to load the color record right now."
-
-      if (!handleAuthFailure(message)) {
-        setEditorError(message)
-        toast.error(message)
-      }
-    } finally {
-      setEditorLoading(false)
-    }
   }
 
   async function submitEditor() {
