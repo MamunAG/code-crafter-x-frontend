@@ -1,4 +1,3 @@
-import AppContainer from "@/components/app-container"
 import { ModuleRoutePage } from "@/components/module-route-page"
 
 function titleizeSlug(slug: string[] = []) {
@@ -22,16 +21,13 @@ export default async function Page({
   const pathLabel = slug.length ? `/merchandising/${slug.join("/")}` : "/merchandising"
 
   return (
-    <AppContainer title={titleizeSlug(slug)}>
-      <ModuleRoutePage
-        current="merchandising"
-        eyebrow="Merchandising"
-        title={titleizeSlug(slug)}
-        description="This nested merchandising route is ready for sourcing, master data, and production screens."
-        pathLabel={pathLabel}
-        showModuleNavigation={false}
-        withShell={false}
-      />
-    </AppContainer>
+    <ModuleRoutePage
+      current="merchandising"
+      eyebrow="Merchandising"
+      title={titleizeSlug(slug)}
+      description="This nested merchandising route is ready for sourcing, master data, and production screens."
+      pathLabel={pathLabel}
+      showModuleNavigation={false}
+    />
   )
 }

@@ -1,18 +1,14 @@
-import AppContainer from "@/components/app-container"
 import { ModuleRoutePage } from "@/components/module-route-page"
 
 export default function Page() {
   return (
-    <AppContainer title="Sizes">
-      <ModuleRoutePage
-        current="merchandising"
-        eyebrow="Merchandising"
-        title="Colors"
-        description="Dummy colors workspace for palettes, swatches, and other color master data."
-        pathLabel="/merchandising/masters/colors"
-        showModuleNavigation={false}
-        withShell={false}
-      />
-    </AppContainer>
+    <ModuleRoutePage
+      current="merchandising"
+      eyebrow="Merchandising"
+      title="Sizes"
+      description="Dummy colors workspace for palettes, swatches, and other color master data."
+      pathLabel="/merchandising/masters/sizes"
+      showModuleNavigation={false}
+    />
   )
 }
