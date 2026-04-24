@@ -12,6 +12,13 @@ type LoginFormProps = {
   apiUrl: string
 }
 
+const AUTH_COOKIE_NAME = "auth_session"
+const AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
+
+function setAuthCookie() {
+  document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${AUTH_COOKIE_MAX_AGE_SECONDS}; samesite=lax`
+}
+
 export function LoginForm({ apiUrl }: LoginFormProps) {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -46,13 +53,17 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
         if (payload.data?.user) {
           window.localStorage.setItem("auth_user", JSON.stringify(payload.data.user))
         }
+
+        if (accessToken || refreshToken) {
+          setAuthCookie()
+        }
       }
 
       setLoggedInUser(payload.data?.user ?? null)
       setMessage(payload.message || "Login successful")
       setPassword("")
       shouldRedirect = true
-      router.push("/home")
+      router.push("/")
     } catch (error) {
       const fallback = "Login failed. Please check your credentials."
       setError(error instanceof Error ? error.message : fallback)
