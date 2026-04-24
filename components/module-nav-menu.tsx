@@ -6,12 +6,6 @@ import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import {
   NavigationMenu,
   NavigationMenuContent,
   NavigationMenuItem,
@@ -100,7 +94,10 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
               </Button>
             </SheetTrigger>
 
-            <SheetContent side="left" className="w-[min(88vw,420px)] p-0">
+            <SheetContent
+              side="left"
+              className="w-[min(88vw,420px)] border-r border-slate-200 bg-white/90 p-0 text-slate-900 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/85 dark:text-slate-100"
+            >
               <div className="flex h-full flex-col">
                 <SheetHeader className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
                   <SheetTitle className="text-base">Modules</SheetTitle>
@@ -108,75 +105,26 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
 
                 <ScrollArea className="flex-1">
                   <div className="p-4">
-                    <Accordion type="single" collapsible className="border-none">
-                      {MODULE_NAVIGATION.map((module) => (
-                        <AccordionItem
-                          key={module.key}
-                          value={module.key}
-                          className="border-b border-slate-200 dark:border-white/10"
-                        >
-                          <AccordionTrigger
+                    <div className="space-y-2">
+                      {MODULE_NAVIGATION.map((module) => {
+                        const isActive = current === module.key
+
+                        return (
+                          <Link
+                            key={module.key}
+                            href={module.href}
                             className={cn(
-                              "rounded-xl px-3 py-2 text-sm font-medium text-slate-900 hover:no-underline dark:text-slate-100",
-                              current === module.key &&
-                                "bg-slate-100 dark:bg-white/10",
+                              "block rounded-xl border px-3 py-3 text-sm font-medium transition",
+                              isActive
+                                ? "border-slate-900 bg-slate-100 text-slate-950 dark:border-white dark:bg-white/10 dark:text-white"
+                                : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10",
                             )}
                           >
                             {module.label}
-                          </AccordionTrigger>
-                          <AccordionContent className="px-1 pb-4">
-                            <div className="space-y-3 pt-1">
-                              <Link
-                                href={module.href}
-                                className="block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
-                              >
-                                Open overview
-                              </Link>
-
-                              {module.groups.map((group) => (
-                                <div
-                                  key={group.label}
-                                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5"
-                                >
-                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                                    {group.label}
-                                  </p>
-                                  <div className="mt-2 space-y-1">
-                                    {group.items.map((item) => (
-                                      <div
-                                        key={item.href}
-                                        className="rounded-xl bg-white/80 p-2 dark:bg-slate-950/60"
-                                      >
-                                        <Link
-                                          href={item.href}
-                                          className="block rounded-lg px-2 py-1 text-sm font-medium text-slate-900 transition hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10"
-                                        >
-                                          {item.label}
-                                        </Link>
-
-                                        {item.children?.length ? (
-                                          <div className="mt-2 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
-                                            {item.children.map((child) => (
-                                              <Link
-                                                key={child.href}
-                                                href={child.href}
-                                                className="block rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                                              >
-                                                {child.label}
-                                              </Link>
-                                            ))}
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                          </Link>
+                        )
+                      })}
+                    </div>
                   </div>
                 </ScrollArea>
               </div>
@@ -318,65 +266,26 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
 
               <ScrollArea className="flex-1">
                 <div className="p-4">
-                  <Accordion type="single" collapsible className="border-none">
-                    {MODULE_NAVIGATION.map((module) => (
-                      <AccordionItem key={module.key} value={module.key} className="border-b border-slate-200 dark:border-white/10">
-                        <AccordionTrigger className={cn(
-                          "rounded-xl px-3 py-2 text-sm font-medium text-slate-900 hover:no-underline dark:text-slate-100",
-                          current === module.key && "bg-slate-100 dark:bg-white/10",
-                        )}>
+                  <div className="space-y-2">
+                    {MODULE_NAVIGATION.map((module) => {
+                      const isActive = current === module.key
+
+                      return (
+                        <Link
+                          key={module.key}
+                          href={module.href}
+                          className={cn(
+                            "block rounded-xl border px-3 py-3 text-sm font-medium transition",
+                            isActive
+                              ? "border-slate-900 bg-slate-100 text-slate-950 dark:border-white dark:bg-white/10 dark:text-white"
+                              : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10",
+                          )}
+                        >
                           {module.label}
-                        </AccordionTrigger>
-                        <AccordionContent className="px-1 pb-4">
-                          <div className="space-y-3 pt-1">
-                            <Link
-                              href={module.href}
-                              className="block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
-                            >
-                              Open overview
-                            </Link>
-
-                            {module.groups.map((group) => (
-                              <div
-                                key={group.label}
-                                className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5"
-                              >
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                                  {group.label}
-                                </p>
-                                <div className="mt-2 space-y-1">
-                                  {group.items.map((item) => (
-                                    <div key={item.href} className="rounded-xl bg-white/80 p-2 dark:bg-slate-950/60">
-                                      <Link
-                                        href={item.href}
-                                        className="block rounded-lg px-2 py-1 text-sm font-medium text-slate-900 transition hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10"
-                                      >
-                                        {item.label}
-                                      </Link>
-
-                                      {item.children?.length ? (
-                                        <div className="mt-2 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
-                                          {item.children.map((child) => (
-                                            <Link
-                                              key={child.href}
-                                              href={child.href}
-                                              className="block rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                                            >
-                                              {child.label}
-                                            </Link>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
               </ScrollArea>
             </div>
