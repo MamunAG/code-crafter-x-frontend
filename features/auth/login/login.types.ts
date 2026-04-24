@@ -7,6 +7,7 @@ export type LoginResponse = {
     user?: {
       id?: string
       email?: string
+      recovery_email?: string | null
       name?: string
       user_name?: string
       display_name?: string
@@ -31,6 +32,7 @@ export type LoginResponse = {
 export type LoggedInUser = {
   id?: string
   email?: string
+  recovery_email?: string | null
   name?: string
   user_name?: string
   display_name?: string

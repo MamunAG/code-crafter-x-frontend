@@ -29,6 +29,11 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
   const [error, setError] = useState("")
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null)
 
+  function isEmailVerificationRequired(message: string) {
+    const normalized = message.toLowerCase()
+    return normalized.includes("verify your email")
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
@@ -81,7 +86,15 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
       router.push("/")
     } catch (error) {
       const fallback = "Login failed. Please check your credentials."
-      setError(error instanceof Error ? error.message : fallback)
+      const errorMessage = error instanceof Error ? error.message : fallback
+
+      if (isEmailVerificationRequired(errorMessage)) {
+        router.push(`/confirm-email?email=${encodeURIComponent(email.trim())}`)
+        shouldRedirect = true
+        return
+      }
+
+      setError(errorMessage)
     } finally {
       if (!shouldRedirect) {
         setLoading(false)
@@ -137,6 +150,14 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
               required
               minLength={6}
             />
+            <div className="flex justify-end pt-1">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-slate-600 underline underline-offset-4 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </label>
         </div>
 

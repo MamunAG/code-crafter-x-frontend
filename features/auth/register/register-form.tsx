@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { DEFAULT_GENDER_OPTIONS } from "./register.constants"
@@ -25,6 +26,7 @@ const initialValues: RegisterFormValues = {
 }
 
 export function RegisterForm({ apiUrl }: RegisterFormProps) {
+  const router = useRouter()
   const [values, setValues] = useState<RegisterFormValues>(initialValues)
   const [loading, setLoading] = useState(false)
   const [genderLoading, setGenderLoading] = useState(true)
@@ -49,15 +51,20 @@ export function RegisterForm({ apiUrl }: RegisterFormProps) {
     setLoading(true)
     setError("")
     setMessage("")
+    let shouldRedirect = false
 
     try {
       const payload = await registerUser({ apiUrl, values })
       setMessage(payload.message || "Registration successful")
       setValues(initialValues)
+      router.push(`/confirm-email?email=${encodeURIComponent(values.email)}`)
+      shouldRedirect = true
     } catch (error) {
       setError(error instanceof Error ? error.message : "Registration failed")
     } finally {
-      setLoading(false)
+      if (!shouldRedirect) {
+        setLoading(false)
+      }
     }
   }
 

@@ -46,6 +46,7 @@ export type BackendProfileUser = {
   display_name?: string
   user_name?: string
   email?: string
+  recovery_email?: string | null
   phone_no?: string
   date_of_birth?: string
   gender?: string
