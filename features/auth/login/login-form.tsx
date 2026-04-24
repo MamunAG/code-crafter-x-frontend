@@ -5,18 +5,19 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import {
+  clearAuthUserAvatarCookie,
+  getAuthUserImageUrl,
+  getAuthUserLabel,
+  serializeAuthSessionCookie,
+  serializeAuthUserAvatarCookie,
+  serializeAuthUserLabelCookie,
+} from "@/lib/auth-session"
 import { loginUser } from "./login.service"
 import type { LoggedInUser } from "./login.types"
 
 type LoginFormProps = {
   apiUrl: string
-}
-
-const AUTH_COOKIE_NAME = "auth_session"
-const AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
-
-function setAuthCookie() {
-  document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${AUTH_COOKIE_MAX_AGE_SECONDS}; samesite=lax`
 }
 
 export function LoginForm({ apiUrl }: LoginFormProps) {
@@ -55,7 +56,21 @@ export function LoginForm({ apiUrl }: LoginFormProps) {
         }
 
         if (accessToken || refreshToken) {
-          setAuthCookie()
+          document.cookie = serializeAuthSessionCookie()
+        }
+
+        const user = payload.data?.user ?? { email }
+        const userLabel = getAuthUserLabel(user)
+        const userImageUrl = getAuthUserImageUrl(user)
+
+        if (userLabel) {
+          document.cookie = serializeAuthUserLabelCookie(userLabel)
+        }
+
+        if (userImageUrl) {
+          document.cookie = serializeAuthUserAvatarCookie(userImageUrl)
+        } else {
+          document.cookie = clearAuthUserAvatarCookie()
         }
       }
 

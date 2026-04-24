@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const AUTH_COOKIE_NAME = "auth_session"
+import { AUTH_COOKIE_NAME } from "@/lib/auth-session"
 
 export function middleware(request: NextRequest) {
   const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value
@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl)
   }
 
-  if (pathname === "/") {
+  if (pathname === "/" || pathname === "/account" || pathname === "/profile") {
     if (!authCookie) {
       const signInUrl = new URL("/sign-in", request.url)
       return NextResponse.redirect(signInUrl)
@@ -27,5 +27,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/sign-in"],
+  matcher: ["/", "/account", "/profile", "/login", "/sign-in"],
 }

@@ -3,10 +3,18 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
+import {
+  clearAuthUserAvatarCookie,
+  getAuthUserImageUrl,
+  getAuthUserLabel,
+  parseStoredAuthUser,
+  serializeAuthSessionCookie,
+  serializeAuthUserAvatarCookie,
+  serializeAuthUserLabelCookie,
+} from "@/lib/auth-session"
+
 import { LoginForm } from "./login-form"
 import { LoginHero } from "./login-hero"
-
-const AUTH_COOKIE_NAME = "auth_session"
 
 function hasStoredAuth() {
   if (typeof window === "undefined") {
@@ -19,10 +27,6 @@ function hasStoredAuth() {
   return Boolean(accessToken || refreshToken)
 }
 
-function setAuthCookie() {
-  document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
-}
-
 export function LoginPage() {
   const router = useRouter()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
@@ -32,7 +36,17 @@ export function LoginPage() {
       return
     }
 
-    setAuthCookie()
+    const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+    const userLabel = getAuthUserLabel(storedUser)
+    const userImageUrl = getAuthUserImageUrl(storedUser)
+
+    document.cookie = serializeAuthSessionCookie()
+    document.cookie = serializeAuthUserLabelCookie(userLabel)
+    if (userImageUrl) {
+      document.cookie = serializeAuthUserAvatarCookie(userImageUrl)
+    } else {
+      document.cookie = clearAuthUserAvatarCookie()
+    }
     router.replace("/")
   }, [router])
 
