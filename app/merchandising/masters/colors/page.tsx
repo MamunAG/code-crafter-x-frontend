@@ -1,18 +1,9 @@
-import AppContainer from "@/components/app-container"
-import { ModuleRoutePage } from "@/components/module-route-page"
+import { ColorWorkspace } from "@/features/merchandising/colors/color-workspace"
 
 export default function Page() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+
   return (
-    <AppContainer title="Colors">
-      <ModuleRoutePage
-        current="merchandising"
-        eyebrow="Merchandising"
-        title="Colors"
-        description="Dummy colors workspace for palettes, swatches, and other color master data."
-        pathLabel="/merchandising/masters/colors"
-        showModuleNavigation={false}
-        withShell={false}
-      />
-    </AppContainer>
+    <ColorWorkspace apiUrl={apiUrl} />
   )
 }
