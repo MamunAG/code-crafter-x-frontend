@@ -13,7 +13,13 @@ import {
   Undo2,
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  type ColumnDef,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
 
+import { AppDataTable } from "@/components/app-data-table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -44,14 +50,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 
 import {
   createColor,
@@ -438,7 +436,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [colors, setColors] = useState<ColorRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
-  const [limit] = useState(10)
+  const [limit, setLimit] = useState(10)
 
   const [draftFilters, setDraftFilters] = useState<ColorFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<ColorFilterValues>(DEFAULT_FILTERS)
@@ -457,6 +455,139 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [recentlyDeletedColor, setRecentlyDeletedColor] = useState<ColorRecord | null>(null)
   const [recentAction, setRecentAction] = useState<PendingDeleteMode | null>(null)
   const [recentActionWorking, setRecentActionWorking] = useState(false)
+
+  const columns = useMemo<ColumnDef<ColorRecord>[]>(
+    () => [
+      {
+        id: "color",
+        header: "Color",
+        cell: ({ row }) => {
+          const color = row.original
+          const swatch = buildColorSwatch(color.colorName)
+
+          return (
+            <div className="pl-4">
+              <div className="flex items-center gap-3">
+                <span
+                  className="size-8 shrink-0 rounded-full ring-1 ring-slate-900/10 dark:ring-white/10"
+                  style={{ backgroundColor: swatch }}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">
+                    {color.colorName}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    ID #{color.id}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        id: "displayName",
+        header: "Display name",
+        cell: ({ row }) => (
+          <span className="text-xs text-slate-700 dark:text-slate-200">
+            {row.original.colorDisplayName || "Not set"}
+          </span>
+        ),
+      },
+      {
+        id: "description",
+        header: "Description",
+        cell: ({ row }) => (
+          <p className="line-clamp-2 max-w-[22rem] whitespace-normal text-xs leading-5 text-slate-600 dark:text-slate-300">
+            {row.original.colorDescription || "No description provided."}
+          </p>
+        ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const color = row.original
+          const statusTone = colorBadgeTone(color)
+          const statusLabel = color.deleted_at
+            ? "Deleted"
+            : color.isActive === false
+              ? "Inactive"
+              : "Active"
+
+          return (
+            <Badge variant={statusTone} className="rounded-full px-3 py-1">
+              {statusLabel}
+            </Badge>
+          )
+        },
+      },
+      {
+        id: "updated",
+        header: "Updated",
+        cell: ({ row }) => {
+          const color = row.original
+
+          return (
+            <div className="space-y-1">
+              <p className="text-xs text-slate-700 dark:text-slate-200">
+                {formatDate(color.updated_at || color.created_at)}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {color.updated_by_id
+                  ? `Updated by ${color.updated_by_id}`
+                  : "No editor metadata"}
+              </p>
+            </div>
+          )
+        },
+      },
+      {
+        id: "actions",
+        header: () => <span className="pr-4">Actions</span>,
+        cell: ({ row }) => {
+          const color = row.original
+
+          return (
+            <div className="pr-4 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                    <span className="sr-only">Open actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => openEditDialog(color.id)}>
+                    Edit color
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setDeleteTarget(color)}
+                  >
+                    Delete color
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+    ],
+    [openEditDialog],
+  )
+
+  const table = useReactTable({
+    data: colors,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -906,20 +1037,21 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="p-4 sm:p-6">
               <form
-                className="grid gap-4 lg:grid-cols-12"
                 onSubmit={(event) => {
                   event.preventDefault()
                   setActiveFilters(draftFilters)
                   setPage(1)
                 }}
+                className="flex flex-wrap gap-3"
               >
-                <div className="space-y-1.5 lg:col-span-3">
-                  <label htmlFor="filterColorName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-[12rem] flex-1 space-y-1">
+                  <label htmlFor="filterColorName" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
                     Color name
                   </label>
                   <Input
                     id="filterColorName"
                     value={draftFilters.colorName}
+                    className="h-7 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -929,13 +1061,14 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Blue"
                   />
                 </div>
-                <div className="space-y-1.5 lg:col-span-3">
-                  <label htmlFor="filterColorDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-[12rem] flex-1 space-y-1">
+                  <label htmlFor="filterColorDisplayName" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
                     Display name
                   </label>
                   <Input
                     id="filterColorDisplayName"
                     value={draftFilters.colorDisplayName}
+                    className="h-7 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -945,13 +1078,14 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Ocean Blue"
                   />
                 </div>
-                <div className="space-y-1.5 lg:col-span-4">
-                  <label htmlFor="filterColorDescription" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                <div className="min-w-[16rem] flex-[1.4] space-y-1">
+                  <label htmlFor="filterColorDescription" className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
                     Description
                   </label>
                   <Input
                     id="filterColorDescription"
                     value={draftFilters.colorDescription}
+                    className="h-7 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -961,15 +1095,15 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Deep blue shade used for denim."
                   />
                 </div>
-                <div className="flex items-end gap-2 lg:col-span-2">
-                  <Button type="submit" className="w-full rounded-xl">
+                <div className="flex min-w-[10rem] items-end justify-end gap-2">
+                  <Button type="submit" className="w-24 rounded-xl">
                     <Search className="size-3.5" />
                     Search
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full rounded-xl"
+                    className="w-24 rounded-xl"
                     onClick={() => {
                       setDraftFilters(DEFAULT_FILTERS)
                       setActiveFilters(DEFAULT_FILTERS)
@@ -996,16 +1130,20 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {loadingColors ? (
-                <div className="space-y-3 p-4 sm:p-6">
-                  <Skeleton className="h-10 rounded-xl" />
-                  <Skeleton className="h-10 rounded-xl" />
-                  <Skeleton className="h-10 rounded-xl" />
-                  <Skeleton className="h-10 rounded-xl" />
-                  <Skeleton className="h-10 rounded-xl" />
-                </div>
-              ) : colors.length === 0 ? (
-                <div className="p-4 sm:p-6">
+              <AppDataTable
+                table={table}
+                pageSummary={pageSummary}
+                page={page}
+                totalPages={meta?.totalPages ?? 1}
+                pageSize={limit}
+                isLoading={loadingColors}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={(nextPage) => setPage(nextPage)}
+                onPageSizeChange={(nextPageSize) => {
+                  setLimit(nextPageSize)
+                  setPage(1)
+                }}
+                emptyState={
                   <EmptyState
                     title="No colors found"
                     description={
@@ -1024,134 +1162,9 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                         : openCreateDialog
                     }
                   />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">Color</TableHead>
-                      <TableHead>Display name</TableHead>
-                      <TableHead className="max-w-[22rem]">Description</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead className="pr-4 text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {colors.map((color) => {
-                      const swatch = buildColorSwatch(color.colorName)
-                      const statusTone = colorBadgeTone(color)
-                      const statusLabel =
-                        color.deleted_at
-                          ? "Deleted"
-                          : color.isActive === false
-                            ? "Inactive"
-                            : "Active"
-
-                      return (
-                        <TableRow key={color.id}>
-                          <TableCell className="pl-4">
-                            <div className="flex items-center gap-3">
-                              <span
-                                className="size-8 shrink-0 rounded-full ring-1 ring-slate-900/10 dark:ring-white/10"
-                                style={{ backgroundColor: swatch }}
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">
-                                  {color.colorName}
-                                </p>
-                                <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                                  ID #{color.id}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-slate-700 dark:text-slate-200">
-                              {color.colorDisplayName || "Not set"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="max-w-[22rem] whitespace-normal">
-                            <p className="line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                              {color.colorDescription || "No description provided."}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={statusTone} className="rounded-full px-3 py-1">
-                              {statusLabel}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <p className="text-xs text-slate-700 dark:text-slate-200">
-                                {formatDate(color.updated_at || color.created_at)}
-                              </p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                {color.updated_by_id ? `Updated by ${color.updated_by_id}` : "No editor metadata"}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="pr-4 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="rounded-full"
-                                >
-                                  <MoreHorizontal className="size-3.5" />
-                                  <span className="sr-only">Open actions</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuItem onSelect={() => openEditDialog(color.id)}>
-                                  Edit color
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={() => setDeleteTarget(color)}
-                                >
-                                  Delete color
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              )}
+                }
+              />
             </CardContent>
-            <div className="flex flex-col gap-3 border-t border-slate-200/70 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {pageSummary}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={loadingColors || !meta?.hasPreviousPage}
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={() => setPage((current) => current + 1)}
-                  disabled={loadingColors || !meta?.hasNextPage}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
           </Card>
         </div>
       </ScrollArea>
