@@ -12,6 +12,13 @@ import {
 
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { getModuleNavigation, type ModuleNavItem } from "@/lib/module-navigation"
 
@@ -63,6 +70,7 @@ function renderNavItem({
   setOpenItems,
   collapsed,
   depth,
+  onNavigate,
 }: {
   item: ModuleNavItem
   pathname: string
@@ -70,6 +78,7 @@ function renderNavItem({
   setOpenItems: Dispatch<SetStateAction<string[]>>
   collapsed: boolean
   depth: number
+  onNavigate?: () => void
 }) {
   const itemActive = isPathActive(pathname, item.href)
   const itemExactActive = pathname === item.href
@@ -108,6 +117,7 @@ function renderNavItem({
       ) : (
         <Link
           href={item.href}
+          onClick={onNavigate}
           className={cn(
             "block rounded-lg px-3 py-2 transition",
             getItemDepthClass(depth),
@@ -129,6 +139,7 @@ function renderNavItem({
                 setOpenItems,
                 collapsed,
                 depth: depth + 1,
+                onNavigate,
               }),
             )}
           </div>
@@ -138,36 +149,12 @@ function renderNavItem({
   )
 }
 
-function MerchandisingOverview() {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white/75 p-8 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:p-10">
-      <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-        Merchandising
-      </p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-        Merchandising workspace
-      </h1>
-      <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
-        This module now uses a simple left sidebar with grouped submenu links and nested child items.
-      </p>
-
-      <div className="mt-8">
-        <Link
-          href="/account"
-          className="inline-flex h-11 items-center rounded-lg bg-slate-900 px-6 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-        >
-          Go to account
-        </Link>
-      </div>
-    </div>
-  )
-}
-
 export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
   const pathname = usePathname()
   const app_module = getModuleNavigation("merchandising")
   const [openItems, setOpenItems] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpenPathname, setMobileOpenPathname] = useState<string | null>(null)
 
   const groups = useMemo(() => app_module?.groups ?? [], [app_module])
   const activeOpenItems = useMemo(
@@ -177,7 +164,7 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
           ...openItems,
           ...groups.flatMap((group) => getActiveParentHrefs(group.items, pathname)),
         ]),
-      ),
+    ),
     [groups, openItems, pathname],
   )
 
@@ -185,13 +172,97 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
     return null
   }
 
+  const sidebarContent = (mobile = false) => {
+    const isCompact = collapsed && !mobile
+
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-4 dark:border-white/10">
+        {!isCompact ? (
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {app_module.label}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {app_module.description}
+            </p>
+          </div>
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
+            M
+          </div>
+        )}
+
+        {!mobile ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
+            aria-label="Minimize sidebar"
+            title="Minimize sidebar"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+
+      <ScrollArea className="flex-1 min-h-0">
+        <div className={cn("px-2 py-3", collapsed && !mobile && "lg:px-1")}>
+          {groups.map((group) => (
+            <section key={group.label} className="mb-4">
+              {!collapsed || mobile ? (
+                <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  {group.label}
+                </p>
+              ) : null}
+              <div className="space-y-1">
+                {group.items.map((item) =>
+                  renderNavItem({
+                    item,
+                    pathname,
+                    openItems: activeOpenItems,
+                    setOpenItems,
+                    collapsed: isCompact,
+                    depth: 0,
+                    onNavigate: mobile ? () => setMobileOpenPathname(null) : undefined,
+                  }),
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </ScrollArea>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        "relative flex h-full w-full min-h-0 flex-col px-3 py-4 sm:px-4 sm:py-6 lg:flex-row",
+        "relative flex h-full w-full min-h-0 flex-1 flex-col px-3 py-4 sm:px-4 sm:py-6 lg:flex-row",
         collapsed ? "lg:gap-0" : "lg:gap-4",
       )}
     >
+      <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            {app_module.label}
+          </p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {app_module.description}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileOpenPathname(pathname)}
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:bg-slate-900 dark:hover:text-white"
+          aria-label="Open merchandising navigation"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+          Menu
+        </button>
+      </div>
+
       {collapsed ? (
         <button
           type="button"
@@ -206,67 +277,30 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
 
       <aside
         className={cn(
-          "flex h-full w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 lg:rounded-r-lg",
+          "hidden h-full w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 lg:flex lg:rounded-r-lg",
           collapsed ? "lg:w-0 lg:overflow-hidden lg:pointer-events-none lg:border-r-0" : "lg:w-64",
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-4 dark:border-white/10">
-            {!collapsed ? (
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  {app_module.label}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {app_module.description}
-                </p>
-              </div>
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
-                M
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setCollapsed((value) => !value)}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
-              aria-label="Minimize sidebar"
-              title="Minimize sidebar"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
-          </div>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <div className={cn("px-2 py-3", collapsed && "lg:px-1")}>
-              {groups.map((group) => (
-                <section key={group.label} className="mb-4">
-                  {!collapsed ? (
-                    <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      {group.label}
-                    </p>
-                  ) : null}
-                  <div className="space-y-1">
-                    {group.items.map((item) =>
-                      renderNavItem({
-                        item,
-                        pathname,
-                        openItems: activeOpenItems,
-                        setOpenItems,
-                        collapsed,
-                        depth: 0,
-                      }),
-                    )}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
+        {sidebarContent(false)}
       </aside>
 
-      <section className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white/75 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_20px_80px_rgba(0,0,0,0.28)]">
+      <Sheet
+        open={mobileOpenPathname === pathname}
+        onOpenChange={(open) => setMobileOpenPathname(open ? pathname : null)}
+      >
+        <SheetContent
+          side="left"
+          className="w-[18rem] border-r border-slate-200 bg-white p-0 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{app_module.label}</SheetTitle>
+            <SheetDescription>{app_module.description}</SheetDescription>
+          </SheetHeader>
+          {sidebarContent(true)}
+        </SheetContent>
+      </Sheet>
+
+      <section className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border border-slate-200 bg-white/75 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_20px_80px_rgba(0,0,0,0.28)]">
         {children}
       </section>
     </div>
