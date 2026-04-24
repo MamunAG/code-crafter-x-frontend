@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Loader2,
   MoreHorizontal,
   Paintbrush,
@@ -942,13 +946,13 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
           <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
-            <CardContent className="p-6 sm:p-8 sm:py-2">
+            <CardContent className="p-4 sm:p-8 sm:py-2">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     Merchandising master data
                   </p>
-                  <h1 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
                     Colors
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -970,7 +974,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
                     <RefreshCcw className="size-3.5" />
                     Refresh
@@ -1035,23 +1039,23 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-2 sm:p-0 sm:px-2">
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  setActiveFilters(draftFilters)
-                  setPage(1)
-                }}
-                className="flex flex-wrap gap-2.5"
-              >
-                <div className="min-w-44 flex-1 space-y-1">
+              <CardContent className="p-3 sm:p-0 sm:px-2">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    setActiveFilters(draftFilters)
+                    setPage(1)
+                  }}
+                  className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                >
+                <div className="min-w-0 space-y-1">
                   <label htmlFor="filterColorName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Color name
                   </label>
                   <Input
                     id="filterColorName"
                     value={draftFilters.colorName}
-                    className="h-7 rounded-md px-2 text-xs"
+                    className="h-9 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -1061,14 +1065,14 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Blue"
                   />
                 </div>
-                <div className="min-w-44 flex-1 space-y-1">
+                <div className="min-w-0 space-y-1">
                   <label htmlFor="filterColorDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Display name
                   </label>
                   <Input
                     id="filterColorDisplayName"
                     value={draftFilters.colorDisplayName}
-                    className="h-7 rounded-md px-2 text-xs"
+                    className="h-9 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -1078,14 +1082,14 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Ocean Blue"
                   />
                 </div>
-                <div className="min-w-56 flex-[1.3] space-y-1">
+                <div className="min-w-0 space-y-1">
                   <label htmlFor="filterColorDescription" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Description
                   </label>
                   <Input
                     id="filterColorDescription"
                     value={draftFilters.colorDescription}
-                    className="h-7 rounded-md px-2 text-xs"
+                    className="h-9 rounded-md px-2 text-xs"
                     onChange={(event) =>
                       setDraftFilters({
                         ...draftFilters,
@@ -1095,15 +1099,15 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     placeholder="Deep blue shade used for denim."
                   />
                 </div>
-                <div className="flex min-w-38 items-end justify-end gap-2">
-                  <Button type="submit" className="w-24 rounded-xl">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-1">
+                  <Button type="submit" className="w-full rounded-xl sm:w-auto">
                     <Search className="size-3.5" />
                     Search
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-24 rounded-xl"
+                    className="w-full rounded-xl sm:w-auto"
                     onClick={() => {
                       setDraftFilters(DEFAULT_FILTERS)
                       setActiveFilters(DEFAULT_FILTERS)
@@ -1130,40 +1134,209 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <AppDataTable
-                table={table}
-                pageSummary={pageSummary}
-                page={page}
-                totalPages={meta?.totalPages ?? 1}
-                pageSize={limit}
-                isLoading={loadingColors}
-                pageSizeOptions={[10, 25, 50, 100]}
-                onPageChange={(nextPage) => setPage(nextPage)}
-                onPageSizeChange={(nextPageSize) => {
-                  setLimit(nextPageSize)
-                  setPage(1)
-                }}
-                emptyState={
-                  <EmptyState
-                    title="No colors found"
-                    description={
-                      [activeFilters.colorName, activeFilters.colorDisplayName, activeFilters.colorDescription].some((value) => value.trim())
-                        ? "Try clearing or relaxing the current filters."
-                        : "Create the first merchandising color to get started."
-                    }
-                    actionLabel={activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription ? "Reset filters" : "New color"}
-                    onAction={
-                      activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription
-                        ? () => {
-                          setDraftFilters(DEFAULT_FILTERS)
-                          setActiveFilters(DEFAULT_FILTERS)
-                          setPage(1)
-                        }
-                        : openCreateDialog
-                    }
-                  />
-                }
-              />
+              <div className="lg:hidden">
+                {loadingColors ? (
+                  <div className="space-y-3 p-4">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <Skeleton key={index} className="h-28 rounded-2xl" />
+                    ))}
+                  </div>
+                ) : colors.length > 0 ? (
+                  <div className="space-y-3 p-4">
+                    {colors.map((color) => {
+                      const statusTone = colorBadgeTone(color)
+                      const statusLabel = color.deleted_at
+                        ? "Deleted"
+                        : color.isActive === false
+                          ? "Inactive"
+                          : "Active"
+
+                      return (
+                        <article key={color.id} className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="size-9 shrink-0 rounded-full ring-1 ring-slate-900/10 dark:ring-white/10"
+                                  style={{ backgroundColor: buildColorSwatch(color.colorName) }}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">
+                                    {getColorLabel(color)}
+                                  </p>
+                                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                    {color.colorName}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="rounded-full"
+                                >
+                                  <MoreHorizontal className="size-3.5" />
+                                  <span className="sr-only">Open actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem onSelect={() => openEditDialog(color.id)}>
+                                  Edit color
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => setDeleteTarget(color)}
+                                >
+                                  Delete color
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge variant={statusTone} className="rounded-full px-3 py-1">
+                              {statusLabel}
+                            </Badge>
+                            {color.deleted_at ? (
+                              <Badge variant="outline" className="rounded-full px-3 py-1">
+                                Deleted record
+                              </Badge>
+                            ) : null}
+                          </div>
+
+                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                            {color.colorDescription || "No description provided."}
+                          </p>
+
+                          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                            <span>{formatDate(color.updated_at || color.created_at)}</span>
+                            <span>#{color.id}</span>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <EmptyState
+                      title="No colors found"
+                      description={
+                        [activeFilters.colorName, activeFilters.colorDisplayName, activeFilters.colorDescription].some((value) => value.trim())
+                          ? "Try clearing or relaxing the current filters."
+                          : "Create the first merchandising color to get started."
+                      }
+                      actionLabel={
+                        activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription
+                          ? "Reset filters"
+                          : "New color"
+                      }
+                      onAction={
+                        activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription
+                          ? () => {
+                            setDraftFilters(DEFAULT_FILTERS)
+                            setActiveFilters(DEFAULT_FILTERS)
+                            setPage(1)
+                          }
+                          : openCreateDialog
+                      }
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 border-t border-slate-200/70 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {pageSummary}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-xl"
+                      onClick={() => setPage(1)}
+                      disabled={loadingColors || page <= 1}
+                    >
+                      <ChevronsLeft className="size-3.5" />
+                      <span className="sr-only">Go to first page</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-xl"
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      disabled={loadingColors || page <= 1}
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      <span className="sr-only">Previous page</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-xl"
+                      onClick={() => setPage((current) => Math.min(meta?.totalPages ?? 1, current + 1))}
+                      disabled={loadingColors || page >= (meta?.totalPages ?? 1)}
+                    >
+                      <ChevronRight className="size-3.5" />
+                      <span className="sr-only">Next page</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-xl"
+                      onClick={() => setPage(meta?.totalPages ?? 1)}
+                      disabled={loadingColors || page >= (meta?.totalPages ?? 1)}
+                    >
+                      <ChevronsRight className="size-3.5" />
+                      <span className="sr-only">Go to last page</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden lg:block">
+                <AppDataTable
+                  table={table}
+                  pageSummary={pageSummary}
+                  page={page}
+                  totalPages={meta?.totalPages ?? 1}
+                  pageSize={limit}
+                  isLoading={loadingColors}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                  onPageChange={(nextPage) => setPage(nextPage)}
+                  onPageSizeChange={(nextPageSize) => {
+                    setLimit(nextPageSize)
+                    setPage(1)
+                  }}
+                  emptyState={
+                    <EmptyState
+                      title="No colors found"
+                      description={
+                        [activeFilters.colorName, activeFilters.colorDisplayName, activeFilters.colorDescription].some((value) => value.trim())
+                          ? "Try clearing or relaxing the current filters."
+                          : "Create the first merchandising color to get started."
+                      }
+                      actionLabel={activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription ? "Reset filters" : "New color"}
+                      onAction={
+                        activeFilters.colorName || activeFilters.colorDisplayName || activeFilters.colorDescription
+                          ? () => {
+                            setDraftFilters(DEFAULT_FILTERS)
+                            setActiveFilters(DEFAULT_FILTERS)
+                            setPage(1)
+                          }
+                          : openCreateDialog
+                      }
+                    />
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
