@@ -269,7 +269,7 @@ function ColorFormDialog({
                 onChange={(event) =>
                   onChange({ ...values, colorName: event.target.value })
                 }
-                placeholder="Blue"
+                placeholder="Input color name"
               />
             </div>
 
@@ -283,7 +283,7 @@ function ColorFormDialog({
                 onChange={(event) =>
                   onChange({ ...values, colorDisplayName: event.target.value })
                 }
-                placeholder="Ocean Blue"
+                placeholder="Input color display name"
               />
             </div>
 
@@ -297,7 +297,7 @@ function ColorFormDialog({
                 onChange={(event) =>
                   onChange({ ...values, colorDescription: event.target.value })
                 }
-                placeholder="Deep blue shade used for denim."
+                placeholder="Input description"
                 className="min-h-24"
               />
             </div>
