@@ -34,8 +34,10 @@ export type ColorRecord = {
   isActive?: boolean
   created_by_id?: string | null
   updated_by_id?: string | null
+  deleted_by_id?: string | null
   created_by_user?: UserSummary | null
   updated_by_user?: UserSummary | null
+  deleted_by_user?: UserSummary | null
   created_at?: string | null
   updated_at?: string | null
   deleted_at?: string | null

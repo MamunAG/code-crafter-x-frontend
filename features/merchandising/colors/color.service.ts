@@ -54,16 +54,21 @@ export async function fetchColors({
   page,
   limit,
   filters,
+  deletedOnly = false,
 }: {
   apiUrl: string
   accessToken: string
   page: number
   limit: number
   filters: Partial<ColorFilterValues>
+  deletedOnly?: boolean
 }): Promise<PaginatedResponse<ColorRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/color")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
+  if (deletedOnly) {
+    url.searchParams.set("deletedOnly", "true")
+  }
   appendFilterParams(url, filters)
 
   const response = await fetch(url, {
