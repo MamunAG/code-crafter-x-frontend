@@ -132,6 +132,10 @@ function getColorLabel(color: ColorRecord) {
   return color.colorDisplayName?.trim() || color.colorName
 }
 
+function getUserLabel(user?: { name?: string | null } | null, fallback?: string | null) {
+  return user?.name?.trim() || fallback?.trim() || ""
+}
+
 function normalizeAuthFailure(message: string) {
   return (
     message.toLowerCase().includes("session expired") ||
@@ -177,14 +181,14 @@ function WorkspaceSkeleton() {
           <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
             <CardContent className="p-6 sm:p-8">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-10 w-72" />
-                  <Skeleton className="h-4 w-[32rem] max-w-full" />
+                <div className="min-w-0 flex-1 space-y-3">
+                  <Skeleton className="h-4 w-28 sm:w-32" />
+                  <Skeleton className="h-10 w-full max-w-64 sm:max-w-72" />
+                  <Skeleton className="h-4 w-full max-w-full sm:max-w-2xl" />
                 </div>
-                <div className="flex gap-3">
-                  <Skeleton className="h-10 w-28 rounded-xl" />
-                  <Skeleton className="h-10 w-24 rounded-xl" />
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Skeleton className="h-10 w-full rounded-xl sm:w-28" />
+                  <Skeleton className="h-10 w-full rounded-xl sm:w-24" />
                 </div>
               </div>
             </CardContent>
@@ -600,8 +604,8 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                 {formatDate(color.created_at)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {color.created_by_id
-                  ? `Created by ${color.created_by_id}`
+                {getUserLabel(color.created_by_user, color.created_by_id)
+                  ? `Created by ${getUserLabel(color.created_by_user, color.created_by_id)}`
                   : "No creator metadata"}
               </p>
             </div>
@@ -620,8 +624,8 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                 {formatDate(color.updated_at || color.created_at)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {color.updated_by_id
-                  ? `Updated by ${color.updated_by_id}`
+                {getUserLabel(color.updated_by_user, color.updated_by_id)
+                  ? `Updated by ${getUserLabel(color.updated_by_user, color.updated_by_id)}`
                   : "No editor metadata"}
               </p>
             </div>

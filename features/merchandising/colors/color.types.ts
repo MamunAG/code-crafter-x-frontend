@@ -14,6 +14,13 @@ export type PaginationMeta = {
   hasPreviousPage: boolean
 }
 
+export type UserSummary = {
+  id?: string | null
+  name?: string | null
+  user_name?: string | null
+  display_name?: string | null
+}
+
 export type PaginatedResponse<T> = {
   items: T[]
   meta: PaginationMeta
@@ -27,6 +34,8 @@ export type ColorRecord = {
   isActive?: boolean
   created_by_id?: string | null
   updated_by_id?: string | null
+  created_by_user?: UserSummary | null
+  updated_by_user?: UserSummary | null
   created_at?: string | null
   updated_at?: string | null
   deleted_at?: string | null
