@@ -297,7 +297,7 @@ function ColorFormDialog({
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-center justify-between rounded-xl border border-slate-200/50 bg-slate-50/70 px-3 py-3 dark:border-white/5 dark:bg-white/[0.03]">
               <div>
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
                   Active
@@ -1066,7 +1066,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                         colorName: event.target.value,
                       })
                     }
-                    placeholder="Blue"
+                    placeholder="Input color name"
                   />
                 </div>
                 <div className="min-w-0 space-y-1">
@@ -1083,7 +1083,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                         colorDisplayName: event.target.value,
                       })
                     }
-                    placeholder="Ocean Blue"
+                    placeholder="Input color display name"
                   />
                 </div>
                 <div className="min-w-0 space-y-1">
@@ -1100,7 +1100,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                         colorDescription: event.target.value,
                       })
                     }
-                    placeholder="Deep blue shade used for denim."
+                    placeholder="Input description"
                   />
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-1">
