@@ -589,6 +589,26 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         },
       },
       {
+        id: "created",
+        header: "Created",
+        cell: ({ row }) => {
+          const color = row.original
+
+          return (
+            <div className="space-y-1">
+              <p className="text-xs text-slate-700 dark:text-slate-200">
+                {formatDate(color.created_at)}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {color.created_by_id
+                  ? `Created by ${color.created_by_id}`
+                  : "No creator metadata"}
+              </p>
+            </div>
+          )
+        },
+      },
+      {
         id: "updated",
         header: "Updated",
         cell: ({ row }) => {
@@ -1218,8 +1238,11 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                             {color.colorDescription || "No description provided."}
                           </p>
 
-                          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                            <span>{formatDate(color.updated_at || color.created_at)}</span>
+                          <div className="mt-4 flex items-start justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="space-y-1">
+                              <span className="block">Created: {formatDate(color.created_at)}</span>
+                              <span className="block">Updated: {formatDate(color.updated_at || color.created_at)}</span>
+                            </div>
                             <span>#{color.id}</span>
                           </div>
                         </article>
