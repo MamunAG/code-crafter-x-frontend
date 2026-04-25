@@ -171,31 +171,35 @@ function EmptyState({
 
 function WorkspaceSkeleton() {
   return (
-    <div className="space-y-6">
-      <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-        <CardContent className="p-6 sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-10 w-72" />
-              <Skeleton className="h-4 w-[32rem] max-w-full" />
-            </div>
-            <div className="flex gap-3">
-              <Skeleton className="h-10 w-28 rounded-xl" />
-              <Skeleton className="h-10 w-24 rounded-xl" />
-            </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <ScrollArea className="h-full">
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+          <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-10 w-72" />
+                  <Skeleton className="h-4 w-[32rem] max-w-full" />
+                </div>
+                <div className="flex gap-3">
+                  <Skeleton className="h-10 w-28 rounded-xl" />
+                  <Skeleton className="h-10 w-24 rounded-xl" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-28 rounded-3xl" />
+            <Skeleton className="h-28 rounded-3xl" />
+            <Skeleton className="h-28 rounded-3xl" />
           </div>
-        </CardContent>
-      </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Skeleton className="h-28 rounded-3xl" />
-        <Skeleton className="h-28 rounded-3xl" />
-        <Skeleton className="h-28 rounded-3xl" />
-      </div>
-
-      <Skeleton className="h-64 rounded-3xl" />
-      <Skeleton className="h-[32rem] rounded-3xl" />
+          <Skeleton className="h-64 rounded-3xl" />
+          <Skeleton className="h-[32rem] rounded-3xl" />
+        </div>
+      </ScrollArea>
     </div>
   )
 }
