@@ -1,7 +1,11 @@
 import { ConfirmEmailForm } from "./confirm-email-form"
 import { ConfirmEmailHero } from "./confirm-email-hero"
 
-export function ConfirmEmailPage() {
+type ConfirmEmailPageProps = {
+  initialEmail?: string
+}
+
+export function ConfirmEmailPage({ initialEmail = "" }: ConfirmEmailPageProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
 
   return (
@@ -9,7 +13,7 @@ export function ConfirmEmailPage() {
       <div className="mx-auto flex min-h-svh w-full max-w-6xl items-center px-6 py-10">
         <div className="grid w-full gap-8 lg:grid-cols-[1.06fr_0.94fr]">
           <ConfirmEmailHero />
-          <ConfirmEmailForm apiUrl={apiUrl} />
+          <ConfirmEmailForm apiUrl={apiUrl} initialEmail={initialEmail} />
         </div>
       </div>
     </main>

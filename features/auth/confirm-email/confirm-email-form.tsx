@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Mail, RotateCcw, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 
@@ -13,6 +13,7 @@ import { confirmEmailCode, requestConfirmEmailCode } from "./confirm-email.servi
 
 type ConfirmEmailFormProps = {
   apiUrl: string
+  initialEmail?: string
 }
 
 type ConfirmStep = "request" | "verify"
@@ -74,10 +75,8 @@ function StepIndicator({ activeStep }: { activeStep: ConfirmStep }) {
   )
 }
 
-export function ConfirmEmailForm({ apiUrl }: ConfirmEmailFormProps) {
+export function ConfirmEmailForm({ apiUrl, initialEmail = "" }: ConfirmEmailFormProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const initialEmail = searchParams.get("email") ?? ""
 
   const [step, setStep] = useState<ConfirmStep>(initialEmail ? "verify" : "request")
   const [email, setEmail] = useState(initialEmail)
