@@ -256,11 +256,12 @@ function ColorFormDialog({
 
             <div className="space-y-1.5">
               <label htmlFor="colorName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Color name
+                Color name <span className="text-red-500">*</span>
               </label>
               <Input
                 id="colorName"
                 value={values.colorName}
+                required
                 onChange={(event) =>
                   onChange({ ...values, colorName: event.target.value })
                 }
