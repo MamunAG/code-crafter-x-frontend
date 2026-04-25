@@ -1,14 +1,7 @@
-import { ModuleRoutePage } from "@/components/module-route-page"
+import { SizeWorkspace } from "@/features/merchandising/sizes/size-workspace"
 
 export default function Page() {
-  return (
-    <ModuleRoutePage
-      current="merchandising"
-      eyebrow="Merchandising"
-      title="Sizes"
-      description="Dummy colors workspace for palettes, swatches, and other color master data."
-      pathLabel="/merchandising/masters/sizes"
-      showModuleNavigation={false}
-    />
-  )
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+
+  return <SizeWorkspace apiUrl={apiUrl} />
 }
