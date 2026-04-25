@@ -253,7 +253,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorValues, setEditorValues] = useState<ColorFormValues>(DEFAULT_FORM_VALUES)
+  const [editorInitialValues, setEditorInitialValues] = useState<ColorFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<ColorRecord | null>(null)
@@ -285,6 +285,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorError("")
     setEditorSubmitting(false)
     setEditorLoading(true)
+    setEditorInitialValues(DEFAULT_FORM_VALUES)
     setEditorOpen(true)
 
     try {
@@ -300,7 +301,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         id: colorId,
       })
 
-      setEditorValues({
+      setEditorInitialValues({
         colorName: record.colorName ?? "",
         colorDisplayName: record.colorDisplayName ?? "",
         colorDescription: record.colorDescription ?? "",
@@ -488,20 +489,14 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorMode("create")
     setEditingId(null)
     setEditorError("")
-    setEditorValues(DEFAULT_FORM_VALUES)
+    setEditorInitialValues(DEFAULT_FORM_VALUES)
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
   }
 
-  async function submitEditor() {
+  async function submitEditor(values: ColorFormValues) {
     if (editorSubmitting || editorLoading) {
-      return
-    }
-
-    const trimmedName = editorValues.colorName.trim()
-    if (!trimmedName) {
-      setEditorError("Color name is required.")
       return
     }
 
@@ -519,7 +514,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         await createColor({
           apiUrl,
           accessToken: token,
-          payload: editorValues,
+          payload: values,
         })
         toast.success("Color created successfully.")
       } else if (editingId != null) {
@@ -527,13 +522,13 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           id: editingId,
-          payload: editorValues,
+          payload: values,
         })
         toast.success("Color updated successfully.")
       }
 
       setEditorOpen(false)
-      setEditorValues(DEFAULT_FORM_VALUES)
+      setEditorInitialValues(DEFAULT_FORM_VALUES)
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
@@ -824,18 +819,17 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         loading={editorLoading}
         submitting={editorSubmitting}
         error={editorError}
-        values={editorValues}
+        initialValues={editorInitialValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {
-            setEditorValues(DEFAULT_FORM_VALUES)
+            setEditorInitialValues(DEFAULT_FORM_VALUES)
             setEditorError("")
             setEditorLoading(false)
             setEditorSubmitting(false)
             setEditingId(null)
           }
         }}
-        onChange={setEditorValues}
         onSubmit={submitEditor}
       />
 

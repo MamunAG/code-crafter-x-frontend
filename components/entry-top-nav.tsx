@@ -15,14 +15,14 @@ import { cn } from "@/lib/utils"
 
 type EntryTopNavProps = {
   current:
-    | "home"
-    | "app-config"
-    | "merchandising"
-    | "iam"
-    | "account"
-    | "profile"
-    | "register"
-    | "sign-in"
+  | "home"
+  | "app-config"
+  | "merchandising"
+  | "iam"
+  | "account"
+  | "profile"
+  | "register"
+  | "sign-in"
 }
 
 const NAV_ITEMS = [

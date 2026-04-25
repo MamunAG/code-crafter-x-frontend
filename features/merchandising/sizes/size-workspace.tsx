@@ -210,7 +210,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorValues, setEditorValues] = useState<SizeFormValues>(DEFAULT_FORM_VALUES)
+  const [editorInitialValues, setEditorInitialValues] = useState<SizeFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<SizeRecord | null>(null)
@@ -242,6 +242,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorError("")
     setEditorSubmitting(false)
     setEditorLoading(true)
+    setEditorInitialValues(DEFAULT_FORM_VALUES)
     setEditorOpen(true)
 
     try {
@@ -257,7 +258,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         id: sizeId,
       })
 
-      setEditorValues({
+      setEditorInitialValues({
         sizeName: record.sizeName ?? "",
         isActive: record.isActive !== false,
       })
@@ -442,20 +443,14 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorMode("create")
     setEditingId(null)
     setEditorError("")
-    setEditorValues(DEFAULT_FORM_VALUES)
+    setEditorInitialValues(DEFAULT_FORM_VALUES)
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
   }
 
-  async function submitEditor() {
+  async function submitEditor(values: SizeFormValues) {
     if (editorSubmitting || editorLoading) {
-      return
-    }
-
-    const trimmedName = editorValues.sizeName.trim()
-    if (!trimmedName) {
-      setEditorError("Size name is required.")
       return
     }
 
@@ -473,19 +468,19 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         await createSize({
           apiUrl,
           accessToken: token,
-          payload: editorValues,
+          payload: values,
         })
       } else if (editingId !== null) {
         await updateSize({
           apiUrl,
           accessToken: token,
           id: editingId,
-          payload: editorValues,
+          payload: values,
         })
       }
 
       setEditorOpen(false)
-      setEditorValues(DEFAULT_FORM_VALUES)
+      setEditorInitialValues(DEFAULT_FORM_VALUES)
       setEditingId(null)
       triggerRefresh()
       toast.success(editorMode === "create" ? "Size saved successfully" : "Size updated successfully")
@@ -779,18 +774,17 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         loading={editorLoading}
         submitting={editorSubmitting}
         error={editorError}
-        values={editorValues}
+        initialValues={editorInitialValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {
-            setEditorValues(DEFAULT_FORM_VALUES)
+            setEditorInitialValues(DEFAULT_FORM_VALUES)
             setEditorError("")
             setEditorLoading(false)
             setEditorSubmitting(false)
             setEditingId(null)
           }
         }}
-        onChange={setEditorValues}
         onSubmit={submitEditor}
       />
 
