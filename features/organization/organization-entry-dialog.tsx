@@ -127,7 +127,7 @@ export function OrganizationEntryDialog({
 
               <div className="space-y-1.5">
                 <label htmlFor="organization-address" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Address <span className="text-red-500">*</span>
+                  Address <span className="text-slate-500 dark:text-slate-400">(optional)</span>
                 </label>
                 <Textarea
                   id="organization-address"
@@ -135,7 +135,6 @@ export function OrganizationEntryDialog({
                   className="min-h-24"
                   aria-invalid={Boolean(errors.address)}
                   {...register("address", {
-                    required: "Address is required.",
                     setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
                   })}
                 />
@@ -144,14 +143,13 @@ export function OrganizationEntryDialog({
 
               <div className="space-y-1.5">
                 <label htmlFor="organization-contact" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Contact <span className="text-red-500">*</span>
+                  Contact <span className="text-slate-500 dark:text-slate-400">(optional)</span>
                 </label>
                 <Input
                   id="organization-contact"
                   placeholder="Input contact number or email"
                   aria-invalid={Boolean(errors.contact)}
                   {...register("contact", {
-                    required: "Contact is required.",
                     setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
                   })}
                 />

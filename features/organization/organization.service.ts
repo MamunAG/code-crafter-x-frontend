@@ -42,8 +42,8 @@ export async function createOrganization({
     },
     body: JSON.stringify({
       name: payload.name.trim(),
-      address: payload.address.trim(),
-      contact: payload.contact.trim(),
+      address: payload.address.trim() || undefined,
+      contact: payload.contact.trim() || undefined,
     }),
   })
 

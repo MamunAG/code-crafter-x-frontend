@@ -8,8 +8,8 @@ export type ApiResponse<T = unknown> = {
 export type OrganizationRecord = {
   id: string
   name: string
-  address: string
-  contact: string
+  address?: string | null
+  contact?: string | null
 }
 
 export type OrganizationFormValues = {

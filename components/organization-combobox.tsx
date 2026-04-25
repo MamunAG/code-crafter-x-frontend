@@ -24,15 +24,21 @@ type OrganizationComboBoxProps = {
 
 export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
     const [organizations, setOrganizations] = useState<OrganizationRecord[]>(INITIAL_ORGANIZATIONS)
+    const [comboboxOpen, setComboboxOpen] = useState(false)
     const [entryDialogOpen, setEntryDialogOpen] = useState(false)
 
     function handleOrganizationCreated(organization: OrganizationRecord) {
         setOrganizations((currentOrganizations) => [organization, ...currentOrganizations])
     }
 
+    function handleCreateOrganizationClick() {
+        setComboboxOpen(false)
+        setEntryDialogOpen(true)
+    }
+
     return (
         <>
-            <Combobox items={organizations}>
+            <Combobox open={comboboxOpen} onOpenChange={setComboboxOpen} items={organizations}>
                 <ComboboxInput
                     placeholder="Switch organization"
                     className={className ?? "w-[17rem] max-w-[min(17rem,calc(100vw-7rem))] text-xs"}
@@ -67,7 +73,7 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setEntryDialogOpen(true)}
+                            onClick={handleCreateOrganizationClick}
                             className="h-8 w-full justify-start gap-2 border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-none hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
                         >
                             <Plus className="size-3" />
