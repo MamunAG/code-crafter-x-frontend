@@ -572,6 +572,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         toast.success("Size deleted permanently")
       }
 
+      setRecentlyDeletedSize(null)
       setPendingActionTarget(null)
       setPendingActionMode(null)
       triggerRefresh()
@@ -768,7 +769,6 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
             onDeletedPageChange={setDeletedPage}
             onDeletedLimitChange={setDeletedLimit}
             onOpenAction={openPendingActionDialog}
-            onRetry={triggerRefresh}
           />
         </div>
       </ScrollArea>

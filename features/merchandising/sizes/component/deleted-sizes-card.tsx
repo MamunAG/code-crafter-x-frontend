@@ -7,7 +7,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   MoreHorizontal,
-  RefreshCcw,
   Search,
 } from "lucide-react"
 import {
@@ -54,7 +53,6 @@ type DeletedSizesCardProps = {
   onDeletedPageChange: (nextPage: number) => void
   onDeletedLimitChange: (nextPageSize: number) => void
   onOpenAction: (size: SizeRecord, mode: DeletedSizeActionMode) => void
-  onRetry: () => void
 }
 
 function formatDate(value?: string | null) {
@@ -111,7 +109,6 @@ export function DeletedSizesCard({
   onDeletedPageChange,
   onDeletedLimitChange,
   onOpenAction,
-  onRetry,
 }: DeletedSizesCardProps) {
   const deletedPageSummary = useMemo(() => {
     if (!deletedMeta || deletedMeta.total === 0) {
@@ -271,10 +268,6 @@ export function DeletedSizesCard({
                 }}
               >
                 Reset
-              </Button>
-              <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onRetry}>
-                <RefreshCcw className="size-3.5" />
-                Refresh
               </Button>
             </div>
           </div>
