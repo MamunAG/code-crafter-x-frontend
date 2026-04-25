@@ -1,3 +1,6 @@
 Using the color page as the blueprint, so you can mirror the same 
 table, filters, popup, soft-delete, and deleted-items pattern without guessing.
+while create new record then update_at column should null.
+created_by_id should store in db from logged in user jwt token.
+updated_by_id should store in db from logged in user jwt token.
 please make size page.
