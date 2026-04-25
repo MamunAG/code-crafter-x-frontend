@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { LogOut, UserRound, Settings2 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -54,23 +55,52 @@ export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
             </AvatarFallback>
           </Avatar>
         </button>
-      </DropdownMenuTrigger>
+    </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent
+        align="end"
+        className="w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]"
+      >
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-white/5">
+          <Avatar className="size-8 ring-1 ring-white shadow-sm dark:ring-white/10">
+            {imageUrl ? (
+              <AvatarImage src={imageUrl} alt={userLabel} />
+            ) : null}
+            <AvatarFallback className="bg-slate-900 text-[10px] font-semibold text-white dark:bg-white dark:text-slate-900">
+              {getAuthInitials(userLabel)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">
+              {userLabel}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Signed in
+            </p>
+          </div>
+        </div>
+        <DropdownMenuSeparator className="my-2 bg-slate-200/80 dark:bg-white/10" />
         <DropdownMenuItem asChild>
-          <Link href="/account">Account</Link>
+          <Link href="/account" className="gap-2 text-xs text-slate-700 dark:text-slate-200">
+            <Settings2 className="size-3.5 text-slate-400 dark:text-slate-500" />
+            Account
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/profile">Profile</Link>
+          <Link href="/profile" className="gap-2 text-xs text-slate-700 dark:text-slate-200">
+            <UserRound className="size-3.5 text-slate-400 dark:text-slate-500" />
+            Profile
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="my-2 bg-slate-200/80 dark:bg-white/10" />
         <DropdownMenuItem
-          className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-300"
+          className="gap-2 text-xs text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-300"
           onSelect={(event) => {
             event.preventDefault()
             handleLogout()
           }}
         >
+          <LogOut className="size-3.5" />
           Logout
         </DropdownMenuItem>
       </DropdownMenuContent>

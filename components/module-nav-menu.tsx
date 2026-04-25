@@ -5,6 +5,7 @@ import { Menu } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { OrganizationComboBox } from "@/components/organization-combobox"
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -102,6 +103,13 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
                 <SheetHeader className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
                   <SheetTitle className="text-base">Modules</SheetTitle>
                 </SheetHeader>
+
+                <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Organization
+                  </p>
+                  <OrganizationComboBox className="w-full text-xs" />
+                </div>
 
                 <ScrollArea className="flex-1">
                   <div className="p-4">
@@ -263,6 +271,13 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
               <SheetHeader className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
                 <SheetTitle className="text-base">Modules</SheetTitle>
               </SheetHeader>
+
+              <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Organization
+                </p>
+                <OrganizationComboBox className="w-full text-xs" />
+              </div>
 
               <ScrollArea className="flex-1">
                 <div className="p-4">

@@ -12,6 +12,7 @@ import {
   readAuthUserAvatarCookie,
 } from "@/lib/auth-session"
 import { cn } from "@/lib/utils"
+import { OrganizationComboBox } from "./organization-combobox"
 
 type EntryTopNavProps = {
   current:
@@ -60,6 +61,9 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
           </Link>
           <div className="lg:hidden">
             <ModuleNavMenu current={current} />
+          </div>
+          <div className="hidden lg:block">
+            <OrganizationComboBox />
           </div>
         </div>
 
