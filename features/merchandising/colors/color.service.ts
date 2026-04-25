@@ -48,6 +48,16 @@ function appendFilterParams(url: URL, filters: Partial<ColorFilterValues>) {
   }
 }
 
+function normalizeHexColorCode(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return undefined
+  }
+
+  return trimmed.startsWith("#") ? trimmed.toUpperCase() : `#${trimmed.toUpperCase()}`
+}
+
 export async function fetchColors({
   apiUrl,
   accessToken,
@@ -136,6 +146,7 @@ export async function createColor({
       colorName: payload.colorName.trim(),
       colorDisplayName: payload.colorDisplayName.trim() || undefined,
       colorDescription: payload.colorDescription.trim() || undefined,
+      colorHexCode: normalizeHexColorCode(payload.colorHexCode),
       isActive: payload.isActive,
     }),
   })
@@ -171,6 +182,7 @@ export async function updateColor({
       colorName: payload.colorName.trim(),
       colorDisplayName: payload.colorDisplayName.trim() || undefined,
       colorDescription: payload.colorDescription.trim() || undefined,
+      colorHexCode: normalizeHexColorCode(payload.colorHexCode),
       isActive: payload.isActive,
     }),
   })

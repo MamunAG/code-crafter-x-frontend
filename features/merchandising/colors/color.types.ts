@@ -31,6 +31,7 @@ export type ColorRecord = {
   colorName: string
   colorDisplayName?: string | null
   colorDescription?: string | null
+  colorHexCode?: string | null
   isActive?: boolean
   created_by_id?: string | null
   updated_by_id?: string | null
@@ -53,5 +54,6 @@ export type ColorFormValues = {
   colorName: string
   colorDisplayName: string
   colorDescription: string
+  colorHexCode: string
   isActive: boolean
 }

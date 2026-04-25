@@ -84,8 +84,11 @@ const DEFAULT_FORM_VALUES: ColorFormValues = {
   colorName: "",
   colorDisplayName: "",
   colorDescription: "",
+  colorHexCode: "",
   isActive: true,
 }
+
+const NEUTRAL_COLOR_SWATCH = "#9CA3AF"
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -116,16 +119,34 @@ function colorBadgeTone(color?: ColorRecord | null) {
   return color.isActive === false ? "outline" : "secondary"
 }
 
-function buildColorSwatch(name: string) {
-  const trimmed = name.trim() || "Color"
-  let hash = 0
+function isValidHexColorCode(value: string) {
+  return /^#?[0-9A-Fa-f]{6}$/.test(value.trim())
+}
 
-  for (let index = 0; index < trimmed.length; index += 1) {
-    hash = trimmed.charCodeAt(index) + ((hash << 5) - hash)
+function normalizeHexColorCode(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return ""
   }
 
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue} 72% 55%)`
+  return trimmed.startsWith("#") ? trimmed.toUpperCase() : `#${trimmed.toUpperCase()}`
+}
+
+function getPickerColorValue(hexCode: string) {
+  if (isValidHexColorCode(hexCode)) {
+    return normalizeHexColorCode(hexCode)
+  }
+
+  return NEUTRAL_COLOR_SWATCH
+}
+
+function getColorSwatchColor(color: ColorRecord) {
+  if (color.colorHexCode && isValidHexColorCode(color.colorHexCode)) {
+    return normalizeHexColorCode(color.colorHexCode)
+  }
+
+  return NEUTRAL_COLOR_SWATCH
 }
 
 function getColorLabel(color: ColorRecord) {
@@ -300,6 +321,50 @@ function ColorFormDialog({
                 placeholder="Input description"
                 className="min-h-24"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="colorHexCode" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                Hex color code
+              </label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="colorHexCode"
+                  value={values.colorHexCode}
+                  onChange={(event) =>
+                    onChange({ ...values, colorHexCode: event.target.value })
+                  }
+                  placeholder="Input hex color code"
+                  className="sm:flex-1"
+                />
+                <label
+                  htmlFor="colorHexCodePicker"
+                  className="size-8 shrink-0 cursor-pointer rounded-full border border-slate-200 shadow-sm transition-transform hover:scale-105 dark:border-white/10"
+                  style={{
+                    backgroundColor: isValidHexColorCode(values.colorHexCode)
+                      ? normalizeHexColorCode(values.colorHexCode)
+                      : NEUTRAL_COLOR_SWATCH,
+                  }}
+                >
+                  <span className="sr-only">Pick a color</span>
+                  <Input
+                    id="colorHexCodePicker"
+                    type="color"
+                    aria-label="Pick a color"
+                    value={getPickerColorValue(values.colorHexCode)}
+                    onChange={(event) =>
+                      onChange({
+                        ...values,
+                        colorHexCode: normalizeHexColorCode(event.target.value),
+                      })
+                    }
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                Optional. Use a 6-digit hex value such as #1E88E5.
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-xl border border-slate-200/50 bg-slate-50/70 px-3 py-3 dark:border-white/5 dark:bg-white/[0.03]">
@@ -518,6 +583,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         colorName: record.colorName ?? "",
         colorDisplayName: record.colorDisplayName ?? "",
         colorDescription: record.colorDescription ?? "",
+        colorHexCode: record.colorHexCode ?? "",
         isActive: record.isActive !== false,
       })
     } catch (caughtError) {
@@ -550,7 +616,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         header: "Color",
         cell: ({ row }) => {
           const color = row.original
-          const swatch = buildColorSwatch(color.colorName)
+          const swatch = getColorSwatchColor(color)
 
           return (
             <div className="pl-4">
@@ -578,6 +644,15 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         cell: ({ row }) => (
           <span className="text-xs text-slate-700 dark:text-slate-200">
             {row.original.colorDisplayName?.trim() || "Not set"}
+          </span>
+        ),
+      },
+      {
+        id: "hexCode",
+        header: "Hex code",
+        cell: ({ row }) => (
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+            {row.original.colorHexCode?.trim() || "Not set"}
           </span>
         ),
       },
@@ -703,7 +778,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         header: "Color",
         cell: ({ row }) => {
           const color = row.original
-          const swatch = buildColorSwatch(color.colorName)
+          const swatch = getColorSwatchColor(color)
 
           return (
             <div className="pl-4">
@@ -731,6 +806,15 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         cell: ({ row }) => (
           <span className="text-xs text-slate-700 dark:text-slate-200">
             {row.original.colorDisplayName?.trim() || "Not set"}
+          </span>
+        ),
+      },
+      {
+        id: "hexCode",
+        header: "Hex code",
+        cell: ({ row }) => (
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+            {row.original.colorHexCode?.trim() || "Not set"}
           </span>
         ),
       },
@@ -1422,7 +1506,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                               <div className="flex items-center gap-3">
                                 <span
                                   className="size-9 shrink-0 rounded-full ring-1 ring-slate-900/10 dark:ring-white/10"
-                                  style={{ backgroundColor: buildColorSwatch(color.colorName) }}
+                                  style={{ backgroundColor: getColorSwatchColor(color) }}
                                 />
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">
@@ -1430,6 +1514,9 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                                   </p>
                                   <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                                     {color.colorName}
+                                  </p>
+                                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                    {color.colorHexCode?.trim() || "Not set"}
                                   </p>
                                 </div>
                               </div>
@@ -1753,7 +1840,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                                 <div className="flex items-center gap-3">
                                   <span
                                     className="size-9 shrink-0 rounded-full ring-1 ring-slate-900/10 dark:ring-white/10"
-                                    style={{ backgroundColor: buildColorSwatch(color.colorName) }}
+                                    style={{ backgroundColor: getColorSwatchColor(color) }}
                                   />
                                   <div className="min-w-0 space-y-0.5">
                                     <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -1767,6 +1854,12 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                                     </p>
                                     <p className="truncate text-xs text-slate-700 dark:text-slate-200">
                                       {color.colorDisplayName?.trim() || "Not set"}
+                                    </p>
+                                    <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                      Hex code
+                                    </p>
+                                    <p className="truncate text-xs text-slate-700 dark:text-slate-200">
+                                      {color.colorHexCode?.trim() || "Not set"}
                                     </p>
                                   </div>
                                 </div>
