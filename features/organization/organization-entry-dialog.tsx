@@ -53,6 +53,7 @@ export function OrganizationEntryDialog({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    clearErrors,
     reset,
   } = useForm<OrganizationFormValues>({
     defaultValues: DEFAULT_VALUES,
@@ -61,10 +62,18 @@ export function OrganizationEntryDialog({
   })
 
   useEffect(() => {
+    if (open) {
+      reset(DEFAULT_VALUES)
+      clearErrors()
+      return
+    }
+
     if (!open) {
       reset(DEFAULT_VALUES)
+      clearErrors()
+      return
     }
-  }, [open, reset])
+  }, [clearErrors, open, reset])
 
   async function handleValidSubmit(values: OrganizationFormValues) {
     const accessToken = window.localStorage.getItem("access_token")
@@ -96,6 +105,7 @@ export function OrganizationEntryDialog({
       <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
         <form
           className="flex max-h-[calc(100vh-2rem)] flex-col"
+          noValidate
           onSubmit={handleSubmit(handleValidSubmit)}
         >
           <div className="border-b border-slate-200/70 px-6 pb-4 pt-6 dark:border-white/10">
@@ -133,12 +143,10 @@ export function OrganizationEntryDialog({
                   id="organization-address"
                   placeholder="Input organization address"
                   className="min-h-24"
-                  aria-invalid={Boolean(errors.address)}
                   {...register("address", {
                     setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
                   })}
                 />
-                <FieldErrorMessage message={errors.address?.message} />
               </div>
 
               <div className="space-y-1.5">
@@ -148,12 +156,10 @@ export function OrganizationEntryDialog({
                 <Input
                   id="organization-contact"
                   placeholder="Input contact number or email"
-                  aria-invalid={Boolean(errors.contact)}
                   {...register("contact", {
                     setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
                   })}
                 />
-                <FieldErrorMessage message={errors.contact?.message} />
               </div>
             </div>
           </ScrollArea>
