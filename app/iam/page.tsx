@@ -1,13 +1,12 @@
-import { ModuleLandingPage } from "@/components/module-landing-page"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { IamOverview } from "@/features/iam/iam-overview"
 
 export default function Page() {
   return (
-    <ModuleLandingPage
-      eyebrow="IAM"
-      title="Identity and access management"
-      description="This module will cover users, roles, permissions, and access policies."
-      actionHref="/account"
-      actionLabel="Go to account"
-    />
+    <div className="h-full min-h-0">
+      <ScrollArea className="h-full">
+        <IamOverview />
+      </ScrollArea>
+    </div>
   )
 }
