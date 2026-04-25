@@ -137,7 +137,7 @@ export function OrganizationEntryDialog({
 
               <div className="space-y-1.5">
                 <label htmlFor="organization-address" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Address <span className="text-slate-500 dark:text-slate-400">(optional)</span>
+                  Address
                 </label>
                 <Textarea
                   id="organization-address"
@@ -151,7 +151,7 @@ export function OrganizationEntryDialog({
 
               <div className="space-y-1.5">
                 <label htmlFor="organization-contact" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Contact <span className="text-slate-500 dark:text-slate-400">(optional)</span>
+                  Contact
                 </label>
                 <Input
                   id="organization-contact"
