@@ -48,7 +48,7 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
                         <ComboboxItem
                             key={item.id}
                             value={item.name}
-                            className="px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                            className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
                         >
                             <Building2 className="size-3 text-slate-400 dark:text-slate-500" />
                             {item.name}

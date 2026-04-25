@@ -80,13 +80,19 @@ export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
           </div>
         </div>
         <DropdownMenuSeparator className="my-2 bg-slate-200/80 dark:bg-white/10" />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem
+          asChild
+          className="rounded-md transition-colors hover:bg-slate-900/40 hover:text-slate-100 dark:hover:bg-white/5 dark:hover:text-slate-100"
+        >
           <Link href="/account" className="gap-2 text-xs text-slate-700 dark:text-slate-200">
             <Settings2 className="size-3.5 text-slate-400 dark:text-slate-500" />
             Account
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem
+          asChild
+          className="rounded-md transition-colors hover:bg-slate-900/40 hover:text-slate-100 dark:hover:bg-white/5 dark:hover:text-slate-100"
+        >
           <Link href="/profile" className="gap-2 text-xs text-slate-700 dark:text-slate-200">
             <UserRound className="size-3.5 text-slate-400 dark:text-slate-500" />
             Profile
@@ -94,7 +100,7 @@ export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
         </DropdownMenuItem>
         <DropdownMenuSeparator className="my-2 bg-slate-200/80 dark:bg-white/10" />
         <DropdownMenuItem
-          className="gap-2 text-xs text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-300"
+          className="gap-2 rounded-md text-xs text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
           onSelect={(event) => {
             event.preventDefault()
             handleLogout()
