@@ -289,7 +289,7 @@ export function ColorTableSection({
           return (
             <div className="space-y-1">
               <p className="text-xs text-slate-700 dark:text-slate-200">
-                {formatDate(color.updated_at || color.created_at)}
+                {formatDate(color.updated_at)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {color.updated_by_user?.name?.trim() || color.updated_by_id?.trim()
@@ -542,7 +542,7 @@ export function ColorTableSection({
                       <div className="mt-4 flex items-start justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
                         <div className="space-y-1">
                           <span className="block">Created: {formatDate(color.created_at)}</span>
-                          <span className="block">Updated: {formatDate(color.updated_at || color.created_at)}</span>
+                          <span className="block">Updated: {formatDate(color.updated_at)}</span>
                         </div>
                         <span>#{color.id}</span>
                       </div>
