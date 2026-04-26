@@ -227,13 +227,13 @@ export function IamOverview() {
                                 className={cn(
                                   "text-sm font-medium text-slate-900 dark:text-slate-100",
                                   action.href === "/iam/access/organization-requests" &&
-                                    "whitespace-nowrap",
+                                  "whitespace-nowrap",
                                 )}
                               >
                                 {action.label}
                               </p>
                               {action.href === "/iam/access/organization-requests" &&
-                              pendingRequestCount !== null ? (
+                                pendingRequestCount !== null ? (
                                 <Badge
                                   variant="outline"
                                   className={cn(
@@ -249,14 +249,14 @@ export function IamOverview() {
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                               {action.href === "/iam/access/organization-requests" &&
-                              pendingRequestCount !== null
+                                pendingRequestCount !== null
                                 ? pendingRequestCount > 0
                                   ? `${pendingRequestCount} pending request${pendingRequestCount === 1 ? "" : "s"}`
                                   : "No pending requests"
                                 : "Jump straight into the operational screen."}
                             </p>
                             {action.href === "/iam/access/organization-requests" &&
-                            pendingRequestCount !== null ? (
+                              pendingRequestCount !== null ? (
                               <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Review them in queue
                               </p>
