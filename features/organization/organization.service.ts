@@ -47,6 +47,7 @@ export async function createOrganization({
       name: payload.name.trim(),
       address: payload.address.trim() || undefined,
       contact: payload.contact.trim() || undefined,
+      isDefault: payload.isDefault,
     }),
   })
 
@@ -91,6 +92,38 @@ export async function updateOrganization({
   }
 
   return responseData.data
+}
+
+export async function updateOrganizationDefault({
+  apiUrl,
+  accessToken,
+  userId,
+  organizationId,
+  isDefault,
+}: {
+  apiUrl: string
+  accessToken: string
+  userId: string
+  organizationId: string
+  isDefault: boolean
+}): Promise<void> {
+  const response = await fetch(
+    buildApiUrl(
+      apiUrl,
+      `/api/v1/user-to-oranization-map/mapping/${userId}/${organizationId}/default`,
+    ),
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ isDefault }),
+    },
+  )
+
+  await readJsonResponse(response)
 }
 
 export async function fetchUserOrganizations({

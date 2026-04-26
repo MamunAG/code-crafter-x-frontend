@@ -3,10 +3,11 @@
 import { useEffect } from "react"
 
 import { Loader2 } from "lucide-react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -18,8 +19,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
+import { parseStoredAuthUser } from "@/lib/auth-session"
 
-import { createOrganization, updateOrganization } from "./organization.service"
+import {
+  createOrganization,
+  updateOrganization,
+  updateOrganizationDefault,
+} from "./organization.service"
 import type { OrganizationFormValues, OrganizationRecord } from "./organization.types"
 
 type OrganizationEntryDialogProps = {
@@ -34,6 +40,7 @@ const DEFAULT_VALUES: OrganizationFormValues = {
   name: "",
   address: "",
   contact: "",
+  isDefault: false,
 }
 
 function FieldErrorMessage({ message }: { message?: string }) {
@@ -56,6 +63,7 @@ export function OrganizationEntryDialog({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
     clearErrors,
     reset,
@@ -78,6 +86,7 @@ export function OrganizationEntryDialog({
             name: organization.name ?? "",
             address: organization.address ?? "",
             contact: organization.contact ?? "",
+            isDefault: Boolean(organization.isDefault),
           }
         : DEFAULT_VALUES,
     )
@@ -86,6 +95,8 @@ export function OrganizationEntryDialog({
 
   async function handleValidSubmit(values: OrganizationFormValues) {
     const accessToken = window.localStorage.getItem("access_token")
+    const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+    const userId = storedUser?.id
 
     if (!accessToken) {
       toast.error(
@@ -101,19 +112,47 @@ export function OrganizationEntryDialog({
       return
     }
 
+    if (isEditMode && !userId) {
+      toast.error("Please sign in again to update the default organization.")
+      return
+    }
+
+    const authenticatedAccessToken = accessToken
+
     try {
-      const savedOrganization = isEditMode
+      let savedOrganization = isEditMode
         ? await updateOrganization({
             apiUrl,
-            accessToken,
-            id: organization.id,
+            accessToken: authenticatedAccessToken,
+            id: organization!.id,
             payload: values,
           })
         : await createOrganization({
             apiUrl,
-            accessToken,
+            accessToken: authenticatedAccessToken,
             payload: values,
-          })
+        })
+
+      if (isEditMode && organization!.isDefault !== values.isDefault) {
+        if (!userId) {
+          toast.error("Please sign in again to update the default organization.")
+          return
+        }
+
+        const authenticatedUserId = userId
+
+        await updateOrganizationDefault({
+          apiUrl,
+          accessToken: authenticatedAccessToken,
+          userId: authenticatedUserId,
+          organizationId: organization!.id,
+          isDefault: values.isDefault,
+        })
+        savedOrganization = {
+          ...savedOrganization,
+          isDefault: values.isDefault,
+        }
+      }
 
       toast.success(
         isEditMode ? "Organization updated successfully." : "Organization created successfully.",
@@ -195,6 +234,31 @@ export function OrganizationEntryDialog({
                   })}
                 />
               </div>
+
+              <Controller
+                control={control}
+                name="isDefault"
+                render={({ field }) => (
+                  <div className="flex items-start gap-3 rounded-xl border border-slate-200/70 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/5">
+                    <Checkbox
+                      id="organization-default"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                    />
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="organization-default"
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                      >
+                        Make this the default organization
+                      </label>
+                      <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                        The default organization is selected automatically when this user logs in.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              />
             </div>
           </ScrollArea>
 

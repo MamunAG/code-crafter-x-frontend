@@ -10,10 +10,12 @@ export type OrganizationRecord = {
   name: string
   address?: string | null
   contact?: string | null
+  isDefault?: boolean
 }
 
 export type OrganizationFormValues = {
   name: string
   address: string
   contact: string
+  isDefault: boolean
 }

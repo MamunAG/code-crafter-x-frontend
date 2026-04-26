@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Building2, Plus } from "lucide-react"
 
@@ -37,17 +37,22 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
   const [organizationDialogOrganization, setOrganizationDialogOrganization] =
     useState<OrganizationOption | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const preferredOrganizationIdRef = useRef<string | null>(null)
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
 
   useEffect(() => {
     const accessToken = window.localStorage.getItem("access_token")
     const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+    const userId = storedUser?.id
 
-    if (!accessToken || !storedUser?.id) {
+    if (!accessToken || !userId) {
       return
     }
 
+    const authenticatedAccessToken = accessToken
+    const authenticatedUserId = userId
     let isMounted = true
 
     async function loadOrganizations() {
@@ -56,8 +61,8 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
       try {
         const nextOrganizations = await fetchUserOrganizations({
           apiUrl,
-          accessToken,
-          userId: storedUser.id,
+          accessToken: authenticatedAccessToken,
+          userId: authenticatedUserId,
         })
         const nextOrganizationOptions = nextOrganizations.map((organization) => ({
           ...organization,
@@ -67,13 +72,28 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
 
         if (isMounted) {
           setOrganizations(nextOrganizationOptions)
+          const preferredOrganizationId = preferredOrganizationIdRef.current
+          preferredOrganizationIdRef.current = null
+
           setSelectedOrganization((currentSelectedOrganization) => {
             if (!nextOrganizationOptions.length) {
               return null
             }
 
+            if (preferredOrganizationId) {
+              return (
+                nextOrganizationOptions.find(
+                  (organization) => organization.id === preferredOrganizationId,
+                ) ?? nextOrganizationOptions.find((organization) => organization.isDefault)
+                ?? nextOrganizationOptions[0]
+                ?? null
+              )
+            }
+
             if (!currentSelectedOrganization) {
-              return nextOrganizationOptions[0] ?? null
+              return nextOrganizationOptions.find((organization) => organization.isDefault)
+                ?? nextOrganizationOptions[0]
+                ?? null
             }
 
             return (
@@ -100,24 +120,11 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
     return () => {
       isMounted = false
     }
-  }, [apiUrl])
-
-  function toOrganizationOption(organization: OrganizationRecord): OrganizationOption {
-    return {
-      ...organization,
-      label: organization.name,
-      value: organization.id,
-    }
-  }
+  }, [apiUrl, reloadKey])
 
   function handleOrganizationSaved(organization: OrganizationRecord) {
-    const organizationOption = toOrganizationOption(organization)
-
-    setOrganizations((currentOrganizations) => [
-      organizationOption,
-      ...currentOrganizations.filter((currentOrganization) => currentOrganization.id !== organization.id),
-    ])
-    setSelectedOrganization(organizationOption)
+    preferredOrganizationIdRef.current = organization.id
+    setReloadKey((currentReloadKey) => currentReloadKey + 1)
   }
 
   function handleCreateOrganizationClick() {
