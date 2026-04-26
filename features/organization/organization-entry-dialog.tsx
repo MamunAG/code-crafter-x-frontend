@@ -19,13 +19,15 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 
-import { createOrganization } from "./organization.service"
+import { createOrganization, updateOrganization } from "./organization.service"
 import type { OrganizationFormValues, OrganizationRecord } from "./organization.types"
 
 type OrganizationEntryDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated?: (organization: OrganizationRecord) => void
+  mode?: "create" | "edit"
+  organization?: OrganizationRecord | null
+  onSaved?: (organization: OrganizationRecord) => void
 }
 
 const DEFAULT_VALUES: OrganizationFormValues = {
@@ -45,7 +47,9 @@ function FieldErrorMessage({ message }: { message?: string }) {
 export function OrganizationEntryDialog({
   open,
   onOpenChange,
-  onCreated,
+  mode = "create",
+  organization = null,
+  onSaved,
 }: OrganizationEntryDialogProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
 
@@ -61,41 +65,69 @@ export function OrganizationEntryDialog({
     reValidateMode: "onChange",
   })
 
+  const isEditMode = mode === "edit"
+
   useEffect(() => {
-    if (open) {
-      reset(DEFAULT_VALUES)
-      clearErrors()
+    if (!open) {
       return
     }
 
-    if (!open) {
-      reset(DEFAULT_VALUES)
-      clearErrors()
-      return
-    }
-  }, [clearErrors, open, reset])
+    reset(
+      isEditMode && organization
+        ? {
+            name: organization.name ?? "",
+            address: organization.address ?? "",
+            contact: organization.contact ?? "",
+          }
+        : DEFAULT_VALUES,
+    )
+    clearErrors()
+  }, [clearErrors, isEditMode, open, organization, reset])
 
   async function handleValidSubmit(values: OrganizationFormValues) {
     const accessToken = window.localStorage.getItem("access_token")
 
     if (!accessToken) {
-      toast.error("Please sign in again to create an organization.")
+      toast.error(
+        isEditMode
+          ? "Please sign in again to edit an organization."
+          : "Please sign in again to create an organization.",
+      )
+      return
+    }
+
+    if (isEditMode && !organization?.id) {
+      toast.error("No organization is selected for editing.")
       return
     }
 
     try {
-      const organization = await createOrganization({
-        apiUrl,
-        accessToken,
-        payload: values,
-      })
+      const savedOrganization = isEditMode
+        ? await updateOrganization({
+            apiUrl,
+            accessToken,
+            id: organization.id,
+            payload: values,
+          })
+        : await createOrganization({
+            apiUrl,
+            accessToken,
+            payload: values,
+          })
 
-      toast.success("Organization created successfully.")
-      onCreated?.(organization)
+      toast.success(
+        isEditMode ? "Organization updated successfully." : "Organization created successfully.",
+      )
+      onSaved?.(savedOrganization)
       onOpenChange(false)
       reset(DEFAULT_VALUES)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create the organization right now."
+      const message =
+        error instanceof Error
+          ? error.message
+          : isEditMode
+            ? "Unable to update the organization right now."
+            : "Unable to create the organization right now."
       toast.error(message)
     }
   }
@@ -110,9 +142,11 @@ export function OrganizationEntryDialog({
         >
           <div className="border-b border-slate-200/70 px-6 pb-4 pt-6 dark:border-white/10">
             <DialogHeader>
-              <DialogTitle>Create organization</DialogTitle>
+              <DialogTitle>{isEditMode ? "Edit organization" : "Create organization"}</DialogTitle>
               <DialogDescription>
-                Add a new organization using the same fields exposed by the organization API.
+                {isEditMode
+                  ? "Update the selected organization using the same fields exposed by the organization API."
+                  : "Add a new organization using the same fields exposed by the organization API."}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -176,7 +210,7 @@ export function OrganizationEntryDialog({
               </Button>
               <Button type="submit" disabled={isSubmitting} className="rounded-xl">
                 {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Save organization
+                {isEditMode ? "Save changes" : "Save organization"}
               </Button>
             </DialogFooter>
           </div>
