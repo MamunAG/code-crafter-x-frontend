@@ -53,6 +53,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             ],
           },
           {
+            label: "Menu",
+            href: "/app-config/core/menu",
+            description: "Create and manage organization-specific menu entries.",
+          },
+          {
             label: "Branding",
             href: "/app-config/core/branding",
             description: "Logo, theme, and email branding.",
@@ -286,6 +291,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
               { label: "Policies", href: "/iam/access/permissions/policies" },
               { label: "Rules", href: "/iam/access/permissions/rules" },
             ],
+          },
+          {
+            label: "Menu permissions",
+            href: "/iam/access/menu-permissions",
+            description: "Grant view, create, update, and delete menu access to users.",
           },
           {
             label: "Organization access",

@@ -18,6 +18,10 @@ import { fetchUserOrganizations } from "@/features/organization/organization.ser
 import { OrganizationEntryDialog } from "@/features/organization/organization-entry-dialog"
 import type { OrganizationRecord } from "@/features/organization/organization.types"
 import { parseStoredAuthUser } from "@/lib/auth-session"
+import {
+  readSelectedOrganizationId,
+  writeSelectedOrganizationId,
+} from "@/lib/organization-selection"
 import { SelectSeparator } from "./ui/select"
 
 type OrganizationOption = OrganizationRecord & {
@@ -90,26 +94,41 @@ export function OrganizationComboBox({
             }
 
             if (preferredOrganizationId) {
-              return (
+              const nextSelectedOrganization = (
                 nextOrganizationOptions.find(
                   (organization) => organization.id === preferredOrganizationId,
                 ) ?? nextOrganizationOptions.find((organization) => organization.isDefault)
                 ?? nextOrganizationOptions[0]
                 ?? null
               )
+              if (nextSelectedOrganization) {
+                writeSelectedOrganizationId(nextSelectedOrganization.id)
+              }
+              return nextSelectedOrganization
             }
 
             if (!currentSelectedOrganization) {
-              return nextOrganizationOptions.find((organization) => organization.isDefault)
+              const storedOrganizationId = readSelectedOrganizationId()
+              const nextSelectedOrganization = nextOrganizationOptions.find(
+                (organization) => organization.id === storedOrganizationId,
+              ) ?? nextOrganizationOptions.find((organization) => organization.isDefault)
                 ?? nextOrganizationOptions[0]
                 ?? null
+              if (nextSelectedOrganization) {
+                writeSelectedOrganizationId(nextSelectedOrganization.id)
+              }
+              return nextSelectedOrganization
             }
 
-            return (
+            const nextSelectedOrganization = (
               nextOrganizationOptions.find(
                 (organization) => organization.id === currentSelectedOrganization.id,
               ) ?? nextOrganizationOptions[0] ?? null
             )
+            if (nextSelectedOrganization) {
+              writeSelectedOrganizationId(nextSelectedOrganization.id)
+            }
+            return nextSelectedOrganization
           })
 
           if (!nextOrganizationOptions.length) {
@@ -192,6 +211,9 @@ export function OrganizationComboBox({
         value={selectedOrganization}
         onValueChange={(organization) => {
           setSelectedOrganization(organization)
+          if (organization) {
+            writeSelectedOrganizationId(organization.id)
+          }
         }}
         isItemEqualToValue={(item, value) => item.id === value.id}
       >

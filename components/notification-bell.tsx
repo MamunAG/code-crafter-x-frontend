@@ -299,7 +299,7 @@ export function NotificationBell() {
                     key={notification.id}
                     type="button"
                     className={cn(
-                      "w-full rounded-2xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-white/10",
+                      "w-full cursor-pointer rounded-2xl px-3 py-3 text-left transition hover:bg-slate-100 disabled:cursor-wait dark:hover:bg-white/10",
                       notification.isRead ? "opacity-75" : "bg-slate-50 dark:bg-white/5",
                     )}
                     disabled={workingId === notification.id}
