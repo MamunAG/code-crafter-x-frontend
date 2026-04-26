@@ -24,6 +24,12 @@ export const AUTH_USER_LABEL_COOKIE_NAME = "auth_user_label"
 export const AUTH_USER_AVATAR_COOKIE_NAME = "auth_user_avatar"
 export const AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
+export function clearStoredAuthSession() {
+  window.localStorage.removeItem("access_token")
+  window.localStorage.removeItem("refresh_token")
+  window.localStorage.removeItem("auth_user")
+}
+
 export function getAuthUserLabel(user: AuthUser | null | undefined, fallback = "User") {
   if (!user) {
     return fallback

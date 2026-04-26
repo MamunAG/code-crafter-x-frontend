@@ -260,6 +260,7 @@ export function OrganizationComboBox({
         onOpenChange={handleOrganizationDialogOpenChange}
         mode={organizationDialogMode}
         organization={organizationDialogOrganization}
+        showLogoutAction={organizations.length === 0 && organizationDialogMode === "create"}
         onSaved={handleOrganizationSaved}
       />
     </>

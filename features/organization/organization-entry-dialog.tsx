@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
-import { Loader2 } from "lucide-react"
+import { Loader2, LogOut } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 
@@ -19,7 +20,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { parseStoredAuthUser } from "@/lib/auth-session"
+import {
+  clearAuthSessionCookie,
+  clearAuthUserAvatarCookie,
+  clearAuthUserLabelCookie,
+  clearStoredAuthSession,
+  parseStoredAuthUser,
+} from "@/lib/auth-session"
 
 import {
   createOrganization,
@@ -34,6 +41,7 @@ type OrganizationEntryDialogProps = {
   mode?: "create" | "edit"
   organization?: OrganizationRecord | null
   onSaved?: (organization: OrganizationRecord) => void
+  showLogoutAction?: boolean
 }
 
 const DEFAULT_VALUES: OrganizationFormValues = {
@@ -57,8 +65,10 @@ export function OrganizationEntryDialog({
   mode = "create",
   organization = null,
   onSaved,
+  showLogoutAction = false,
 }: OrganizationEntryDialogProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+  const router = useRouter()
 
   const {
     register,
@@ -171,6 +181,14 @@ export function OrganizationEntryDialog({
     }
   }
 
+  function handleLogout() {
+    clearStoredAuthSession()
+    document.cookie = clearAuthSessionCookie()
+    document.cookie = clearAuthUserLabelCookie()
+    document.cookie = clearAuthUserAvatarCookie()
+    router.replace("/sign-in")
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
@@ -185,7 +203,9 @@ export function OrganizationEntryDialog({
               <DialogDescription>
                 {isEditMode
                   ? "Update the selected organization using the same fields exposed by the organization API."
-                  : "Add a new organization using the same fields exposed by the organization API."}
+                  : showLogoutAction
+                    ? "No organizations are mapped to this account yet. Create one to continue or log out."
+                    : "Add a new organization using the same fields exposed by the organization API."}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -264,14 +284,26 @@ export function OrganizationEntryDialog({
 
           <div className="border-t border-slate-200/70 px-6 py-4 dark:border-white/10">
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="rounded-xl"
-              >
-                Cancel
-              </Button>
+              {showLogoutAction ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                >
+                  <LogOut className="size-3.5" />
+                  Logout
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  className="rounded-xl"
+                >
+                  Cancel
+                </Button>
+              )}
               <Button type="submit" disabled={isSubmitting} className="rounded-xl">
                 {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {isEditMode ? "Save changes" : "Save organization"}

@@ -10,6 +10,7 @@ import {
   clearAuthUserAvatarCookie,
   clearAuthUserLabelCookie,
   getAuthInitials,
+  clearStoredAuthSession,
 } from "@/lib/auth-session"
 import {
   DropdownMenu,
@@ -28,9 +29,7 @@ export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
   const router = useRouter()
 
   function handleLogout() {
-    window.localStorage.removeItem("access_token")
-    window.localStorage.removeItem("refresh_token")
-    window.localStorage.removeItem("auth_user")
+    clearStoredAuthSession()
     document.cookie = clearAuthSessionCookie()
     document.cookie = clearAuthUserLabelCookie()
     document.cookie = clearAuthUserAvatarCookie()
