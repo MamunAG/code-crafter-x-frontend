@@ -214,11 +214,11 @@ export function IamOverview() {
                         key={action.href}
                         href={action.href}
                         className={cn(
-                          "group flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20",
+                          "group flex min-h-[5.25rem] items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20",
                         )}
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white transition group-hover:bg-sky-600 dark:bg-white dark:text-slate-950">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white transition group-hover:bg-sky-600 dark:bg-white dark:text-slate-950">
                             <Icon className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -254,12 +254,6 @@ export function IamOverview() {
                                   : "No pending requests"
                                 : "Jump straight into the operational screen."}
                             </p>
-                            {action.href === "/iam/access/organization-requests" &&
-                            pendingRequestCount !== null ? (
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Review them in queue
-                              </p>
-                            ) : null}
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2 pl-3">
