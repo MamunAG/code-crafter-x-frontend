@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
@@ -204,7 +205,7 @@ export function OrganizationEntryDialog({
                 {isEditMode
                   ? "Update the selected organization using the same fields exposed by the organization API."
                   : showLogoutAction
-                    ? "No organizations are mapped to this account yet. Create one to continue or log out."
+                    ? "No organizations are mapped to this account yet. Create one, request access to an existing organization, or log out."
                     : "Add a new organization using the same fields exposed by the organization API."}
               </DialogDescription>
             </DialogHeader>
@@ -285,15 +286,25 @@ export function OrganizationEntryDialog({
           <div className="border-t border-slate-200/70 px-6 py-4 dark:border-white/10">
             <DialogFooter>
               {showLogoutAction ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleLogout}
-                  className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-                >
-                  <LogOut className="size-3.5" />
-                  Logout
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    asChild
+                    className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
+                  >
+                    <Link href="/organization-access-request">Request access</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleLogout}
+                    className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                  >
+                    <LogOut className="size-3.5" />
+                    Logout
+                  </Button>
+                </>
               ) : (
                 <Button
                   type="button"

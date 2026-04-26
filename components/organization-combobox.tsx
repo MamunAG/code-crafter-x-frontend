@@ -44,13 +44,9 @@ export function OrganizationComboBox({
   const [isLoading, setIsLoading] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const preferredOrganizationIdRef = useRef<string | null>(null)
-  const instanceIdRef = useRef<string | null>(null)
+  const instanceIdRef = useRef<string>(crypto.randomUUID())
   const router = useRouter()
   const pathname = usePathname()
-
-  if (!instanceIdRef.current) {
-    instanceIdRef.current = crypto.randomUUID()
-  }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
 
@@ -58,6 +54,7 @@ export function OrganizationComboBox({
     const accessToken = window.localStorage.getItem("access_token")
     const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
     const userId = storedUser?.id
+    const instanceId = instanceIdRef.current
 
     if (!accessToken || !userId) {
       return
@@ -116,8 +113,6 @@ export function OrganizationComboBox({
           })
 
           if (!nextOrganizationOptions.length) {
-            const instanceId = instanceIdRef.current
-
             if (organizationRequirementOwnerId === null || organizationRequirementOwnerId === instanceId) {
               organizationRequirementOwnerId = instanceId
               setOrganizationDialogMode("create")
@@ -151,7 +146,7 @@ export function OrganizationComboBox({
     return () => {
       isMounted = false
 
-      if (organizationRequirementOwnerId === instanceIdRef.current) {
+      if (organizationRequirementOwnerId === instanceId) {
         organizationRequirementOwnerId = null
       }
     }

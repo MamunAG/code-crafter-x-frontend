@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   ArrowRight,
@@ -21,7 +24,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { fetchPendingOrganizationAccessRequests } from "@/features/organization-access-request/organization-access-request.service"
 import { getModuleNavigation } from "@/lib/module-navigation"
+import { parseStoredAuthUser } from "@/lib/auth-session"
 import { cn } from "@/lib/utils"
 
 type IamSection = {
@@ -87,12 +92,55 @@ const quickActions = [
     href: "/iam/security/sessions/active",
     icon: Fingerprint,
   },
+  {
+    label: "Access requests",
+    href: "/iam/access/organization-requests",
+    icon: ScrollText,
+  },
 ]
 
 export function IamOverview() {
-  const module = getModuleNavigation("iam")
+  const moduleData = getModuleNavigation("iam")
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+  const [pendingRequestCount, setPendingRequestCount] = useState<number | null>(null)
 
-  if (!module) {
+  useEffect(() => {
+    const accessToken = window.localStorage.getItem("access_token")
+    const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+
+    if (!accessToken || !storedUser?.id) {
+      setPendingRequestCount(null)
+      return
+    }
+
+    const authenticatedAccessToken = accessToken
+    let isMounted = true
+
+    async function loadPendingCount() {
+      try {
+        const pendingRequests = await fetchPendingOrganizationAccessRequests({
+          apiUrl,
+          accessToken: authenticatedAccessToken,
+        })
+
+        if (isMounted) {
+          setPendingRequestCount(pendingRequests.length)
+        }
+      } catch {
+        if (isMounted) {
+          setPendingRequestCount(null)
+        }
+      }
+    }
+
+    void loadPendingCount()
+
+    return () => {
+      isMounted = false
+    }
+  }, [apiUrl])
+
+  if (!moduleData) {
     return null
   }
 
@@ -165,22 +213,61 @@ export function IamOverview() {
                       <Link
                         key={action.href}
                         href={action.href}
-                        className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20"
+                        className={cn(
+                          "group flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20",
+                        )}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white transition group-hover:bg-sky-600 dark:bg-white dark:text-slate-950">
                             <Icon className="h-4 w-4" />
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                              {action.label}
-                            </p>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={cn(
+                                  "text-sm font-medium text-slate-900 dark:text-slate-100",
+                                  action.href === "/iam/access/organization-requests" &&
+                                    "whitespace-nowrap",
+                                )}
+                              >
+                                {action.label}
+                              </p>
+                              {action.href === "/iam/access/organization-requests" &&
+                              pendingRequestCount !== null ? (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "h-5 rounded-full border-slate-200 bg-white px-2 text-[10px] font-semibold uppercase tracking-[0.18em] dark:border-white/10 dark:bg-white/5",
+                                    pendingRequestCount > 0
+                                      ? "text-amber-700 dark:text-amber-200"
+                                      : "text-slate-500 dark:text-slate-400",
+                                  )}
+                                >
+                                  {pendingRequestCount}
+                                </Badge>
+                              ) : null}
+                            </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                              Jump straight into the operational screen.
+                              {action.href === "/iam/access/organization-requests" &&
+                              pendingRequestCount !== null
+                                ? pendingRequestCount > 0
+                                  ? `${pendingRequestCount} pending request${pendingRequestCount === 1 ? "" : "s"}`
+                                  : "No pending requests"
+                                : "Jump straight into the operational screen."}
                             </p>
+                            {action.href === "/iam/access/organization-requests" &&
+                            pendingRequestCount !== null ? (
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {pendingRequestCount > 0
+                                  ? "Review them in the IAM request queue."
+                                  : "All requests are cleared right now."}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
-                        <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-700 dark:group-hover:text-white" />
+                        <div className="flex shrink-0 items-center gap-2 pl-3">
+                          <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-700 dark:group-hover:text-white" />
+                        </div>
                       </Link>
                     )
                   })}
@@ -278,7 +365,7 @@ export function IamOverview() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-3">
-            {module.groups.map((group) => (
+            {moduleData.groups.map((group) => (
               <div
                 key={group.label}
                 className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"

@@ -287,6 +287,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
               { label: "Rules", href: "/iam/access/permissions/rules" },
             ],
           },
+          {
+            label: "Organization access",
+            href: "/iam/access/organization-requests",
+            description: "Review membership requests and assign users to organizations.",
+          },
         ],
       },
       {

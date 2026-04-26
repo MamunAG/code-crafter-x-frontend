@@ -1,9 +1,14 @@
 import type {
   ApiResponse,
-  OrganizationFormValues,
   OrganizationMembershipRecord,
   OrganizationRecord,
-} from "./organization.types"
+} from "@/features/organization/organization.types"
+
+import type {
+  OrganizationAccessRequestAssignment,
+  OrganizationAccessRequestFormValues,
+  OrganizationAccessRequestRecord,
+} from "./organization-access-request.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -11,7 +16,7 @@ function buildApiUrl(apiUrl: string, path: string) {
 
 async function readJsonResponse<T>(
   response: Response,
-  fallbackMessage = "Unable to complete the organization request right now.",
+  fallbackMessage = "Unable to complete the organization access request right now.",
 ) {
   let payload: ApiResponse<T> | null = null
 
@@ -32,16 +37,16 @@ async function readJsonResponse<T>(
   return payload
 }
 
-export async function createOrganization({
+export async function createOrganizationAccessRequest({
   apiUrl,
   accessToken,
   payload,
 }: {
   apiUrl: string
   accessToken: string
-  payload: OrganizationFormValues
-}): Promise<OrganizationRecord> {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/organization"), {
+  payload: OrganizationAccessRequestFormValues
+}): Promise<OrganizationAccessRequestRecord> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/organization-access-requests"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -49,74 +54,61 @@ export async function createOrganization({
       Accept: "application/json",
     },
     body: JSON.stringify({
-      name: payload.name.trim(),
-      address: payload.address.trim() || undefined,
-      contact: payload.contact.trim() || undefined,
-      isDefault: payload.isDefault,
+      adminEmail: payload.adminEmail.trim(),
+      message: payload.message.trim() || undefined,
     }),
   })
 
-  const responseData = await readJsonResponse<OrganizationRecord>(response)
+  const responseData = await readJsonResponse<OrganizationAccessRequestRecord>(response)
 
   if (!responseData.data) {
-    throw new Error("The organization was saved, but the created record was not returned.")
+    throw new Error("The access request was saved, but the created record was not returned.")
   }
 
   return responseData.data
 }
 
-export async function updateOrganization({
+export async function fetchPendingOrganizationAccessRequests({
   apiUrl,
   accessToken,
-  id,
-  payload,
 }: {
   apiUrl: string
   accessToken: string
-  id: string
-  payload: OrganizationFormValues
-}): Promise<OrganizationRecord> {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/organization/${id}`), {
-    method: "PATCH",
+}): Promise<OrganizationAccessRequestRecord[]> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/organization-access-requests/pending"), {
+    method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
-      name: payload.name.trim(),
-      address: payload.address.trim() || undefined,
-      contact: payload.contact.trim() || undefined,
-    }),
+    cache: "no-store",
   })
 
-  const responseData = await readJsonResponse<OrganizationRecord>(response)
+  const responseData = await readJsonResponse<OrganizationAccessRequestRecord[]>(
+    response,
+    "Unable to load pending access requests right now.",
+  )
 
-  if (!responseData.data) {
-    throw new Error("The organization was updated, but the updated record was not returned.")
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The pending access request list was returned without data.")
   }
 
   return responseData.data
 }
 
-export async function updateOrganizationDefault({
+export async function approveOrganizationAccessRequest({
   apiUrl,
   accessToken,
-  userId,
-  organizationId,
-  isDefault,
+  requestId,
+  assignments,
 }: {
   apiUrl: string
   accessToken: string
-  userId: string
-  organizationId: string
-  isDefault: boolean
-}): Promise<void> {
+  requestId: string
+  assignments: OrganizationAccessRequestAssignment[]
+}): Promise<OrganizationAccessRequestRecord> {
   const response = await fetch(
-    buildApiUrl(
-      apiUrl,
-      `/api/v1/user-to-oranization-map/mapping/${userId}/${organizationId}/default`,
-    ),
+    buildApiUrl(apiUrl, `/api/v1/organization-access-requests/${requestId}/approve`),
     {
       method: "PATCH",
       headers: {
@@ -124,47 +116,55 @@ export async function updateOrganizationDefault({
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ isDefault }),
+      body: JSON.stringify({ assignments }),
     },
   )
 
-  await readJsonResponse(response)
-}
+  const responseData = await readJsonResponse<OrganizationAccessRequestRecord>(response)
 
-export async function fetchUserOrganizations({
-  apiUrl,
-  accessToken,
-  userId,
-}: {
-  apiUrl: string
-  accessToken: string
-  userId: string
-}): Promise<OrganizationRecord[]> {
-  const response = await fetch(
-    buildApiUrl(apiUrl, `/api/v1/user-to-oranization-map/user/${userId}/organizations`),
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    },
-  )
-
-  const responseData = await readJsonResponse<OrganizationRecord[]>(
-    response,
-    "Unable to load organizations right now.",
-  )
-
-  if (!Array.isArray(responseData.data)) {
-    throw new Error("The organization list was returned without data.")
+  if (!responseData.data) {
+    throw new Error("The request was approved, but the updated record was not returned.")
   }
 
   return responseData.data
 }
 
-export async function fetchOrganizations({
+export async function rejectOrganizationAccessRequest({
+  apiUrl,
+  accessToken,
+  requestId,
+  reviewNote,
+}: {
+  apiUrl: string
+  accessToken: string
+  requestId: string
+  reviewNote?: string
+}): Promise<OrganizationAccessRequestRecord> {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/organization-access-requests/${requestId}/reject`),
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        reviewNote: reviewNote?.trim() || undefined,
+      }),
+    },
+  )
+
+  const responseData = await readJsonResponse<OrganizationAccessRequestRecord>(response)
+
+  if (!responseData.data) {
+    throw new Error("The request was rejected, but the updated record was not returned.")
+  }
+
+  return responseData.data
+}
+
+export async function fetchAccessibleOrganizations({
   apiUrl,
   accessToken,
 }: {
@@ -192,7 +192,7 @@ export async function fetchOrganizations({
   return responseData.data
 }
 
-export async function fetchUserOrganizationMappings({
+export async function fetchAdminOrganizationMemberships({
   apiUrl,
   accessToken,
   userId,
