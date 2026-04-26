@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { Building2, Plus } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
 
 import {
   Combobox,
@@ -28,7 +29,11 @@ type OrganizationComboBoxProps = {
   className?: string
 }
 
-export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
+let organizationRequirementOwnerId: string | null = null
+
+export function OrganizationComboBox({
+  className,
+}: OrganizationComboBoxProps) {
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([])
   const [selectedOrganization, setSelectedOrganization] = useState<OrganizationOption | null>(null)
   const [comboboxOpen, setComboboxOpen] = useState(false)
@@ -39,6 +44,13 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const preferredOrganizationIdRef = useRef<string | null>(null)
+  const instanceIdRef = useRef<string | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+
+  if (!instanceIdRef.current) {
+    instanceIdRef.current = crypto.randomUUID()
+  }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
 
@@ -102,6 +114,25 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
               ) ?? nextOrganizationOptions[0] ?? null
             )
           })
+
+          if (!nextOrganizationOptions.length) {
+            const instanceId = instanceIdRef.current
+
+            if (organizationRequirementOwnerId === null || organizationRequirementOwnerId === instanceId) {
+              organizationRequirementOwnerId = instanceId
+              setOrganizationDialogMode("create")
+              setOrganizationDialogOrganization(null)
+              setOrganizationDialogOpen(true)
+
+              if (pathname !== "/") {
+                router.replace("/")
+              }
+            }
+          }
+
+          if (nextOrganizationOptions.length && organizationRequirementOwnerId === instanceIdRef.current) {
+            organizationRequirementOwnerId = null
+          }
         }
       } catch {
         if (isMounted) {
@@ -119,12 +150,24 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
 
     return () => {
       isMounted = false
+
+      if (organizationRequirementOwnerId === instanceIdRef.current) {
+        organizationRequirementOwnerId = null
+      }
     }
-  }, [apiUrl, reloadKey])
+  }, [apiUrl, pathname, reloadKey, router])
 
   function handleOrganizationSaved(organization: OrganizationRecord) {
     preferredOrganizationIdRef.current = organization.id
     setReloadKey((currentReloadKey) => currentReloadKey + 1)
+  }
+
+  function handleOrganizationDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen && organizations.length === 0) {
+      return
+    }
+
+    setOrganizationDialogOpen(nextOpen)
   }
 
   function handleCreateOrganizationClick() {
@@ -214,7 +257,7 @@ export function OrganizationComboBox({ className }: OrganizationComboBoxProps) {
 
       <OrganizationEntryDialog
         open={organizationDialogOpen}
-        onOpenChange={setOrganizationDialogOpen}
+        onOpenChange={handleOrganizationDialogOpenChange}
         mode={organizationDialogMode}
         organization={organizationDialogOrganization}
         onSaved={handleOrganizationSaved}
