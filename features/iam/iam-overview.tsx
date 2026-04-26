@@ -258,9 +258,7 @@ export function IamOverview() {
                             {action.href === "/iam/access/organization-requests" &&
                             pendingRequestCount !== null ? (
                               <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {pendingRequestCount > 0
-                                  ? "Review them in the IAM request queue."
-                                  : "All requests are cleared right now."}
+                                Review them in queue
                               </p>
                             ) : null}
                           </div>
