@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   OrganizationFormValues,
+  OrganizationMemberUserRecord,
   OrganizationMembershipRecord,
   OrganizationRecord,
 } from "./organization.types"
@@ -220,6 +221,102 @@ export async function fetchUserOrganizationMappings({
 
   if (!Array.isArray(responseData.data)) {
     throw new Error("The organization membership list was returned without data.")
+  }
+
+  return responseData.data
+}
+
+export async function fetchOrganizationMemberships({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId: string
+}): Promise<OrganizationMembershipRecord[]> {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/user-to-oranization-map/organization/${organizationId}/mappings`),
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  )
+
+  const responseData = await readJsonResponse<OrganizationMembershipRecord[]>(
+    response,
+    "Unable to load organization members right now.",
+  )
+
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The organization member list was returned without data.")
+  }
+
+  return responseData.data
+}
+
+export async function revokeOrganizationAccess({
+  apiUrl,
+  accessToken,
+  userId,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  userId: string
+  organizationId: string
+}): Promise<void> {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/user-to-oranization-map/mapping/${userId}/${organizationId}`),
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+    },
+  )
+
+  await readJsonResponse<OrganizationMemberUserRecord>(response, "Unable to revoke organization access right now.")
+}
+
+export async function updateOrganizationMemberRole({
+  apiUrl,
+  accessToken,
+  userId,
+  organizationId,
+  role,
+}: {
+  apiUrl: string
+  accessToken: string
+  userId: string
+  organizationId: string
+  role: "admin" | "user"
+}): Promise<OrganizationMembershipRecord> {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/user-to-oranization-map/mapping/${userId}/${organizationId}/role`),
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ role }),
+    },
+  )
+
+  const responseData = await readJsonResponse<OrganizationMembershipRecord>(
+    response,
+    "Unable to update the member role right now.",
+  )
+
+  if (!responseData.data) {
+    throw new Error("The organization role was updated, but the updated membership was not returned.")
   }
 
   return responseData.data

@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
-import { Bell, House } from "lucide-react"
+import { House } from "lucide-react"
 
 import { AuthAvatarMenu } from "@/components/auth-avatar-menu"
 import { ModuleNavMenu } from "@/components/module-nav-menu"
+import { NotificationBell } from "@/components/notification-bell"
 import {
   AUTH_COOKIE_NAME,
   AUTH_USER_AVATAR_COOKIE_NAME,
@@ -85,20 +86,7 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
             <div className="hidden lg:block">
               <ModuleNavMenu current={current} />
             </div>
-            <Link
-              href="/account"
-              aria-label="Notifications"
-              title="Notifications"
-              className={cn(
-                "relative inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-white/20",
-                current === "account"
-                  ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                  : "",
-              )}
-            >
-              <Bell className="h-4 w-4" />
-              <span className="sr-only">Notifications</span>
-            </Link>
+            <NotificationBell />
             <AuthAvatarMenu userLabel={userLabel} imageUrl={userImageUrl} />
           </div>
         ) : (

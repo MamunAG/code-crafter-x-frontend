@@ -19,6 +19,7 @@ export type OrganizationMembershipRecord = {
   role: "admin" | "user"
   isDefault: boolean
   organization: OrganizationRecord
+  user?: OrganizationMemberUserRecord
 }
 
 export type OrganizationFormValues = {
@@ -26,4 +27,11 @@ export type OrganizationFormValues = {
   address: string
   contact: string
   isDefault: boolean
+}
+
+export type OrganizationMemberUserRecord = {
+  id: string
+  name?: string | null
+  email?: string | null
+  user_name?: string | null
 }
