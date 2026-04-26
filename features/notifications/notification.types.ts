@@ -21,4 +21,11 @@ export type NotificationRecord = {
 export type NotificationListResponse = {
   items: NotificationRecord[]
   unreadCount: number
+  meta: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+  }
 }

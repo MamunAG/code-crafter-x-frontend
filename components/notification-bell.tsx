@@ -19,6 +19,8 @@ import {
 } from "@/lib/firebase-client"
 import { cn } from "@/lib/utils"
 
+const NOTIFICATION_PAGE_SIZE = 10
+
 function formatNotificationTime(value: string) {
   const date = new Date(value)
 
@@ -53,13 +55,16 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasNextPage, setHasNextPage] = useState(false)
   const [workingId, setWorkingId] = useState("")
   const [markingAll, setMarkingAll] = useState(false)
 
   const hasUnread = unreadCount > 0
   const unreadLabel = useMemo(() => (unreadCount > 9 ? "9+" : String(unreadCount)), [unreadCount])
 
-  const loadNotifications = useCallback(async ({ silent = false } = {}) => {
+  const loadNotifications = useCallback(async ({ silent = false, nextPage = 1, append = false } = {}) => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     const accessToken = window.localStorage.getItem("access_token")
 
@@ -67,7 +72,9 @@ export function NotificationBell() {
       return
     }
 
-    if (!silent) {
+    if (append) {
+      setLoadingMore(true)
+    } else if (!silent) {
       setLoading(true)
     }
 
@@ -75,16 +82,22 @@ export function NotificationBell() {
       const result = await fetchNotifications({
         apiUrl,
         accessToken,
-        limit: 20,
+        page: nextPage,
+        limit: NOTIFICATION_PAGE_SIZE,
       })
 
-      setNotifications(result.items)
+      setNotifications((currentNotifications) =>
+        append ? [...currentNotifications, ...result.items] : result.items,
+      )
       setUnreadCount(result.unreadCount)
+      setPage(result.meta.page)
+      setHasNextPage(result.meta.hasNextPage)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load notifications right now."
       toast.error(message)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [])
 
@@ -208,12 +221,26 @@ export function NotificationBell() {
       })
       setNotifications(result.items)
       setUnreadCount(result.unreadCount)
+      setPage(result.meta.page)
+      setHasNextPage(result.meta.hasNextPage)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to mark notifications as read right now."
       toast.error(message)
     } finally {
       setMarkingAll(false)
     }
+  }
+
+  function handleLoadMore() {
+    if (!hasNextPage || loadingMore) {
+      return
+    }
+
+    void loadNotifications({
+      silent: true,
+      nextPage: page + 1,
+      append: true,
+    })
   }
 
   return (
@@ -266,38 +293,51 @@ export function NotificationBell() {
                 Loading notifications
               </div>
             ) : notifications.length > 0 ? (
-              notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  type="button"
-                  className={cn(
-                    "w-full rounded-2xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-white/10",
-                    notification.isRead ? "opacity-75" : "bg-slate-50 dark:bg-white/5",
-                  )}
-                  disabled={workingId === notification.id}
-                  onClick={() => void handleNotificationClick(notification)}
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={cn(
-                        "mt-1 h-2 w-2 shrink-0 rounded-full",
-                        notification.isRead ? "bg-slate-300 dark:bg-slate-700" : "bg-red-500",
-                      )}
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-slate-950 dark:text-white">
-                        {notification.title}
+              <>
+                {notifications.map((notification) => (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    className={cn(
+                      "w-full rounded-2xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-white/10",
+                      notification.isRead ? "opacity-75" : "bg-slate-50 dark:bg-white/5",
+                    )}
+                    disabled={workingId === notification.id}
+                    onClick={() => void handleNotificationClick(notification)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          "mt-1 h-2 w-2 shrink-0 rounded-full",
+                          notification.isRead ? "bg-slate-300 dark:bg-slate-700" : "bg-red-500",
+                        )}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-slate-950 dark:text-white">
+                          {notification.title}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
+                          {notification.body}
+                        </span>
+                        <span className="mt-2 block text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          {formatNotificationTime(notification.created_at)}
+                        </span>
                       </span>
-                      <span className="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
-                        {notification.body}
-                      </span>
-                      <span className="mt-2 block text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        {formatNotificationTime(notification.created_at)}
-                      </span>
-                    </span>
-                  </div>
-                </button>
-              ))
+                    </div>
+                  </button>
+                ))}
+                {hasNextPage ? (
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+                    disabled={loadingMore}
+                    onClick={handleLoadMore}
+                  >
+                    {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    {loadingMore ? "Loading more" : "Load more"}
+                  </button>
+                ) : null}
+              </>
             ) : (
               <div className="px-4 py-8 text-center">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">

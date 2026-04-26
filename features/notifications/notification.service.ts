@@ -30,13 +30,16 @@ async function readJsonResponse<T>(
 export async function fetchNotifications({
   apiUrl,
   accessToken,
-  limit = 20,
+  page = 1,
+  limit = 10,
 }: {
   apiUrl: string
   accessToken: string
+  page?: number
   limit?: number
 }): Promise<NotificationListResponse> {
   const url = buildApiUrl(apiUrl, "/api/v1/notifications")
+  url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
 
   const response = await fetch(url, {
