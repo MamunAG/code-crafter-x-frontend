@@ -233,14 +233,13 @@ export function IamOverview() {
                                 {action.label}
                               </p>
                               {action.href === "/iam/access/organization-requests" &&
-                                pendingRequestCount !== null ? (
+                              pendingRequestCount !== null &&
+                              pendingRequestCount > 0 ? (
                                 <Badge
                                   variant="outline"
                                   className={cn(
                                     "h-5 rounded-full border-slate-200 bg-white px-2 text-[10px] font-semibold uppercase tracking-[0.18em] dark:border-white/10 dark:bg-white/5",
-                                    pendingRequestCount > 0
-                                      ? "text-amber-700 dark:text-amber-200"
-                                      : "text-slate-500 dark:text-slate-400",
+                                    "text-amber-700 dark:text-amber-200",
                                   )}
                                 >
                                   {pendingRequestCount}
@@ -256,7 +255,7 @@ export function IamOverview() {
                                 : "Jump straight into the operational screen."}
                             </p>
                             {action.href === "/iam/access/organization-requests" &&
-                              pendingRequestCount !== null ? (
+                            pendingRequestCount !== null ? (
                               <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Review them in queue
                               </p>
