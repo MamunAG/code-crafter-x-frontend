@@ -53,6 +53,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             ],
           },
           {
+            label: "Module Entry",
+            href: "/app-config/core/module-entry",
+            description: "Create and manage application module entries.",
+          },
+          {
             label: "Menu",
             href: "/app-config/core/menu",
             description: "Create and manage organization-specific menu entries.",
@@ -293,7 +298,7 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             ],
           },
           {
-            label: "Menu permissions",
+            label: "User menu access",
             href: "/iam/access/menu-permissions",
             description: "Grant view, create, update, and delete menu access to users.",
           },

@@ -1,0 +1,7 @@
+import { ModuleEntryWorkspace } from "./module-entry-workspace"
+
+export function ModuleEntryPage() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+
+  return <ModuleEntryWorkspace apiUrl={apiUrl} />
+}

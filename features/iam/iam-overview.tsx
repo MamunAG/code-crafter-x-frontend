@@ -78,24 +78,19 @@ const quickActions = [
     icon: UserCog,
   },
   {
-    label: "Role matrix",
-    href: "/iam/access/roles/matrix",
+    label: "User menu access",
+    href: "/iam/access/menu-permissions",
     icon: ShieldHalf,
   },
   {
-    label: "Audit events",
-    href: "/iam/security/audit-logs/events",
+    label: "Access requests",
+    href: "/iam/access/organization-requests",
     icon: ScrollText,
   },
   {
     label: "Active sessions",
     href: "/iam/security/sessions/active",
     icon: Fingerprint,
-  },
-  {
-    label: "Access requests",
-    href: "/iam/access/organization-requests",
-    icon: ScrollText,
   },
 ]
 

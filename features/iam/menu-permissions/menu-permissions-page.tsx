@@ -1,11 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, RefreshCcw, Save, ShieldCheck } from "lucide-react"
+import { Loader2, RefreshCcw, Save, Search, ShieldCheck, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fetchMenus } from "@/features/app-config/menu/menu.service"
@@ -27,6 +29,7 @@ import type {
 } from "./menu-permission.types"
 
 type PermissionKey = "canView" | "canCreate" | "canUpdate" | "canDelete"
+type MenuFilterMode = "all" | "mapped" | "unmapped"
 
 const PERMISSION_LABELS: Array<{ key: PermissionKey; label: string }> = [
   { key: "canView", label: "View" },
@@ -67,6 +70,8 @@ export function MenuPermissionsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [menuSearch, setMenuSearch] = useState("")
+  const [menuFilterMode, setMenuFilterMode] = useState<MenuFilterMode>("all")
   const menusRef = useRef<MenuRecord[]>([])
   const manageableMappingsRef = useRef<ManageableUserMappingRecord[]>([])
 
@@ -94,6 +99,27 @@ export function MenuPermissionsPage() {
     () => new Map(permissions.map((permission) => [permission.menuId, permission])),
     [permissions],
   )
+
+  const filteredMenus = useMemo(() => {
+    const normalizedSearch = menuSearch.trim().toLowerCase()
+
+    return menus.filter((menu) => {
+      const isMapped = mappedMenuIdSet.has(menu.id)
+      const matchesMode =
+        menuFilterMode === "all"
+        || (menuFilterMode === "mapped" && isMapped)
+        || (menuFilterMode === "unmapped" && !isMapped)
+      const matchesSearch =
+        !normalizedSearch
+        || menu.menuName.toLowerCase().includes(normalizedSearch)
+        || menu.menuPath.toLowerCase().includes(normalizedSearch)
+        || menu.description?.toLowerCase().includes(normalizedSearch)
+
+      return matchesMode && matchesSearch
+    })
+  }, [mappedMenuIdSet, menuFilterMode, menuSearch, menus])
+
+  const hasMenuFilters = Boolean(menuSearch.trim() || menuFilterMode !== "all")
 
   const loadOrganizationAccess = useCallback(async (userId: string, organizationId: string, nextMenus?: MenuRecord[]) => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -309,6 +335,11 @@ export function MenuPermissionsPage() {
     )
   }
 
+  function resetMenuFilters() {
+    setMenuSearch("")
+    setMenuFilterMode("all")
+  }
+
   async function handleSave() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     const accessToken = window.localStorage.getItem("access_token")
@@ -462,6 +493,57 @@ export function MenuPermissionsPage() {
           </Button>
         </div>
 
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={menuSearch}
+                onChange={(event) => setMenuSearch(event.target.value)}
+                placeholder="Search menu by name, path, or description"
+                className="h-11 rounded-xl bg-white pl-9 dark:bg-slate-950"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(["all", "mapped", "unmapped"] as MenuFilterMode[]).map((mode) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  variant={menuFilterMode === mode ? "default" : "outline"}
+                  className="h-10 rounded-full capitalize"
+                  onClick={() => setMenuFilterMode(mode)}
+                >
+                  {mode}
+                </Button>
+              ))}
+              {hasMenuFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 rounded-full"
+                  onClick={resetMenuFilters}
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-full">
+              Showing {filteredMenus.length} of {menus.length}
+            </Badge>
+            <Badge variant="secondary" className="rounded-full">
+              {mappedMenuIds.length} mapped
+            </Badge>
+            <Badge variant="outline" className="rounded-full">
+              {Math.max(menus.length - mappedMenuIds.length, 0)} unmapped
+            </Badge>
+          </div>
+        </div>
+
         <div className="mt-5 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 p-8 text-sm text-slate-500 dark:border-white/10">
@@ -489,8 +571,18 @@ export function MenuPermissionsPage() {
                 Create menu entries under App Config before assigning permissions.
               </p>
             </div>
+          ) : !filteredMenus.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+              <p className="font-bold">No menu matches your search.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Try another name/path or clear the menu filters.
+              </p>
+              <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={resetMenuFilters}>
+                Clear filters
+              </Button>
+            </div>
           ) : (
-            menus.map((menu) => {
+            filteredMenus.map((menu) => {
               const permission = permissionByMenuId.get(menu.id)
               const isMapped = mappedMenuIdSet.has(menu.id)
 
