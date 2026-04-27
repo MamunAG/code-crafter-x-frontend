@@ -14,6 +14,7 @@ import { confirmEmailCode, requestConfirmEmailCode } from "./confirm-email.servi
 type ConfirmEmailFormProps = {
   apiUrl: string
   initialEmail?: string
+  initialStep?: ConfirmStep
 }
 
 type ConfirmStep = "request" | "verify"
@@ -75,10 +76,14 @@ function StepIndicator({ activeStep }: { activeStep: ConfirmStep }) {
   )
 }
 
-export function ConfirmEmailForm({ apiUrl, initialEmail = "" }: ConfirmEmailFormProps) {
+export function ConfirmEmailForm({
+  apiUrl,
+  initialEmail = "",
+  initialStep = "request",
+}: ConfirmEmailFormProps) {
   const router = useRouter()
 
-  const [step, setStep] = useState<ConfirmStep>(initialEmail ? "verify" : "request")
+  const [step, setStep] = useState<ConfirmStep>(initialStep)
   const [email, setEmail] = useState(initialEmail)
   const [code, setCode] = useState("")
   const [requesting, setRequesting] = useState(false)

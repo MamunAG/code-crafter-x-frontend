@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, RefreshCcw, Save, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 
@@ -67,6 +67,16 @@ export function MenuPermissionsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const menusRef = useRef<MenuRecord[]>([])
+  const manageableMappingsRef = useRef<ManageableUserMappingRecord[]>([])
+
+  useEffect(() => {
+    menusRef.current = menus
+  }, [menus])
+
+  useEffect(() => {
+    manageableMappingsRef.current = manageableMappings
+  }, [manageableMappings])
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === selectedUserId) ?? null,
@@ -85,14 +95,14 @@ export function MenuPermissionsPage() {
     [permissions],
   )
 
-  const loadOrganizationAccess = useCallback(
-    async (userId: string, organizationId: string, nextMenus?: MenuRecord[]) => {
+  const loadOrganizationAccess = useCallback(async (userId: string, organizationId: string, nextMenus?: MenuRecord[]) => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
       const accessToken = window.localStorage.getItem("access_token")
+      const menuList = nextMenus ?? menusRef.current
 
       if (!apiUrl || !accessToken || !userId || !organizationId) {
         setMappedMenuIds([])
-        setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+        setPermissions(buildDefaultPermissions(menuList, []))
         return
       }
 
@@ -100,7 +110,6 @@ export function MenuPermissionsPage() {
       setError("")
 
       try {
-        const menuList = nextMenus ?? menus
         const [menuMaps, existingPermissions] = await Promise.all([
           fetchMenuOrganizationMaps({
             apiUrl,
@@ -124,9 +133,7 @@ export function MenuPermissionsPage() {
       } finally {
         setLoading(false)
       }
-    },
-    [menus],
-  )
+    }, [])
 
   const loadUserOrganizations = useCallback(
     async (
@@ -135,11 +142,13 @@ export function MenuPermissionsPage() {
       preferredOrganizationId?: string,
       nextMenus?: MenuRecord[],
     ) => {
+      const menuList = nextMenus ?? menusRef.current
+
       if (!userId) {
         setOrganizations([])
         setSelectedOrganizationId("")
         setMappedMenuIds([])
-        setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+        setPermissions(buildDefaultPermissions(menuList, []))
         return
       }
 
@@ -166,7 +175,7 @@ export function MenuPermissionsPage() {
           await loadOrganizationAccess(userId, nextOrganization.id, nextMenus)
         } else {
           setMappedMenuIds([])
-          setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+          setPermissions(buildDefaultPermissions(menuList, []))
         }
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "Unable to load user organizations."
@@ -176,7 +185,7 @@ export function MenuPermissionsPage() {
         setLoading(false)
       }
     },
-    [loadOrganizationAccess, menus],
+    [loadOrganizationAccess],
   )
 
   const loadWorkspace = useCallback(async () => {
@@ -248,7 +257,7 @@ export function MenuPermissionsPage() {
 
   async function handleUserChange(userId: string) {
     setSelectedUserId(userId)
-    await loadUserOrganizations(userId, manageableMappings)
+    await loadUserOrganizations(userId, manageableMappingsRef.current)
   }
 
   async function handleOrganizationChange(organizationId: string) {

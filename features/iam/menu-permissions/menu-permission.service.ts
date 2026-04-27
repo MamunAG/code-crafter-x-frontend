@@ -22,8 +22,12 @@ async function readJsonResponse<T>(
     payload = null
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error(payload?.message || "You do not have permission to manage menu access.")
   }
 
   if (!response.ok || !payload?.success) {

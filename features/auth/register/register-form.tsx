@@ -57,7 +57,7 @@ export function RegisterForm({ apiUrl }: RegisterFormProps) {
       const payload = await registerUser({ apiUrl, values })
       setMessage(payload.message || "Registration successful")
       setValues(initialValues)
-      router.push(`/confirm-email?email=${encodeURIComponent(values.email)}`)
+      router.push(`/confirm-email?email=${encodeURIComponent(values.email)}&from=register&step=code`)
       shouldRedirect = true
     } catch (error) {
       setError(error instanceof Error ? error.message : "Registration failed")
