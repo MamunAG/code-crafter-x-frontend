@@ -1,5 +1,7 @@
-import { MenuEntryPage } from "@/features/app-config/menu/menu-entry-page"
+import { MenuWorkspace } from "@/features/app-config/menu/menu-workspace"
 
 export default function Page() {
-  return <MenuEntryPage />
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+
+  return <MenuWorkspace apiUrl={apiUrl} />
 }

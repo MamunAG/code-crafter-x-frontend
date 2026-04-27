@@ -6,22 +6,25 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fetchMenus } from "@/features/app-config/menu/menu.service"
 import type { MenuRecord } from "@/features/app-config/menu/menu.types"
-import {
-  fetchOrganizationMemberships,
-  fetchUserOrganizations,
-} from "@/features/organization/organization.service"
-import type { OrganizationMembershipRecord, OrganizationRecord } from "@/features/organization/organization.types"
+import type { OrganizationRecord } from "@/features/organization/organization.types"
 import { getAuthInitials, parseStoredAuthUser } from "@/lib/auth-session"
 import {
-  readSelectedOrganizationId,
-  SELECTED_ORGANIZATION_CHANGED_EVENT,
-  writeSelectedOrganizationId,
-} from "@/lib/organization-selection"
-import { fetchMenuPermissions, saveMenuPermissions } from "./menu-permission.service"
-import type { MenuPermissionRecord, MenuPermissionValue } from "./menu-permission.types"
+  fetchManageableUserMappings,
+  fetchMenuOrganizationMaps,
+  fetchMenuPermissions,
+  saveMenuOrganizationMaps,
+  saveMenuPermissions,
+} from "./menu-permission.service"
+import type {
+  ManageableUserMappingRecord,
+  MenuPermissionRecord,
+  MenuPermissionValue,
+  UserOptionRecord,
+} from "./menu-permission.types"
 
 type PermissionKey = "canView" | "canCreate" | "canUpdate" | "canDelete"
 
@@ -32,8 +35,8 @@ const PERMISSION_LABELS: Array<{ key: PermissionKey; label: string }> = [
   { key: "canDelete", label: "Delete" },
 ]
 
-function getMemberLabel(membership: OrganizationMembershipRecord) {
-  return membership.user?.name || membership.user?.user_name || membership.user?.email || "User"
+function getUserLabel(user: UserOptionRecord) {
+  return user.name || user.user_name || user.email || "User"
 }
 
 function buildDefaultPermissions(menus: MenuRecord[], records: MenuPermissionRecord[]) {
@@ -53,30 +56,127 @@ function buildDefaultPermissions(menus: MenuRecord[], records: MenuPermissionRec
 }
 
 export function MenuPermissionsPage() {
+  const [users, setUsers] = useState<UserOptionRecord[]>([])
+  const [manageableMappings, setManageableMappings] = useState<ManageableUserMappingRecord[]>([])
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([])
-  const [memberships, setMemberships] = useState<OrganizationMembershipRecord[]>([])
   const [menus, setMenus] = useState<MenuRecord[]>([])
+  const [mappedMenuIds, setMappedMenuIds] = useState<string[]>([])
   const [permissions, setPermissions] = useState<MenuPermissionValue[]>([])
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
   const [selectedUserId, setSelectedUserId] = useState("")
-  const [currentUserId, setCurrentUserId] = useState("")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const selectedUser = useMemo(
+    () => users.find((user) => user.id === selectedUserId) ?? null,
+    [selectedUserId, users],
+  )
 
   const selectedOrganization = useMemo(
     () => organizations.find((organization) => organization.id === selectedOrganizationId) ?? null,
     [organizations, selectedOrganizationId],
   )
 
-  const editableMemberships = useMemo(
-    () => memberships.filter((membership) => membership.userId !== currentUserId),
-    [currentUserId, memberships],
-  )
+  const mappedMenuIdSet = useMemo(() => new Set(mappedMenuIds), [mappedMenuIds])
 
   const permissionByMenuId = useMemo(
     () => new Map(permissions.map((permission) => [permission.menuId, permission])),
     [permissions],
+  )
+
+  const loadOrganizationAccess = useCallback(
+    async (userId: string, organizationId: string, nextMenus?: MenuRecord[]) => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const accessToken = window.localStorage.getItem("access_token")
+
+      if (!apiUrl || !accessToken || !userId || !organizationId) {
+        setMappedMenuIds([])
+        setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+        return
+      }
+
+      setLoading(true)
+      setError("")
+
+      try {
+        const menuList = nextMenus ?? menus
+        const [menuMaps, existingPermissions] = await Promise.all([
+          fetchMenuOrganizationMaps({
+            apiUrl,
+            accessToken,
+            organizationId,
+          }),
+          fetchMenuPermissions({
+            apiUrl,
+            accessToken,
+            userId,
+            organizationId,
+          }),
+        ])
+
+        setMappedMenuIds(menuMaps.map((mapping) => mapping.menuId))
+        setPermissions(buildDefaultPermissions(menuList, existingPermissions))
+      } catch (loadError) {
+        const message = loadError instanceof Error ? loadError.message : "Unable to load menu access."
+        setError(message)
+        toast.error(message)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [menus],
+  )
+
+  const loadUserOrganizations = useCallback(
+    async (
+      userId: string,
+      sourceMappings: ManageableUserMappingRecord[],
+      preferredOrganizationId?: string,
+      nextMenus?: MenuRecord[],
+    ) => {
+      if (!userId) {
+        setOrganizations([])
+        setSelectedOrganizationId("")
+        setMappedMenuIds([])
+        setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+        return
+      }
+
+      setLoading(true)
+      setError("")
+
+      try {
+        const userOrganizations = sourceMappings
+          .filter((mapping) => mapping.userId === userId)
+          .map((mapping) => ({
+            ...mapping.organization,
+            isDefault: mapping.isDefault,
+          }))
+        const nextOrganization =
+          userOrganizations.find((organization) => organization.id === preferredOrganizationId)
+          ?? userOrganizations.find((organization) => organization.isDefault)
+          ?? userOrganizations[0]
+          ?? null
+
+        setOrganizations(userOrganizations)
+        setSelectedOrganizationId(nextOrganization?.id ?? "")
+
+        if (nextOrganization) {
+          await loadOrganizationAccess(userId, nextOrganization.id, nextMenus)
+        } else {
+          setMappedMenuIds([])
+          setPermissions(buildDefaultPermissions(nextMenus ?? menus, []))
+        }
+      } catch (loadError) {
+        const message = loadError instanceof Error ? loadError.message : "Unable to load user organizations."
+        setError(message)
+        toast.error(message)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [loadOrganizationAccess, menus],
   )
 
   const loadWorkspace = useCallback(async () => {
@@ -90,147 +190,103 @@ export function MenuPermissionsPage() {
       return
     }
 
-    setCurrentUserId(storedUser.id)
     setLoading(true)
     setError("")
 
     try {
-      const userOrganizations = await fetchUserOrganizations({
-        apiUrl,
-        accessToken,
-        userId: storedUser.id,
-      })
-      const storedOrganizationId = readSelectedOrganizationId()
-      const nextOrganization =
-        userOrganizations.find((organization) => organization.id === storedOrganizationId)
-        ?? userOrganizations.find((organization) => organization.isDefault)
-        ?? userOrganizations[0]
-        ?? null
+      const [nextUsers, menuResult] = await Promise.all([
+        fetchManageableUserMappings({
+          apiUrl,
+          accessToken,
+        }),
+        fetchMenus({
+          apiUrl,
+          accessToken,
+          page: 1,
+          limit: 100,
+        }),
+      ])
+      const editableMappings = nextUsers.filter((mapping) => mapping.userId !== storedUser.id)
+      const userById = new Map<string, UserOptionRecord>()
 
-      setOrganizations(userOrganizations)
+      for (const mapping of editableMappings) {
+        if (mapping.user && !userById.has(mapping.userId)) {
+          userById.set(mapping.userId, {
+            ...mapping.user,
+            role: mapping.role,
+          })
+        }
+      }
 
-      if (nextOrganization) {
-        setSelectedOrganizationId(nextOrganization.id)
-        writeSelectedOrganizationId(nextOrganization.id)
+      const editableUsers = [...userById.values()]
+      const nextUserId = editableUsers[0]?.id ?? ""
+
+      setManageableMappings(editableMappings)
+      setUsers(editableUsers)
+      setMenus(menuResult.items)
+      setSelectedUserId(nextUserId)
+
+      if (nextUserId) {
+        await loadUserOrganizations(nextUserId, editableMappings, undefined, menuResult.items)
+      } else {
+        setOrganizations([])
+        setMappedMenuIds([])
+        setPermissions(buildDefaultPermissions(menuResult.items, []))
       }
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Unable to load organizations right now."
+      const message = loadError instanceof Error ? loadError.message : "Unable to load menu permissions right now."
       setError(message)
       toast.error(message)
     } finally {
       setLoading(false)
     }
-  }, [])
-
-  const loadOrganizationData = useCallback(
-    async (organizationId: string, preferredUserId?: string) => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const accessToken = window.localStorage.getItem("access_token")
-
-      if (!apiUrl || !accessToken || !organizationId) {
-        setMemberships([])
-        setMenus([])
-        setPermissions([])
-        return
-      }
-
-      setLoading(true)
-      setError("")
-
-      try {
-        const [nextMemberships, menuResult] = await Promise.all([
-          fetchOrganizationMemberships({
-            apiUrl,
-            accessToken,
-            organizationId,
-          }),
-          fetchMenus({
-            apiUrl,
-            accessToken,
-            organizationId,
-            page: 1,
-            limit: 100,
-          }),
-        ])
-        const nextEditableMemberships = nextMemberships.filter((membership) => membership.userId !== currentUserId)
-        const nextSelectedUserId =
-          nextEditableMemberships.find((membership) => membership.userId === preferredUserId)?.userId
-          ?? nextEditableMemberships[0]?.userId
-          ?? ""
-
-        setMemberships(nextMemberships)
-        setMenus(menuResult.items)
-        setSelectedUserId(nextSelectedUserId)
-
-        if (nextSelectedUserId) {
-          const existingPermissions = await fetchMenuPermissions({
-            apiUrl,
-            accessToken,
-            organizationId,
-            userId: nextSelectedUserId,
-          })
-          setPermissions(buildDefaultPermissions(menuResult.items, existingPermissions))
-        } else {
-          setPermissions(buildDefaultPermissions(menuResult.items, []))
-        }
-      } catch (loadError) {
-        const message = loadError instanceof Error ? loadError.message : "Unable to load menu permissions right now."
-        setError(message)
-        toast.error(message)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [currentUserId],
-  )
+  }, [loadUserOrganizations])
 
   useEffect(() => {
     void loadWorkspace()
   }, [loadWorkspace])
 
-  useEffect(() => {
-    if (selectedOrganizationId) {
-      void loadOrganizationData(selectedOrganizationId, selectedUserId)
-    }
-  }, [loadOrganizationData, selectedOrganizationId])
-
-  useEffect(() => {
-    function handleOrganizationChange(event: Event) {
-      const customEvent = event as CustomEvent<{ organizationId?: string }>
-      const organizationId = customEvent.detail?.organizationId || readSelectedOrganizationId()
-      setSelectedOrganizationId(organizationId)
-    }
-
-    window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
-    return () => window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
-  }, [])
-
   async function handleUserChange(userId: string) {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    const accessToken = window.localStorage.getItem("access_token")
-
     setSelectedUserId(userId)
+    await loadUserOrganizations(userId, manageableMappings)
+  }
 
-    if (!apiUrl || !accessToken || !selectedOrganizationId || !userId) {
-      setPermissions(buildDefaultPermissions(menus, []))
-      return
-    }
+  async function handleOrganizationChange(organizationId: string) {
+    setSelectedOrganizationId(organizationId)
+    await loadOrganizationAccess(selectedUserId, organizationId)
+  }
 
-    try {
-      const existingPermissions = await fetchMenuPermissions({
-        apiUrl,
-        accessToken,
-        organizationId: selectedOrganizationId,
-        userId,
-      })
-      setPermissions(buildDefaultPermissions(menus, existingPermissions))
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Unable to load user menu permissions."
-      toast.error(message)
+  function toggleMapping(menuId: string, value: boolean) {
+    setMappedMenuIds((currentMenuIds) => {
+      if (value) {
+        return currentMenuIds.includes(menuId) ? currentMenuIds : [...currentMenuIds, menuId]
+      }
+
+      return currentMenuIds.filter((currentMenuId) => currentMenuId !== menuId)
+    })
+
+    if (!value) {
+      setPermissions((currentPermissions) =>
+        currentPermissions.map((permission) =>
+          permission.menuId === menuId
+            ? {
+                ...permission,
+                canView: false,
+                canCreate: false,
+                canUpdate: false,
+                canDelete: false,
+              }
+            : permission,
+        ),
+      )
     }
   }
 
   function togglePermission(menuId: string, key: PermissionKey, value: boolean) {
+    if (!mappedMenuIdSet.has(menuId)) {
+      return
+    }
+
     setPermissions((currentPermissions) =>
       currentPermissions.map((permission) =>
         permission.menuId === menuId
@@ -249,29 +305,39 @@ export function MenuPermissionsPage() {
     const accessToken = window.localStorage.getItem("access_token")
 
     if (!apiUrl || !accessToken) {
-      toast.error("Please sign in again to save menu permissions.")
+      toast.error("Please sign in again to save menu access.")
       return
     }
 
-    if (!selectedOrganizationId || !selectedUserId) {
-      toast.error("Select an organization and user before saving permissions.")
+    if (!selectedUserId || !selectedOrganizationId) {
+      toast.error("Select a user and organization before saving menu access.")
       return
     }
 
     setSaving(true)
 
     try {
-      const savedPermissions = await saveMenuPermissions({
+      const nextMappedMenuIds = [...new Set(mappedMenuIds)]
+      await saveMenuOrganizationMaps({
         apiUrl,
         accessToken,
         organizationId: selectedOrganizationId,
-        userId: selectedUserId,
-        permissions,
+        menuIds: nextMappedMenuIds,
       })
+
+      const savedPermissions = await saveMenuPermissions({
+        apiUrl,
+        accessToken,
+        userId: selectedUserId,
+        organizationId: selectedOrganizationId,
+        permissions: permissions.filter((permission) => nextMappedMenuIds.includes(permission.menuId)),
+      })
+
+      setMappedMenuIds(nextMappedMenuIds)
       setPermissions(buildDefaultPermissions(menus, savedPermissions))
-      toast.success("Menu permissions saved successfully.")
+      toast.success("Menu access saved successfully.")
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : "Unable to save menu permissions right now."
+      const message = saveError instanceof Error ? saveError.message : "Unable to save menu access right now."
       toast.error(message)
     } finally {
       setSaving(false)
@@ -279,7 +345,8 @@ export function MenuPermissionsPage() {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto p-4 text-slate-950 dark:text-white sm:p-6">
+    <ScrollArea className="h-full">
+      <div className="p-4 text-slate-950 dark:text-white sm:p-6">
       <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-2xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-950/75 dark:shadow-black/25">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -287,19 +354,19 @@ export function MenuPermissionsPage() {
               IAM Access
             </p>
             <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
-              Menu permissions
+              User menu access
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Organization admins can grant view, create, update, and delete permissions for each
-              App Config menu entry to other users in the same organization.
+              Select a user first, choose one of their organizations, map the available menus to
+              that organization, then grant the user view, create, update, and delete access.
             </p>
           </div>
           <Button
             type="button"
             variant="outline"
             className="rounded-full"
-            onClick={() => void loadOrganizationData(selectedOrganizationId, selectedUserId)}
-            disabled={loading || !selectedOrganizationId}
+            onClick={() => void loadWorkspace()}
+            disabled={loading}
           >
             <RefreshCcw className={loading ? "animate-spin" : ""} />
             Refresh
@@ -309,12 +376,6 @@ export function MenuPermissionsPage() {
         <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Organization
-            </p>
-            <p className="mt-2 font-semibold">{selectedOrganization?.name || "No organization selected"}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
               User
             </p>
             <Select value={selectedUserId} onValueChange={(value) => void handleUserChange(value)}>
@@ -322,21 +383,44 @@ export function MenuPermissionsPage() {
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                {editableMemberships.map((membership) => (
-                  <SelectItem key={membership.userId} value={membership.userId}>
-                    {getMemberLabel(membership)}
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {getUserLabel(user)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+              Organization
+            </p>
+            <Select
+              value={selectedOrganizationId}
+              onValueChange={(value) => void handleOrganizationChange(value)}
+              disabled={!selectedUserId || organizations.length === 0}
+            >
+              <SelectTrigger className="mt-2 h-10 w-full rounded-xl bg-white dark:bg-slate-950">
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((organization) => (
+                  <SelectItem key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200">
             <p className="flex items-center gap-2 text-sm font-bold">
               <ShieldCheck className="h-4 w-4" />
-              Admin managed
+              Org scoped
             </p>
             <p className="mt-1 text-xs leading-5">
-              Only organization admins can change these permissions.
+              Saved access applies only to this user and organization.
             </p>
           </div>
         </div>
@@ -353,17 +437,19 @@ export function MenuPermissionsPage() {
           <div>
             <h2 className="text-lg font-black">Menu access matrix</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              {menus.length} menu{menus.length === 1 ? "" : "s"} available for this organization.
+              {selectedUser ? getUserLabel(selectedUser) : "No user"} in{" "}
+              {selectedOrganization?.name || "no organization"} has {mappedMenuIds.length} mapped
+              menu{mappedMenuIds.length === 1 ? "" : "s"}.
             </p>
           </div>
           <Button
             type="button"
             className="rounded-full"
-            disabled={saving || loading || !selectedUserId || menus.length === 0}
+            disabled={saving || loading || !selectedUserId || !selectedOrganizationId}
             onClick={() => void handleSave()}
           >
             {saving ? <Loader2 className="animate-spin" /> : <Save />}
-            Save permissions
+            Save access
           </Button>
         </div>
 
@@ -371,13 +457,20 @@ export function MenuPermissionsPage() {
           {loading ? (
             <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 p-8 text-sm text-slate-500 dark:border-white/10">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading permissions
+              Loading menu access
             </div>
-          ) : !editableMemberships.length ? (
+          ) : !users.length ? (
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
               <p className="font-bold">No users available.</p>
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Add another user to this organization before assigning menu permissions.
+                Add another user before assigning menu access.
+              </p>
+            </div>
+          ) : !organizations.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+              <p className="font-bold">This user has no organizations.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Map the user to an organization before assigning menu access.
               </p>
             </div>
           ) : !menus.length ? (
@@ -390,6 +483,7 @@ export function MenuPermissionsPage() {
           ) : (
             menus.map((menu) => {
               const permission = permissionByMenuId.get(menu.id)
+              const isMapped = mappedMenuIdSet.has(menu.id)
 
               return (
                 <article
@@ -415,7 +509,14 @@ export function MenuPermissionsPage() {
                     ) : null}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100">
+                      <Checkbox
+                        checked={isMapped}
+                        onCheckedChange={(checked) => toggleMapping(menu.id, Boolean(checked))}
+                      />
+                      Map
+                    </label>
                     {PERMISSION_LABELS.map((item) => (
                       <label
                         key={item.key}
@@ -423,6 +524,7 @@ export function MenuPermissionsPage() {
                       >
                         <Checkbox
                           checked={Boolean(permission?.[item.key])}
+                          disabled={!isMapped}
                           onCheckedChange={(checked) =>
                             togglePermission(menu.id, item.key, Boolean(checked))
                           }
@@ -437,6 +539,7 @@ export function MenuPermissionsPage() {
           )}
         </div>
       </section>
-    </div>
+      </div>
+    </ScrollArea>
   )
 }

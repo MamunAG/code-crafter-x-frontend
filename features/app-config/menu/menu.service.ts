@@ -1,4 +1,10 @@
-import type { ApiResponse, MenuFormValues, MenuRecord, PaginatedResponse } from "./menu.types"
+import type {
+  ApiResponse,
+  MenuFilterValues,
+  MenuFormValues,
+  MenuRecord,
+  PaginatedResponse,
+} from "./menu.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -30,20 +36,31 @@ async function readJsonResponse<T>(
 export async function fetchMenus({
   apiUrl,
   accessToken,
-  organizationId,
+  filters,
   page = 1,
   limit = 20,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId: string
+  filters?: Partial<MenuFilterValues>
   page?: number
   limit?: number
 }): Promise<PaginatedResponse<MenuRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/menu")
-  url.searchParams.set("organizationId", organizationId)
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
+
+  if (filters?.menuName?.trim()) {
+    url.searchParams.set("menuName", filters.menuName.trim())
+  }
+
+  if (filters?.menuPath?.trim()) {
+    url.searchParams.set("menuPath", filters.menuPath.trim())
+  }
+
+  if (filters?.isActive && filters.isActive !== "all") {
+    url.searchParams.set("isActive", filters.isActive === "active" ? "true" : "false")
+  }
 
   const response = await fetch(url, {
     method: "GET",
@@ -146,7 +163,6 @@ export async function deleteMenu({
 
 function normalizePayload(payload: MenuFormValues) {
   return {
-    organizationId: payload.organizationId,
     menuName: payload.menuName.trim(),
     menuPath: payload.menuPath.trim(),
     description: payload.description.trim() || undefined,

@@ -1,5 +1,3 @@
-import type { OrganizationRecord } from "@/features/organization/organization.types"
-
 export type ApiResponse<T = unknown> = {
   success: boolean
   message: string
@@ -23,22 +21,25 @@ export type PaginatedResponse<T> = {
 
 export type MenuRecord = {
   id: string
-  organizationId: string
   menuName: string
   menuPath: string
   description?: string | null
   displayOrder: number
   isActive: boolean
-  organization?: OrganizationRecord
   created_at?: string
   updated_at?: string | null
 }
 
 export type MenuFormValues = {
-  organizationId: string
   menuName: string
   menuPath: string
   description: string
   displayOrder: number
   isActive: boolean
+}
+
+export type MenuFilterValues = {
+  menuName: string
+  menuPath: string
+  isActive: "all" | "active" | "inactive"
 }

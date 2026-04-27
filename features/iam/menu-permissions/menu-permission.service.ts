@@ -1,4 +1,10 @@
-import type { ApiResponse, MenuPermissionRecord, MenuPermissionValue } from "./menu-permission.types"
+import type {
+  ApiResponse,
+  ManageableUserMappingRecord,
+  MenuOrganizationMapRecord,
+  MenuPermissionRecord,
+  MenuPermissionValue,
+} from "./menu-permission.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -30,19 +36,22 @@ async function readJsonResponse<T>(
 export async function fetchMenuPermissions({
   apiUrl,
   accessToken,
-  organizationId,
   userId,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId: string
   userId?: string
+  organizationId?: string
 }): Promise<MenuPermissionRecord[]> {
   const url = buildApiUrl(apiUrl, "/api/v1/menu-permission")
-  url.searchParams.set("organizationId", organizationId)
 
   if (userId) {
     url.searchParams.set("userId", userId)
+  }
+
+  if (organizationId) {
+    url.searchParams.set("organizationId", organizationId)
   }
 
   const response = await fetch(url, {
@@ -69,14 +78,14 @@ export async function fetchMenuPermissions({
 export async function saveMenuPermissions({
   apiUrl,
   accessToken,
-  organizationId,
   userId,
+  organizationId,
   permissions,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId: string
   userId: string
+  organizationId: string
   permissions: MenuPermissionValue[]
 }): Promise<MenuPermissionRecord[]> {
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/menu-permission"), {
@@ -87,8 +96,8 @@ export async function saveMenuPermissions({
       Accept: "application/json",
     },
     body: JSON.stringify({
-      organizationId,
       userId,
+      organizationId,
       permissions,
     }),
   })
@@ -100,6 +109,103 @@ export async function saveMenuPermissions({
 
   if (!Array.isArray(responseData.data)) {
     throw new Error("The menu permissions were saved, but the updated records were not returned.")
+  }
+
+  return responseData.data
+}
+
+export async function fetchManageableUserMappings({
+  apiUrl,
+  accessToken,
+}: {
+  apiUrl: string
+  accessToken: string
+}): Promise<ManageableUserMappingRecord[]> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/user-to-oranization-map/admin/users"), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  })
+
+  const responseData = await readJsonResponse<ManageableUserMappingRecord[]>(
+    response,
+    "Unable to load users from your admin organizations right now.",
+  )
+
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The manageable user list was returned without data.")
+  }
+
+  return responseData.data
+}
+
+export async function fetchMenuOrganizationMaps({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId: string
+}): Promise<MenuOrganizationMapRecord[]> {
+  const url = buildApiUrl(apiUrl, "/api/v1/menu-to-organization-map")
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  })
+
+  const responseData = await readJsonResponse<MenuOrganizationMapRecord[]>(
+    response,
+    "Unable to load organization menu mappings right now.",
+  )
+
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The organization menu mapping list was returned without data.")
+  }
+
+  return responseData.data
+}
+
+export async function saveMenuOrganizationMaps({
+  apiUrl,
+  accessToken,
+  organizationId,
+  menuIds,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId: string
+  menuIds: string[]
+}): Promise<MenuOrganizationMapRecord[]> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/menu-to-organization-map"), {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      organizationId,
+      menuIds,
+    }),
+  })
+
+  const responseData = await readJsonResponse<MenuOrganizationMapRecord[]>(
+    response,
+    "Unable to save organization menu mappings right now.",
+  )
+
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The organization menu mappings were saved, but the updated records were not returned.")
   }
 
   return responseData.data

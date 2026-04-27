@@ -15,11 +15,20 @@ export function writeSelectedOrganizationId(organizationId: string) {
   }
 
   window.localStorage.setItem(SELECTED_ORGANIZATION_ID_STORAGE_KEY, organizationId)
-  window.dispatchEvent(
-    new CustomEvent(SELECTED_ORGANIZATION_CHANGED_EVENT, {
-      detail: {
-        organizationId,
-      },
-    }),
-  )
+  const dispatchOrganizationChange = () => {
+    window.dispatchEvent(
+      new CustomEvent(SELECTED_ORGANIZATION_CHANGED_EVENT, {
+        detail: {
+          organizationId,
+        },
+      }),
+    )
+  }
+
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(dispatchOrganizationChange)
+    return
+  }
+
+  window.setTimeout(dispatchOrganizationChange, 0)
 }
