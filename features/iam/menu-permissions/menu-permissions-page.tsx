@@ -1,12 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, RefreshCcw, Save, Search, ShieldCheck, X } from "lucide-react"
+import { Loader2, RefreshCcw, Save, Search, ShieldCheck, UsersRound, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -72,6 +80,7 @@ export function MenuPermissionsPage() {
   const [error, setError] = useState("")
   const [menuSearch, setMenuSearch] = useState("")
   const [menuFilterMode, setMenuFilterMode] = useState<MenuFilterMode>("all")
+  const [userComboboxOpen, setUserComboboxOpen] = useState(false)
   const menusRef = useRef<MenuRecord[]>([])
   const manageableMappingsRef = useRef<ManageableUserMappingRecord[]>([])
 
@@ -278,7 +287,11 @@ export function MenuPermissionsPage() {
   }, [loadUserOrganizations])
 
   useEffect(() => {
-    void loadWorkspace()
+    const loadTimer = window.setTimeout(() => {
+      void loadWorkspace()
+    }, 0)
+
+    return () => window.clearTimeout(loadTimer)
   }, [loadWorkspace])
 
   async function handleUserChange(userId: string) {
@@ -418,18 +431,50 @@ export function MenuPermissionsPage() {
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
               User
             </p>
-            <Select value={selectedUserId} onValueChange={(value) => void handleUserChange(value)}>
-              <SelectTrigger className="mt-2 h-10 w-full rounded-xl bg-white dark:bg-slate-950">
-                <SelectValue placeholder="Select user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {getUserLabel(user)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              open={userComboboxOpen}
+              onOpenChange={setUserComboboxOpen}
+              items={users}
+              value={selectedUser}
+              onValueChange={(user) => {
+                setUserComboboxOpen(false)
+                if (user) {
+                  void handleUserChange(user.id)
+                }
+              }}
+              isItemEqualToValue={(item, value) => item.id === value.id}
+            >
+              <ComboboxInput
+                placeholder={loading ? "Loading users..." : "Search users"}
+                disabled={loading || users.length === 0}
+                className="mt-2 w-full text-xs"
+              />
+              <ComboboxContent className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
+                <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                    User
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                    Search and choose a user to load their organizations.
+                  </p>
+                </div>
+                <ComboboxEmpty className="py-5 text-xs">
+                  {loading ? "Loading users..." : "No users available."}
+                </ComboboxEmpty>
+                <ComboboxList className="px-2 py-2">
+                  {(user) => (
+                    <ComboboxItem
+                      key={user.id}
+                      value={user}
+                      className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      <UsersRound className="size-3 text-slate-400 dark:text-slate-500" />
+                      {getUserLabel(user)}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
