@@ -38,6 +38,10 @@ import type {
 
 type PermissionKey = "canView" | "canCreate" | "canUpdate" | "canDelete"
 type MenuFilterMode = "all" | "mapped" | "unmapped"
+type UserOption = UserOptionRecord & {
+  label: string
+  value: string
+}
 
 const PERMISSION_LABELS: Array<{ key: PermissionKey; label: string }> = [
   { key: "canView", label: "View" },
@@ -67,7 +71,7 @@ function buildDefaultPermissions(menus: MenuRecord[], records: MenuPermissionRec
 }
 
 export function MenuPermissionsPage() {
-  const [users, setUsers] = useState<UserOptionRecord[]>([])
+  const [users, setUsers] = useState<UserOption[]>([])
   const [manageableMappings, setManageableMappings] = useState<ManageableUserMappingRecord[]>([])
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([])
   const [menus, setMenus] = useState<MenuRecord[]>([])
@@ -118,11 +122,11 @@ export function MenuPermissionsPage() {
         menuFilterMode === "all"
         || (menuFilterMode === "mapped" && isMapped)
         || (menuFilterMode === "unmapped" && !isMapped)
-        const matchesSearch =
-          !normalizedSearch
-          || menu.menuName.toLowerCase().includes(normalizedSearch)
-          || menu.menuPath?.toLowerCase().includes(normalizedSearch)
-          || menu.description?.toLowerCase().includes(normalizedSearch)
+      const matchesSearch =
+        !normalizedSearch
+        || menu.menuName.toLowerCase().includes(normalizedSearch)
+        || menu.menuPath?.toLowerCase().includes(normalizedSearch)
+        || menu.description?.toLowerCase().includes(normalizedSearch)
 
       return matchesMode && matchesSearch
     })
@@ -131,44 +135,44 @@ export function MenuPermissionsPage() {
   const hasMenuFilters = Boolean(menuSearch.trim() || menuFilterMode !== "all")
 
   const loadOrganizationAccess = useCallback(async (userId: string, organizationId: string, nextMenus?: MenuRecord[]) => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const accessToken = window.localStorage.getItem("access_token")
-      const menuList = nextMenus ?? menusRef.current
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    const accessToken = window.localStorage.getItem("access_token")
+    const menuList = nextMenus ?? menusRef.current
 
-      if (!apiUrl || !accessToken || !userId || !organizationId) {
-        setMappedMenuIds([])
-        setPermissions(buildDefaultPermissions(menuList, []))
-        return
-      }
+    if (!apiUrl || !accessToken || !userId || !organizationId) {
+      setMappedMenuIds([])
+      setPermissions(buildDefaultPermissions(menuList, []))
+      return
+    }
 
-      setLoading(true)
-      setError("")
+    setLoading(true)
+    setError("")
 
-      try {
-        const [menuMaps, existingPermissions] = await Promise.all([
-          fetchMenuOrganizationMaps({
-            apiUrl,
-            accessToken,
-            organizationId,
-          }),
-          fetchMenuPermissions({
-            apiUrl,
-            accessToken,
-            userId,
-            organizationId,
-          }),
-        ])
+    try {
+      const [menuMaps, existingPermissions] = await Promise.all([
+        fetchMenuOrganizationMaps({
+          apiUrl,
+          accessToken,
+          organizationId,
+        }),
+        fetchMenuPermissions({
+          apiUrl,
+          accessToken,
+          userId,
+          organizationId,
+        }),
+      ])
 
-        setMappedMenuIds(menuMaps.map((mapping) => mapping.menuId))
-        setPermissions(buildDefaultPermissions(menuList, existingPermissions))
-      } catch (loadError) {
-        const message = loadError instanceof Error ? loadError.message : "Unable to load menu access."
-        setError(message)
-        toast.error(message)
-      } finally {
-        setLoading(false)
-      }
-    }, [])
+      setMappedMenuIds(menuMaps.map((mapping) => mapping.menuId))
+      setPermissions(buildDefaultPermissions(menuList, existingPermissions))
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Unable to load menu access."
+      setError(message)
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   const loadUserOrganizations = useCallback(
     async (
@@ -251,12 +255,14 @@ export function MenuPermissionsPage() {
         }),
       ])
       const editableMappings = nextUsers.filter((mapping) => mapping.userId !== storedUser.id)
-      const userById = new Map<string, UserOptionRecord>()
+      const userById = new Map<string, UserOption>()
 
       for (const mapping of editableMappings) {
         if (mapping.user && !userById.has(mapping.userId)) {
           userById.set(mapping.userId, {
             ...mapping.user,
+            label: getUserLabel(mapping.user),
+            value: mapping.user.id,
             role: mapping.role,
           })
         }
@@ -318,12 +324,12 @@ export function MenuPermissionsPage() {
         currentPermissions.map((permission) =>
           permission.menuId === menuId
             ? {
-                ...permission,
-                canView: false,
-                canCreate: false,
-                canUpdate: false,
-                canDelete: false,
-              }
+              ...permission,
+              canView: false,
+              canCreate: false,
+              canUpdate: false,
+              canDelete: false,
+            }
             : permission,
         ),
       )
@@ -339,10 +345,10 @@ export function MenuPermissionsPage() {
       currentPermissions.map((permission) =>
         permission.menuId === menuId
           ? {
-              ...permission,
-              [key]: value,
-              canView: key !== "canView" && value ? true : key === "canView" ? value : permission.canView,
-            }
+            ...permission,
+            [key]: value,
+            canView: key !== "canView" && value ? true : key === "canView" ? value : permission.canView,
+          }
           : permission,
       ),
     )
@@ -400,291 +406,291 @@ export function MenuPermissionsPage() {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 text-slate-950 dark:text-white sm:p-6">
-      <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-2xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-950/75 dark:shadow-black/25">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.38em] text-violet-600 dark:text-violet-300">
-              IAM Access
-            </p>
-            <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
-              User menu access
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Select a user first, choose one of their organizations, map the available menus to
-              that organization, then grant the user view, create, update, and delete access.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-full"
-            onClick={() => void loadWorkspace()}
-            disabled={loading}
-          >
-            <RefreshCcw className={loading ? "animate-spin" : ""} />
-            Refresh
-          </Button>
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              User
-            </p>
-            <Combobox
-              open={userComboboxOpen}
-              onOpenChange={setUserComboboxOpen}
-              items={users}
-              value={selectedUser}
-              onValueChange={(user) => {
-                setUserComboboxOpen(false)
-                if (user) {
-                  void handleUserChange(user.id)
-                }
-              }}
-              isItemEqualToValue={(item, value) => item.id === value.id}
+        <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-2xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-950/75 dark:shadow-black/25">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.38em] text-violet-600 dark:text-violet-300">
+                IAM Access
+              </p>
+              <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+                User menu access
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Select a user first, choose one of their organizations, map the available menus to
+                that organization, then grant the user view, create, update, and delete access.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => void loadWorkspace()}
+              disabled={loading}
             >
-              <ComboboxInput
-                placeholder={loading ? "Loading users..." : "Search users"}
-                disabled={loading || users.length === 0}
-                className="mt-2 w-full text-xs"
-              />
-              <ComboboxContent className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
-                <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                    User
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
-                    Search and choose a user to load their organizations.
-                  </p>
-                </div>
-                <ComboboxEmpty className="py-5 text-xs">
-                  {loading ? "Loading users..." : "No users available."}
-                </ComboboxEmpty>
-                <ComboboxList className="px-2 py-2">
-                  {(user) => (
-                    <ComboboxItem
-                      key={user.id}
-                      value={user}
-                      className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
-                    >
-                      <UsersRound className="size-3 text-slate-400 dark:text-slate-500" />
-                      {getUserLabel(user)}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+              <RefreshCcw className={loading ? "animate-spin" : ""} />
+              Refresh
+            </Button>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Organization
-            </p>
-            <Select
-              value={selectedOrganizationId}
-              onValueChange={(value) => void handleOrganizationChange(value)}
-              disabled={!selectedUserId || organizations.length === 0}
-            >
-              <SelectTrigger className="mt-2 h-10 w-full rounded-xl bg-white dark:bg-slate-950">
-                <SelectValue placeholder="Select organization" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((organization) => (
-                  <SelectItem key={organization.id} value={organization.id}>
-                    {organization.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                User
+              </p>
+              <Combobox
+                open={userComboboxOpen}
+                onOpenChange={setUserComboboxOpen}
+                items={users}
+                value={selectedUser}
+                onValueChange={(user) => {
+                  setUserComboboxOpen(false)
+                  if (user) {
+                    void handleUserChange(user.id)
+                  }
+                }}
+                isItemEqualToValue={(item, value) => item.id === value.id}
+              >
+                <ComboboxInput
+                  placeholder={loading ? "Loading users..." : "Search users"}
+                  disabled={loading || users.length === 0}
+                  className="mt-2 w-full text-xs"
+                />
+                <ComboboxContent className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
+                  <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                      User
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      Search and choose a user to load their organizations.
+                    </p>
+                  </div>
+                  <ComboboxEmpty className="py-5 text-xs">
+                    {loading ? "Loading users..." : "No users available."}
+                  </ComboboxEmpty>
+                  <ComboboxList className="px-2 py-2">
+                    {(user) => (
+                      <ComboboxItem
+                        key={user.id}
+                        value={user}
+                        className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                      >
+                        <UsersRound className="size-3 text-slate-400 dark:text-slate-500" />
+                        {user.label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
 
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200">
-            <p className="flex items-center gap-2 text-sm font-bold">
-              <ShieldCheck className="h-4 w-4" />
-              Org scoped
-            </p>
-            <p className="mt-1 text-xs leading-5">
-              Saved access applies only to this user and organization.
-            </p>
-          </div>
-        </div>
-      </section>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                Organization
+              </p>
+              <Select
+                value={selectedOrganizationId}
+                onValueChange={(value) => void handleOrganizationChange(value)}
+                disabled={!selectedUserId || organizations.length === 0}
+              >
+                <SelectTrigger className="mt-2 h-10 w-full rounded-xl bg-white dark:bg-slate-950">
+                  <SelectValue placeholder="Select organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((organization) => (
+                    <SelectItem key={organization.id} value={organization.id}>
+                      {organization.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      {error ? (
-        <section className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
-          {error}
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200">
+              <p className="flex items-center gap-2 text-sm font-bold">
+                <ShieldCheck className="h-4 w-4" />
+                Org scoped
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                Saved access applies only to this user and organization.
+              </p>
+            </div>
+          </div>
         </section>
-      ) : null}
 
-      <section className="mt-5 rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-5 shadow-xl shadow-slate-200/50 dark:border-white/10 dark:bg-slate-950/75 dark:shadow-black/20">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-black">Menu access matrix</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              {selectedUser ? getUserLabel(selectedUser) : "No user"} in{" "}
-              {selectedOrganization?.name || "no organization"} has {mappedMenuIds.length} mapped
-              menu{mappedMenuIds.length === 1 ? "" : "s"}.
-            </p>
+        {error ? (
+          <section className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+            {error}
+          </section>
+        ) : null}
+
+        <section className="mt-5 rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-5 shadow-xl shadow-slate-200/50 dark:border-white/10 dark:bg-slate-950/75 dark:shadow-black/20">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black">Menu access matrix</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {selectedUser ? getUserLabel(selectedUser) : "No user"} in{" "}
+                {selectedOrganization?.name || "no organization"} has {mappedMenuIds.length} mapped
+                menu{mappedMenuIds.length === 1 ? "" : "s"}.
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="rounded-full"
+              disabled={saving || loading || !selectedUserId || !selectedOrganizationId}
+              onClick={() => void handleSave()}
+            >
+              {saving ? <Loader2 className="animate-spin" /> : <Save />}
+              Save access
+            </Button>
           </div>
-          <Button
-            type="button"
-            className="rounded-full"
-            disabled={saving || loading || !selectedUserId || !selectedOrganizationId}
-            onClick={() => void handleSave()}
-          >
-            {saving ? <Loader2 className="animate-spin" /> : <Save />}
-            Save access
-          </Button>
-        </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={menuSearch}
-                onChange={(event) => setMenuSearch(event.target.value)}
-                placeholder="Search menu by name, path, or description"
-                className="h-11 rounded-xl bg-white pl-9 dark:bg-slate-950"
-              />
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={menuSearch}
+                  onChange={(event) => setMenuSearch(event.target.value)}
+                  placeholder="Search menu by name, path, or description"
+                  className="h-11 rounded-xl bg-white pl-9 dark:bg-slate-950"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {(["all", "mapped", "unmapped"] as MenuFilterMode[]).map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={menuFilterMode === mode ? "default" : "outline"}
+                    className="h-10 rounded-full capitalize"
+                    onClick={() => setMenuFilterMode(mode)}
+                  >
+                    {mode}
+                  </Button>
+                ))}
+                {hasMenuFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-10 rounded-full"
+                    onClick={resetMenuFilters}
+                  >
+                    <X className="h-4 w-4" />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {(["all", "mapped", "unmapped"] as MenuFilterMode[]).map((mode) => (
-                <Button
-                  key={mode}
-                  type="button"
-                  variant={menuFilterMode === mode ? "default" : "outline"}
-                  className="h-10 rounded-full capitalize"
-                  onClick={() => setMenuFilterMode(mode)}
-                >
-                  {mode}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full">
+                Showing {filteredMenus.length} of {menus.length}
+              </Badge>
+              <Badge variant="secondary" className="rounded-full">
+                {mappedMenuIds.length} mapped
+              </Badge>
+              <Badge variant="outline" className="rounded-full">
+                {Math.max(menus.length - mappedMenuIds.length, 0)} unmapped
+              </Badge>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 p-8 text-sm text-slate-500 dark:border-white/10">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading menu access
+              </div>
+            ) : !users.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+                <p className="font-bold">No users available.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Add another user before assigning menu access.
+                </p>
+              </div>
+            ) : !organizations.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+                <p className="font-bold">This user has no organizations.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Map the user to an organization before assigning menu access.
+                </p>
+              </div>
+            ) : !menus.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+                <p className="font-bold">No menu entries found.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Create menu entries under App Config before assigning permissions.
+                </p>
+              </div>
+            ) : !filteredMenus.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
+                <p className="font-bold">No menu matches your search.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Try another name/path or clear the menu filters.
+                </p>
+                <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={resetMenuFilters}>
+                  Clear filters
                 </Button>
-              ))}
-              {hasMenuFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-10 rounded-full"
-                  onClick={resetMenuFilters}
-                >
-                  <X className="h-4 w-4" />
-                  Clear
-                </Button>
-              ) : null}
-            </div>
-          </div>
+              </div>
+            ) : (
+              filteredMenus.map((menu) => {
+                const permission = permissionByMenuId.get(menu.id)
+                const isMapped = mappedMenuIdSet.has(menu.id)
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-full">
-              Showing {filteredMenus.length} of {menus.length}
-            </Badge>
-            <Badge variant="secondary" className="rounded-full">
-              {mappedMenuIds.length} mapped
-            </Badge>
-            <Badge variant="outline" className="rounded-full">
-              {Math.max(menus.length - mappedMenuIds.length, 0)} unmapped
-            </Badge>
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 p-8 text-sm text-slate-500 dark:border-white/10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading menu access
-            </div>
-          ) : !users.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
-              <p className="font-bold">No users available.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Add another user before assigning menu access.
-              </p>
-            </div>
-          ) : !organizations.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
-              <p className="font-bold">This user has no organizations.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Map the user to an organization before assigning menu access.
-              </p>
-            </div>
-          ) : !menus.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
-              <p className="font-bold">No menu entries found.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Create menu entries under App Config before assigning permissions.
-              </p>
-            </div>
-          ) : !filteredMenus.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
-              <p className="font-bold">No menu matches your search.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Try another name/path or clear the menu filters.
-              </p>
-              <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={resetMenuFilters}>
-                Clear filters
-              </Button>
-            </div>
-          ) : (
-            filteredMenus.map((menu) => {
-              const permission = permissionByMenuId.get(menu.id)
-              const isMapped = mappedMenuIdSet.has(menu.id)
-
-              return (
-                <article
-                  key={menu.id}
-                  className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5 lg:grid-cols-[1fr_auto]"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xs font-black text-white dark:bg-white dark:text-slate-950">
-                        {getAuthInitials(menu.menuName)}
-                      </div>
-                      <div className="min-w-0">
+                return (
+                  <article
+                    key={menu.id}
+                    className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5 lg:grid-cols-[1fr_auto]"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xs font-black text-white dark:bg-white dark:text-slate-950">
+                          {getAuthInitials(menu.menuName)}
+                        </div>
+                        <div className="min-w-0">
                           <h3 className="truncate font-black">{menu.menuName}</h3>
                           <p className="truncate font-mono text-xs text-violet-700 dark:text-violet-300">
                             {menu.menuPath || "No path set"}
                           </p>
+                        </div>
                       </div>
+                      {menu.description ? (
+                        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          {menu.description}
+                        </p>
+                      ) : null}
                     </div>
-                    {menu.description ? (
-                      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        {menu.description}
-                      </p>
-                    ) : null}
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100">
-                      <Checkbox
-                        checked={isMapped}
-                        onCheckedChange={(checked) => toggleMapping(menu.id, Boolean(checked))}
-                      />
-                      Map
-                    </label>
-                    {PERMISSION_LABELS.map((item) => (
-                      <label
-                        key={item.key}
-                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold dark:border-white/10 dark:bg-slate-950"
-                      >
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100">
                         <Checkbox
-                          checked={Boolean(permission?.[item.key])}
-                          disabled={!isMapped}
-                          onCheckedChange={(checked) =>
-                            togglePermission(menu.id, item.key, Boolean(checked))
-                          }
+                          checked={isMapped}
+                          onCheckedChange={(checked) => toggleMapping(menu.id, Boolean(checked))}
                         />
-                        {item.label}
+                        Map
                       </label>
-                    ))}
-                  </div>
-                </article>
-              )
-            })
-          )}
-        </div>
-      </section>
+                      {PERMISSION_LABELS.map((item) => (
+                        <label
+                          key={item.key}
+                          className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold dark:border-white/10 dark:bg-slate-950"
+                        >
+                          <Checkbox
+                            checked={Boolean(permission?.[item.key])}
+                            disabled={!isMapped}
+                            onCheckedChange={(checked) =>
+                              togglePermission(menu.id, item.key, Boolean(checked))
+                            }
+                          />
+                          {item.label}
+                        </label>
+                      ))}
+                    </div>
+                  </article>
+                )
+              })
+            )}
+          </div>
+        </section>
       </div>
     </ScrollArea>
   )
