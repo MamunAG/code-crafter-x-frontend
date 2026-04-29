@@ -47,6 +47,8 @@ type DeletedColorsCardProps = {
   onDeletedLimitChange: (nextPageSize: number) => void
   onOpenAction: (color: ColorRecord, mode: DeletedColorActionMode) => void
   onRetry: () => void
+  canRestoreColor: boolean
+  canPermanentlyDeleteColor: boolean
 }
 
 const NEUTRAL_COLOR_SWATCH = "#9CA3AF"
@@ -109,6 +111,8 @@ export function DeletedColorsCard({
   onDeletedLimitChange,
   onOpenAction,
   onRetry,
+  canRestoreColor,
+  canPermanentlyDeleteColor,
 }: DeletedColorsCardProps) {
   const deletedTotal = deletedMeta?.total ?? deletedColors.length
 
@@ -209,6 +213,15 @@ export function DeletedColorsCard({
         header: () => <span className="pr-4">Actions</span>,
         cell: ({ row }) => {
           const color = row.original
+          const hasActions = canRestoreColor || canPermanentlyDeleteColor
+
+          if (!hasActions) {
+            return (
+              <div className="pr-4 text-right text-xs text-slate-400 dark:text-slate-500">
+                No actions
+              </div>
+            )
+          }
 
           return (
             <div className="pr-4 text-right">
@@ -225,16 +238,20 @@ export function DeletedColorsCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onSelect={() => onOpenAction(color, "restore")}>
-                    Restore color
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => onOpenAction(color, "permanent")}
-                  >
-                    Delete permanently
-                  </DropdownMenuItem>
+                  {canRestoreColor ? (
+                    <DropdownMenuItem onSelect={() => onOpenAction(color, "restore")}>
+                      Restore color
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canRestoreColor && canPermanentlyDeleteColor ? <DropdownMenuSeparator /> : null}
+                  {canPermanentlyDeleteColor ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => onOpenAction(color, "permanent")}
+                    >
+                      Delete permanently
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -242,7 +259,7 @@ export function DeletedColorsCard({
         },
       },
     ],
-    [onOpenAction],
+    [canPermanentlyDeleteColor, canRestoreColor, onOpenAction],
   )
 
   const deletedTable = useReactTable({
@@ -431,33 +448,41 @@ export function DeletedColorsCard({
                           </div>
                         </div>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="rounded-full"
-                            >
-                              <MoreHorizontal className="size-3.5" />
-                              <span className="sr-only">Open deleted color actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
-                              onSelect={() => onOpenAction(color, "restore")}
-                            >
-                              Restore color
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onSelect={() => onOpenAction(color, "permanent")}
-                            >
-                              Delete permanently
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canRestoreColor || canPermanentlyDeleteColor ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="rounded-full"
+                              >
+                                <MoreHorizontal className="size-3.5" />
+                                <span className="sr-only">Open deleted color actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {canRestoreColor ? (
+                                <DropdownMenuItem
+                                  onSelect={() => onOpenAction(color, "restore")}
+                                >
+                                  Restore color
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canRestoreColor && canPermanentlyDeleteColor ? (
+                                <DropdownMenuSeparator />
+                              ) : null}
+                              {canPermanentlyDeleteColor ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => onOpenAction(color, "permanent")}
+                                >
+                                  Delete permanently
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
                       </div>
 
                       <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">

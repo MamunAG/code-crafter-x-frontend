@@ -79,6 +79,54 @@ export async function fetchMenuPermissions({
   return responseData.data
 }
 
+export async function fetchCurrentMenuPermission({
+  apiUrl,
+  accessToken,
+  organizationId,
+  menuPath,
+  menuName,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+  menuPath?: string
+  menuName?: string
+}): Promise<MenuPermissionRecord> {
+  const url = buildApiUrl(apiUrl, "/api/v1/menu-permission/current")
+
+  if (organizationId) {
+    url.searchParams.set("organizationId", organizationId)
+  }
+
+  if (menuPath) {
+    url.searchParams.set("menuPath", menuPath)
+  }
+
+  if (menuName) {
+    url.searchParams.set("menuName", menuName)
+  }
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  })
+
+  const responseData = await readJsonResponse<MenuPermissionRecord>(
+    response,
+    "Unable to load your menu access right now.",
+  )
+
+  if (!responseData.data) {
+    throw new Error("The current menu permission was returned without data.")
+  }
+
+  return responseData.data
+}
+
 export async function saveMenuPermissions({
   apiUrl,
   accessToken,

@@ -54,6 +54,9 @@ type ColorTableSectionProps = {
   onEditColor: (colorId: number) => void
   onDeleteColor: (color: ColorRecord) => void
   onResetFilters: () => void
+  canCreateColor: boolean
+  canUpdateColor: boolean
+  canDeleteColor: boolean
 }
 
 const NEUTRAL_COLOR_SWATCH = "#9CA3AF"
@@ -158,6 +161,9 @@ export function ColorTableSection({
   onEditColor,
   onDeleteColor,
   onResetFilters,
+  canCreateColor,
+  canUpdateColor,
+  canDeleteColor,
 }: ColorTableSectionProps) {
   const filterCount = useMemo(
     () =>
@@ -305,6 +311,15 @@ export function ColorTableSection({
         header: () => <span className="pr-4">Actions</span>,
         cell: ({ row }) => {
           const color = row.original
+          const hasActions = canUpdateColor || canDeleteColor
+
+          if (!hasActions) {
+            return (
+              <div className="pr-4 text-right text-xs text-slate-400 dark:text-slate-500">
+                No actions
+              </div>
+            )
+          }
 
           return (
             <div className="pr-4 text-right">
@@ -321,16 +336,20 @@ export function ColorTableSection({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onSelect={() => onEditColor(color.id)}>
-                    Edit color
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => onDeleteColor(color)}
-                  >
-                    Delete color
-                  </DropdownMenuItem>
+                  {canUpdateColor ? (
+                    <DropdownMenuItem onSelect={() => onEditColor(color.id)}>
+                      Edit color
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canUpdateColor && canDeleteColor ? <DropdownMenuSeparator /> : null}
+                  {canDeleteColor ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => onDeleteColor(color)}
+                    >
+                      Delete color
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -338,7 +357,7 @@ export function ColorTableSection({
         },
       },
     ],
-    [onDeleteColor, onEditColor],
+    [canDeleteColor, canUpdateColor, onDeleteColor, onEditColor],
   )
 
   const table = useReactTable({
@@ -497,31 +516,37 @@ export function ColorTableSection({
                           </div>
                         </div>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="rounded-full"
-                            >
-                              <MoreHorizontal className="size-3.5" />
-                              <span className="sr-only">Open actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44">
-                            <DropdownMenuItem onSelect={() => onEditColor(color.id)}>
-                              Edit color
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onSelect={() => onDeleteColor(color)}
-                            >
-                              Delete color
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canUpdateColor || canDeleteColor ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="rounded-full"
+                              >
+                                <MoreHorizontal className="size-3.5" />
+                                <span className="sr-only">Open actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              {canUpdateColor ? (
+                                <DropdownMenuItem onSelect={() => onEditColor(color.id)}>
+                                  Edit color
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdateColor && canDeleteColor ? <DropdownMenuSeparator /> : null}
+                              {canDeleteColor ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => onDeleteColor(color)}
+                                >
+                                  Delete color
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -559,8 +584,8 @@ export function ColorTableSection({
                       ? "Try clearing or relaxing the current filters."
                       : "Create the first merchandising color to get started."
                   }
-                  actionLabel={filtersActive ? "Reset filters" : "New color"}
-                  onAction={filtersActive ? onResetFilters : onCreateColor}
+                  actionLabel={filtersActive || !canCreateColor ? "Reset filters" : "New color"}
+                  onAction={filtersActive || !canCreateColor ? onResetFilters : onCreateColor}
                 />
               </div>
             )}
@@ -640,8 +665,8 @@ export function ColorTableSection({
                       ? "Try clearing or relaxing the current filters."
                       : "Create the first merchandising color to get started."
                   }
-                  actionLabel={filtersActive ? "Reset filters" : "New color"}
-                  onAction={filtersActive ? onResetFilters : onCreateColor}
+                  actionLabel={filtersActive || !canCreateColor ? "Reset filters" : "New color"}
+                  onAction={filtersActive || !canCreateColor ? onResetFilters : onCreateColor}
                 />
               }
             />

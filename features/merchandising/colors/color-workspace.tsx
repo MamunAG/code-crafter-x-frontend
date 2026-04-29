@@ -18,6 +18,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
+import { parseStoredAuthUser } from "@/lib/auth-session"
+import {
+  readSelectedOrganizationId,
+  SELECTED_ORGANIZATION_CHANGED_EVENT,
+} from "@/lib/organization-selection"
 
 import { ColorFormDialog } from "./component/color-form-dialog"
 import { ColorTableSection } from "./component/color-table-section"
@@ -40,6 +46,20 @@ import type {
 
 type ColorEditorMode = "create" | "edit"
 type PendingDeleteMode = "soft" | "restore" | "permanent"
+type ColorAccessRules = {
+  canView: boolean
+  canCreate: boolean
+  canUpdate: boolean
+  canDelete: boolean
+}
+
+const COLOR_MENU_NAME = "Color Setup"
+const EMPTY_ACCESS_RULES: ColorAccessRules = {
+  canView: false,
+  canCreate: false,
+  canUpdate: false,
+  canDelete: false,
+}
 
 const DEFAULT_FILTERS: ColorFilterValues = {
   colorName: "",
@@ -233,6 +253,10 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
+  const [accessRules, setAccessRules] = useState<ColorAccessRules | null>(null)
+  const [loadingAccessRules, setLoadingAccessRules] = useState(true)
+  const [accessError, setAccessError] = useState("")
 
   const [colors, setColors] = useState<ColorRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
@@ -279,7 +303,113 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     return true
   }, [router])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    setSelectedOrganizationId(readSelectedOrganizationId())
+
+    function handleOrganizationChange(event: Event) {
+      const nextOrganizationId = event instanceof CustomEvent
+        ? event.detail?.organizationId
+        : readSelectedOrganizationId()
+      setSelectedOrganizationId(nextOrganizationId || "")
+    }
+
+    window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+
+    return () => {
+      window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    let active = true
+
+    async function loadAccessRules() {
+      setLoadingAccessRules(true)
+      setAccessError("")
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+
+        const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+
+        if (storedUser?.role === "admin") {
+          if (active) {
+            setAccessRules({
+              canView: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            })
+          }
+          return
+        }
+
+        const permission = await fetchCurrentMenuPermission({
+          apiUrl,
+          accessToken: token,
+          organizationId: selectedOrganizationId || undefined,
+          menuName: COLOR_MENU_NAME,
+        })
+
+        if (!active) {
+          return
+        }
+
+        setAccessRules({
+          canView: permission.canView,
+          canCreate: permission.canCreate,
+          canUpdate: permission.canUpdate,
+          canDelete: permission.canDelete,
+        })
+      } catch (caughtError) {
+        if (!active) {
+          return
+        }
+
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load your color menu access right now."
+
+        if (handleAuthFailure(message)) {
+          return
+        }
+
+        setAccessRules(EMPTY_ACCESS_RULES)
+        setAccessError(message)
+      } finally {
+        if (active) {
+          setLoadingAccessRules(false)
+        }
+      }
+    }
+
+    void loadAccessRules()
+
+    return () => {
+      active = false
+    }
+  }, [apiUrl, handleAuthFailure, refreshVersion, selectedOrganizationId])
+
   const openEditDialog = useCallback(async (colorId: number) => {
+    if (!accessRules?.canUpdate) {
+      toast.error("You do not have permission to update colors.")
+      return
+    }
+
     setEditorMode("edit")
     setEditingId(colorId)
     setEditorError("")
@@ -321,14 +451,24 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     } finally {
       setEditorLoading(false)
     }
-  }, [apiUrl, handleAuthFailure])
+  }, [accessRules?.canUpdate, apiUrl, handleAuthFailure])
 
   const openPendingActionDialog = useCallback(
     (color: ColorRecord, mode: PendingDeleteMode) => {
+      if (mode === "restore" && !accessRules?.canUpdate) {
+        toast.error("You do not have permission to restore colors.")
+        return
+      }
+
+      if (mode === "permanent" && !accessRules?.canDelete) {
+        toast.error("You do not have permission to permanently delete colors.")
+        return
+      }
+
       setPendingActionTarget(color)
       setPendingActionMode(mode)
     },
-    [],
+    [accessRules?.canDelete, accessRules?.canUpdate],
   )
 
   useEffect(() => {
@@ -339,6 +479,17 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     let active = true
 
     async function loadColors() {
+      if (loadingAccessRules) {
+        return
+      }
+
+      if (!accessRules?.canView) {
+        setColors([])
+        setMeta(null)
+        setLoadingColors(false)
+        return
+      }
+
       setLoadingColors(true)
       setError("")
 
@@ -398,7 +549,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [activeFilters, apiUrl, limit, page, refreshVersion, router])
+  }, [accessRules?.canView, activeFilters, apiUrl, limit, loadingAccessRules, page, refreshVersion, router])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -408,6 +559,17 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     let active = true
 
     async function loadDeletedColors() {
+      if (loadingAccessRules) {
+        return
+      }
+
+      if (!accessRules?.canView || !accessRules.canDelete) {
+        setDeletedColors([])
+        setDeletedMeta(null)
+        setLoadingDeletedColors(false)
+        return
+      }
+
       setLoadingDeletedColors(true)
       setDeletedError("")
 
@@ -468,7 +630,17 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [apiUrl, deletedActiveFilters, deletedLimit, deletedPage, refreshVersion, router])
+  }, [
+    accessRules?.canDelete,
+    accessRules?.canView,
+    apiUrl,
+    deletedActiveFilters,
+    deletedLimit,
+    deletedPage,
+    loadingAccessRules,
+    refreshVersion,
+    router,
+  ])
 
   const activeCount = useMemo(
     () => colors.filter((color) => color.isActive !== false && !color.deleted_at).length,
@@ -486,6 +658,11 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   }
 
   function openCreateDialog() {
+    if (!accessRules?.canCreate) {
+      toast.error("You do not have permission to create colors.")
+      return
+    }
+
     setEditorMode("create")
     setEditingId(null)
     setEditorError("")
@@ -495,8 +672,27 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorOpen(true)
   }
 
+  function requestSoftDelete(color: ColorRecord) {
+    if (!accessRules?.canDelete) {
+      toast.error("You do not have permission to delete colors.")
+      return
+    }
+
+    setDeleteTarget(color)
+  }
+
   async function submitEditor(values: ColorFormValues) {
     if (editorSubmitting || editorLoading) {
+      return
+    }
+
+    if (editorMode === "create" && !accessRules?.canCreate) {
+      toast.error("You do not have permission to create colors.")
+      return
+    }
+
+    if (editorMode === "edit" && !accessRules?.canUpdate) {
+      toast.error("You do not have permission to update colors.")
       return
     }
 
@@ -551,6 +747,11 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
       return
     }
 
+    if (!accessRules?.canDelete) {
+      toast.error("You do not have permission to delete colors.")
+      return
+    }
+
     setDeleteWorking(true)
 
     try {
@@ -599,6 +800,11 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       if (pendingActionMode === "restore") {
+        if (!accessRules?.canUpdate) {
+          toast.error("You do not have permission to restore colors.")
+          return
+        }
+
         await restoreColor({
           apiUrl,
           accessToken: token,
@@ -606,6 +812,11 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         })
         toast.success("Color restored successfully.")
       } else {
+        if (!accessRules?.canDelete) {
+          toast.error("You do not have permission to permanently delete colors.")
+          return
+        }
+
         await permanentlyDeleteColor({
           apiUrl,
           accessToken: token,
@@ -639,14 +850,50 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const activeTotal = meta?.total ?? colors.length
 
   if (
-    loadingColors &&
+    (loadingAccessRules || loadingColors) &&
     colors.length === 0 &&
-    loadingDeletedColors &&
+    (loadingAccessRules || loadingDeletedColors) &&
     deletedColors.length === 0 &&
     !error &&
-    !deletedError
+    !deletedError &&
+    !accessError
   ) {
     return <WorkspaceSkeleton />
+  }
+
+  if (!loadingAccessRules && accessRules && !accessRules.canView) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Merchandising
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Colors
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Manage merchandising color master data.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
+                <RefreshCcw className="size-3.5" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <EmptyState
+          title="Color access unavailable"
+          description={accessError || "You do not have permission to view the Colors menu for the selected organization."}
+          actionLabel="Retry"
+          onAction={triggerRefresh}
+        />
+      </div>
+    )
   }
 
   if (error) {
@@ -727,10 +974,12 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     <RefreshCcw className="size-3.5" />
                     Refresh
                   </Button>
-                  <Button type="button" onClick={openCreateDialog} className="rounded-xl">
-                    <Plus className="size-3.5" />
-                    New color
-                  </Button>
+                  {accessRules?.canCreate ? (
+                    <Button type="button" onClick={openCreateDialog} className="rounded-xl">
+                      <Plus className="size-3.5" />
+                      New color
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </CardContent>
@@ -749,28 +998,32 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50"
-                      onClick={() =>
-                        openPendingActionDialog(recentlyDeletedColor, "restore")
-                      }
-                    >
-                      <Undo2 className="size-3.5" />
-                      Restore
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      className="rounded-xl"
-                      onClick={() =>
-                        openPendingActionDialog(recentlyDeletedColor, "permanent")
-                      }
-                    >
-                      <Trash2 className="size-3.5" />
-                      Delete permanently
-                    </Button>
+                    {accessRules?.canUpdate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50"
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedColor, "restore")
+                        }
+                      >
+                        <Undo2 className="size-3.5" />
+                        Restore
+                      </Button>
+                    ) : null}
+                    {accessRules?.canDelete ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="rounded-xl"
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedColor, "permanent")
+                        }
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete permanently
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </CardContent>
@@ -790,26 +1043,33 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
             onLimitChange={setLimit}
             onCreateColor={openCreateDialog}
             onEditColor={openEditDialog}
-            onDeleteColor={setDeleteTarget}
+            onDeleteColor={requestSoftDelete}
             onResetFilters={resetActiveFilters}
+            canCreateColor={Boolean(accessRules?.canCreate)}
+            canUpdateColor={Boolean(accessRules?.canUpdate)}
+            canDeleteColor={Boolean(accessRules?.canDelete)}
           />
 
-          <DeletedColorsCard
-            deletedColors={deletedColors}
-            deletedMeta={deletedMeta}
-            deletedPage={deletedPage}
-            deletedLimit={deletedLimit}
-            loadingDeletedColors={loadingDeletedColors}
-            deletedError={deletedError}
-            deletedDraftFilters={deletedDraftFilters}
-            deletedActiveFilters={deletedActiveFilters}
-            onDeletedDraftFiltersChange={setDeletedDraftFilters}
-            onDeletedActiveFiltersChange={setDeletedActiveFilters}
-            onDeletedPageChange={setDeletedPage}
-            onDeletedLimitChange={setDeletedLimit}
-            onOpenAction={openPendingActionDialog}
-            onRetry={triggerRefresh}
-          />
+          {accessRules?.canDelete ? (
+            <DeletedColorsCard
+              deletedColors={deletedColors}
+              deletedMeta={deletedMeta}
+              deletedPage={deletedPage}
+              deletedLimit={deletedLimit}
+              loadingDeletedColors={loadingDeletedColors}
+              deletedError={deletedError}
+              deletedDraftFilters={deletedDraftFilters}
+              deletedActiveFilters={deletedActiveFilters}
+              onDeletedDraftFiltersChange={setDeletedDraftFilters}
+              onDeletedActiveFiltersChange={setDeletedActiveFilters}
+              onDeletedPageChange={setDeletedPage}
+              onDeletedLimitChange={setDeletedLimit}
+              onOpenAction={openPendingActionDialog}
+              onRetry={triggerRefresh}
+              canRestoreColor={Boolean(accessRules?.canUpdate)}
+              canPermanentlyDeleteColor={Boolean(accessRules?.canDelete)}
+            />
+          ) : null}
         </div>
       </ScrollArea>
 

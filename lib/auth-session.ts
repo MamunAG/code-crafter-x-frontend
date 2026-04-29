@@ -2,6 +2,7 @@ export type AuthUser = {
   id?: string
   email?: string
   name?: string
+  role?: string
   user_name?: string
   display_name?: string
   avatar?: string
