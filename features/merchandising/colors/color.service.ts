@@ -10,6 +10,31 @@ function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
 }
 
+function buildRequestHeaders({
+  accessToken,
+  organizationId,
+  contentType,
+}: {
+  accessToken: string
+  organizationId?: string
+  contentType?: string
+}) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+  }
+
+  if (contentType) {
+    headers["Content-Type"] = contentType
+  }
+
+  if (organizationId) {
+    headers["x-organization-id"] = organizationId
+  }
+
+  return headers
+}
+
 async function readJsonResponse<T>(response: Response) {
   let payload: ApiResponse<T> | null = null
 
@@ -19,8 +44,12 @@ async function readJsonResponse<T>(response: Response) {
     payload = null
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error(payload?.message || "You do not have permission to complete this color action.")
   }
 
   if (!response.ok || !payload?.success) {
@@ -65,6 +94,7 @@ export async function fetchColors({
   limit,
   filters,
   deletedOnly = false,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
@@ -72,6 +102,7 @@ export async function fetchColors({
   limit: number
   filters: Partial<ColorFilterValues>
   deletedOnly?: boolean
+  organizationId?: string
 }): Promise<PaginatedResponse<ColorRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/color")
   url.searchParams.set("page", String(page))
@@ -83,10 +114,7 @@ export async function fetchColors({
 
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
@@ -103,17 +131,16 @@ export async function fetchColor({
   apiUrl,
   accessToken,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   id: number
+  organizationId?: string
 }): Promise<ColorRecord> {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/color/${id}`), {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
@@ -130,18 +157,20 @@ export async function createColor({
   apiUrl,
   accessToken,
   payload,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   payload: ColorFormValues
+  organizationId?: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/color"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({
+      accessToken,
+      organizationId,
+      contentType: "application/json",
+    }),
     body: JSON.stringify({
       colorName: payload.colorName.trim(),
       colorDisplayName: payload.colorDisplayName.trim() || undefined,
@@ -165,19 +194,21 @@ export async function updateColor({
   accessToken,
   id,
   payload,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   id: number
   payload: ColorFormValues
+  organizationId?: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/color/${id}`), {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({
+      accessToken,
+      organizationId,
+      contentType: "application/json",
+    }),
     body: JSON.stringify({
       colorName: payload.colorName.trim(),
       colorDisplayName: payload.colorDisplayName.trim() || undefined,
@@ -200,17 +231,16 @@ export async function softDeleteColor({
   apiUrl,
   accessToken,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   id: number
+  organizationId?: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/color/${id}`), {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)
@@ -220,17 +250,16 @@ export async function restoreColor({
   apiUrl,
   accessToken,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   id: number
+  organizationId?: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/color/${id}/restore`), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)
@@ -240,17 +269,16 @@ export async function permanentlyDeleteColor({
   apiUrl,
   accessToken,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
   id: number
+  organizationId?: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/color/${id}/permanent`), {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)

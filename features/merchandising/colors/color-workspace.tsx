@@ -82,8 +82,7 @@ function getColorLabel(color: ColorRecord) {
 function normalizeAuthFailure(message: string) {
   return (
     message.toLowerCase().includes("session expired") ||
-    message.toLowerCase().includes("unauthorized") ||
-    message.toLowerCase().includes("forbidden")
+    message.toLowerCase().includes("unauthorized")
   )
 }
 
@@ -429,6 +428,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         apiUrl,
         accessToken: token,
         id: colorId,
+        organizationId: selectedOrganizationId || undefined,
       })
 
       setEditorInitialValues({
@@ -451,7 +451,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     } finally {
       setEditorLoading(false)
     }
-  }, [accessRules?.canUpdate, apiUrl, handleAuthFailure])
+  }, [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId])
 
   const openPendingActionDialog = useCallback(
     (color: ColorRecord, mode: PendingDeleteMode) => {
@@ -510,6 +510,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           page,
           limit,
           filters: activeFilters,
+          organizationId: selectedOrganizationId || undefined,
         })
 
         if (!active) {
@@ -549,7 +550,17 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [accessRules?.canView, activeFilters, apiUrl, limit, loadingAccessRules, page, refreshVersion, router])
+  }, [
+    accessRules?.canView,
+    activeFilters,
+    apiUrl,
+    limit,
+    loadingAccessRules,
+    page,
+    refreshVersion,
+    router,
+    selectedOrganizationId,
+  ])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -591,6 +602,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           limit: deletedLimit,
           filters: deletedActiveFilters,
           deletedOnly: true,
+          organizationId: selectedOrganizationId || undefined,
         })
 
         if (!active) {
@@ -640,6 +652,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     loadingAccessRules,
     refreshVersion,
     router,
+    selectedOrganizationId,
   ])
 
   const activeCount = useMemo(
@@ -711,6 +724,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           payload: values,
+          organizationId: selectedOrganizationId || undefined,
         })
         toast.success("Color created successfully.")
       } else if (editingId != null) {
@@ -719,6 +733,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           accessToken: token,
           id: editingId,
           payload: values,
+          organizationId: selectedOrganizationId || undefined,
         })
         toast.success("Color updated successfully.")
       }
@@ -765,6 +780,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
         apiUrl,
         accessToken: token,
         id: deleteTarget.id,
+        organizationId: selectedOrganizationId || undefined,
       })
 
       setRecentlyDeletedColor(deleteTarget)
@@ -809,6 +825,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
         })
         toast.success("Color restored successfully.")
       } else {
@@ -821,6 +838,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
         })
         toast.success("Color deleted permanently.")
       }
