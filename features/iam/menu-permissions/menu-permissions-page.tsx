@@ -118,11 +118,11 @@ export function MenuPermissionsPage() {
         menuFilterMode === "all"
         || (menuFilterMode === "mapped" && isMapped)
         || (menuFilterMode === "unmapped" && !isMapped)
-      const matchesSearch =
-        !normalizedSearch
-        || menu.menuName.toLowerCase().includes(normalizedSearch)
-        || menu.menuPath.toLowerCase().includes(normalizedSearch)
-        || menu.description?.toLowerCase().includes(normalizedSearch)
+        const matchesSearch =
+          !normalizedSearch
+          || menu.menuName.toLowerCase().includes(normalizedSearch)
+          || menu.menuPath?.toLowerCase().includes(normalizedSearch)
+          || menu.description?.toLowerCase().includes(normalizedSearch)
 
       return matchesMode && matchesSearch
     })
@@ -642,10 +642,10 @@ export function MenuPermissionsPage() {
                         {getAuthInitials(menu.menuName)}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="truncate font-black">{menu.menuName}</h3>
-                        <p className="truncate font-mono text-xs text-violet-700 dark:text-violet-300">
-                          {menu.menuPath}
-                        </p>
+                          <h3 className="truncate font-black">{menu.menuName}</h3>
+                          <p className="truncate font-mono text-xs text-violet-700 dark:text-violet-300">
+                            {menu.menuPath || "No path set"}
+                          </p>
                       </div>
                     </div>
                     {menu.description ? (

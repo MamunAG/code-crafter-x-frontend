@@ -127,12 +127,12 @@ export function MenuTableSection({
   onResetFilters,
 }: MenuTableSectionProps) {
   const filterCount = useMemo(
-    () => [draftFilters.menuName, draftFilters.menuPath].filter((value) => value.trim()).length,
+    () => [draftFilters.menuName].filter((value) => value.trim()).length,
     [draftFilters],
   )
 
   const filtersActive = Boolean(
-    activeFilters.menuName || activeFilters.menuPath || activeFilters.isActive !== "all",
+    activeFilters.menuName || activeFilters.isActive !== "all",
   )
 
   const pageSummary = useMemo(() => {
@@ -156,10 +156,21 @@ export function MenuTableSection({
               <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">
                 {row.original.menuName}
               </p>
-              <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                {row.original.menuPath}
-              </p>
             </div>
+          </div>
+        ),
+      },
+      {
+        id: "module",
+        header: "Module",
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">
+              {row.original.moduleEntry?.moduleName || "Module not set"}
+            </p>
+            <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {row.original.moduleEntry?.moduleKey || row.original.moduleId}
+            </p>
           </div>
         ),
       },
@@ -295,23 +306,6 @@ export function MenuTableSection({
               />
             </div>
             <div className="min-w-0 space-y-1">
-              <label htmlFor="filterMenuPath" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Menu path
-              </label>
-              <Input
-                id="filterMenuPath"
-                value={draftFilters.menuPath}
-                className="h-9 rounded-md px-2 text-xs"
-                onChange={(event) =>
-                  onDraftFiltersChange({
-                    ...draftFilters,
-                    menuPath: event.target.value,
-                  })
-                }
-                placeholder="/dashboard"
-              />
-            </div>
-            <div className="min-w-0 space-y-1">
               <label htmlFor="filterMenuStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                 Active status
               </label>
@@ -382,8 +376,8 @@ export function MenuTableSection({
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">
                             {menu.menuName}
                           </p>
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                            {menu.menuPath}
+                          <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                            {menu.moduleEntry?.moduleName || "Module not set"}
                           </p>
                         </div>
                         <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">

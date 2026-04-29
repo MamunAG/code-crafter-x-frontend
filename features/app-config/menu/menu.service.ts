@@ -39,23 +39,24 @@ export async function fetchMenus({
   filters,
   page = 1,
   limit = 20,
+  deletedOnly = false,
 }: {
   apiUrl: string
   accessToken: string
   filters?: Partial<MenuFilterValues>
   page?: number
   limit?: number
+  deletedOnly?: boolean
 }): Promise<PaginatedResponse<MenuRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/menu")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
+  if (deletedOnly) {
+    url.searchParams.set("deletedOnly", "true")
+  }
 
   if (filters?.menuName?.trim()) {
     url.searchParams.set("menuName", filters.menuName.trim())
-  }
-
-  if (filters?.menuPath?.trim()) {
-    url.searchParams.set("menuPath", filters.menuPath.trim())
   }
 
   if (filters?.isActive && filters.isActive !== "all") {
@@ -161,10 +162,50 @@ export async function deleteMenu({
   await readJsonResponse(response, "Unable to delete the menu entry right now.")
 }
 
+export async function restoreMenu({
+  apiUrl,
+  accessToken,
+  id,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+}): Promise<void> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/menu/${id}/restore`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+
+  await readJsonResponse(response, "Unable to restore the menu entry right now.")
+}
+
+export async function permanentlyDeleteMenu({
+  apiUrl,
+  accessToken,
+  id,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+}): Promise<void> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/menu/${id}/permanent`), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+
+  await readJsonResponse(response, "Unable to delete the menu entry right now.")
+}
+
 function normalizePayload(payload: MenuFormValues) {
   return {
     menuName: payload.menuName.trim(),
-    menuPath: payload.menuPath.trim(),
+    moduleId: payload.moduleId,
     description: payload.description.trim() || undefined,
     displayOrder: Number(payload.displayOrder) || 0,
     isActive: payload.isActive,

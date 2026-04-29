@@ -28,6 +28,8 @@ export type ModuleEntryRecord = {
   isActive: boolean
   created_at?: string
   updated_at?: string | null
+  deleted_at?: string | null
+  deleted_by_id?: string | null
 }
 
 export type ModuleEntryFormValues = {
@@ -42,4 +44,5 @@ export type ModuleEntryFilterValues = {
   moduleName: string
   moduleKey: string
   isActive: "all" | "active" | "inactive"
+  deletedOnly?: boolean
 }

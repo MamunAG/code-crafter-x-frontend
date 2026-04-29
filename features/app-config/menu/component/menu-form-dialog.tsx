@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
@@ -21,8 +21,22 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 
 import type { MenuFormValues } from "../menu.types"
+
+type MenuModuleOption = {
+  label: string
+  value: string
+  moduleKey: string
+}
 
 type MenuEditorMode = "create" | "edit"
 
@@ -33,6 +47,9 @@ type MenuFormDialogProps = {
   submitting: boolean
   error: string
   initialValues: MenuFormValues
+  moduleOptions: MenuModuleOption[]
+  moduleLoading: boolean
+  moduleError: string
   onOpenChange: (open: boolean) => void
   onSubmit: (values: MenuFormValues) => void | Promise<void>
 }
@@ -47,7 +64,7 @@ type ValidationSummaryEntry = {
 
 const MENU_FIELD_ORDER: MenuFieldName[] = [
   "menuName",
-  "menuPath",
+  "moduleId",
   "description",
   "displayOrder",
   "isActive",
@@ -55,7 +72,7 @@ const MENU_FIELD_ORDER: MenuFieldName[] = [
 
 const menuFormSchema = z.object({
   menuName: z.string().trim().min(1, "Menu name is required."),
-  menuPath: z.string().trim().min(1, "Menu path is required."),
+  moduleId: z.string().trim().min(1, "Module is required."),
   description: z.string().transform((value) => value.trim()),
   displayOrder: z.coerce.number().int().min(0, "Display order must be zero or greater."),
   isActive: z.boolean(),
@@ -89,8 +106,8 @@ function buildValidationSummary(errors: FieldErrors<MenuFormValues>) {
     const label =
       field === "menuName"
         ? "Menu name"
-        : field === "menuPath"
-          ? "Menu path"
+        : field === "moduleId"
+            ? "Module"
           : field === "description"
             ? "Description"
             : field === "displayOrder"
@@ -132,6 +149,9 @@ export function MenuFormDialog({
   submitting,
   error,
   initialValues,
+  moduleOptions,
+  moduleLoading,
+  moduleError,
   onOpenChange,
   onSubmit,
 }: MenuFormDialogProps) {
@@ -155,11 +175,13 @@ export function MenuFormDialog({
     reValidateMode: "onChange",
     shouldFocusError: true,
   })
+  const [moduleComboboxOpen, setModuleComboboxOpen] = useState(false)
 
   useEffect(() => {
     if (!open) {
       reset(initialValues)
       clearErrors()
+      setModuleComboboxOpen(false)
       return
     }
 
@@ -168,6 +190,7 @@ export function MenuFormDialog({
   }, [clearErrors, initialValues, open, reset])
 
   const validationSummary = useMemo(() => buildValidationSummary(errors), [errors])
+  const moduleUnavailable = !moduleLoading && moduleOptions.length === 0
 
   const handleValidSubmit: SubmitHandler<MenuFormValues> = async (values) => {
     await onSubmit(values)
@@ -236,6 +259,85 @@ export function MenuFormDialog({
               ) : (
                 <>
                   <Controller
+                    name="moduleId"
+                    control={control}
+                    render={({ field }) => {
+                      const currentModule = moduleOptions.find((option) => option.value === field.value) ?? null
+
+                      return (
+                        <div id="menu-field-moduleId" className="space-y-1.5">
+                          <label
+                            htmlFor="menu-module-combobox"
+                            className="text-xs font-medium text-slate-700 dark:text-slate-300"
+                          >
+                            Module <span className="text-red-500">*</span>
+                          </label>
+                          <Combobox
+                            open={moduleComboboxOpen}
+                            onOpenChange={setModuleComboboxOpen}
+                            items={moduleOptions}
+                            value={currentModule}
+                            onValueChange={(option) => {
+                              field.onChange(option?.value ?? "")
+                              setModuleComboboxOpen(false)
+                            }}
+                            isItemEqualToValue={(item, value) => item.value === value.value}
+                          >
+                            <ComboboxInput
+                              id="menu-module-combobox"
+                              placeholder={
+                                moduleLoading
+                                  ? "Loading modules..."
+                                  : moduleOptions.length > 0
+                                    ? "Select a module"
+                                    : "No modules available"
+                              }
+                              showClear={Boolean(field.value)}
+                              disabled={moduleLoading || moduleUnavailable}
+                              className="w-full"
+                              aria-invalid={Boolean(errors.moduleId)}
+                            />
+                            <ComboboxContent className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]">
+                              <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+                                <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                                  Module
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                                  Every menu must belong to a module.
+                                </p>
+                              </div>
+                              <ComboboxEmpty className="py-5 text-xs">
+                                {moduleLoading
+                                  ? "Loading modules..."
+                                  : moduleError || moduleUnavailable
+                                    ? moduleError || "No modules available."
+                                    : "No modules match your search."}
+                              </ComboboxEmpty>
+                              <ComboboxList className="px-2 py-2">
+                                {(item) => (
+                                  <ComboboxItem
+                                    key={item.value}
+                                    value={item}
+                                    className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                                  >
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                      <span className="truncate">{item.label}</span>
+                                      <span className="truncate text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                                        {item.moduleKey}
+                                      </span>
+                                    </span>
+                                  </ComboboxItem>
+                                )}
+                              </ComboboxList>
+                            </ComboboxContent>
+                          </Combobox>
+                          <FieldErrorMessage message={getErrorMessage(errors.moduleId?.message)} />
+                        </div>
+                      )
+                    }}
+                  />
+
+                  <Controller
                     name="menuName"
                     control={control}
                     render={({ field }) => (
@@ -255,30 +357,6 @@ export function MenuFormDialog({
                           aria-invalid={Boolean(errors.menuName)}
                         />
                         <FieldErrorMessage message={getErrorMessage(errors.menuName?.message)} />
-                      </div>
-                    )}
-                  />
-
-                  <Controller
-                    name="menuPath"
-                    control={control}
-                    render={({ field }) => (
-                      <div id="menu-field-menuPath" className="space-y-1.5">
-                        <label htmlFor={field.name} className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                          Menu path <span className="text-red-500">*</span>
-                        </label>
-                        <Input
-                          {...field}
-                          id={field.name}
-                          ref={field.ref}
-                          required
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          placeholder="/dashboard"
-                          aria-invalid={Boolean(errors.menuPath)}
-                        />
-                        <FieldErrorMessage message={getErrorMessage(errors.menuPath?.message)} />
                       </div>
                     )}
                   />
@@ -373,7 +451,7 @@ export function MenuFormDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading || submitting} className="rounded-xl">
+              <Button type="submit" disabled={loading || submitting || moduleLoading || moduleUnavailable} className="rounded-xl">
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {mode === "create" ? "Save menu" : "Save changes"}
               </Button>

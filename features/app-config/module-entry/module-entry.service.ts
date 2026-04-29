@@ -43,16 +43,21 @@ export async function fetchModuleEntries({
   filters,
   page = 1,
   limit = 20,
+  deletedOnly = false,
 }: {
   apiUrl: string
   accessToken: string
   filters?: Partial<ModuleEntryFilterValues>
   page?: number
   limit?: number
+  deletedOnly?: boolean
 }): Promise<PaginatedResponse<ModuleEntryRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/module-entry")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
+  if (deletedOnly) {
+    url.searchParams.set("deletedOnly", "true")
+  }
 
   if (filters?.moduleName?.trim()) {
     url.searchParams.set("moduleName", filters.moduleName.trim())
@@ -161,6 +166,46 @@ export async function deleteModuleEntry({
   id: string
 }): Promise<void> {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/module-entry/${id}`), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+
+  await readJsonResponse(response, "Unable to delete the module entry right now.")
+}
+
+export async function restoreModuleEntry({
+  apiUrl,
+  accessToken,
+  id,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+}): Promise<void> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/module-entry/${id}/restore`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+
+  await readJsonResponse(response, "Unable to restore the module entry right now.")
+}
+
+export async function permanentlyDeleteModuleEntry({
+  apiUrl,
+  accessToken,
+  id,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+}): Promise<void> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/module-entry/${id}/permanent`), {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${accessToken}`,
