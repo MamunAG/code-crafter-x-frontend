@@ -2,6 +2,7 @@ export type ModuleLeafItem = {
   label: string
   href: string
   description?: string
+  permissionMenuName?: string
 }
 
 export type ModuleNavItem = ModuleLeafItem & {
@@ -22,10 +23,20 @@ export type ModuleNavigationItem = {
   groups: ModuleGroup[]
 }
 
+export type NavigationPermissionRecord = {
+  canView: boolean
+  menu?: {
+    menuName?: string | null
+    moduleEntry?: {
+      moduleName?: string | null
+    } | null
+  } | null
+}
+
 export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
   {
     key: "app-config",
-    label: "App Confi",
+    label: "App Config",
     href: "/app-config",
     description: "Global configuration, identity settings, and platform setup.",
     groups: [
@@ -53,7 +64,7 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             ],
           },
           {
-            label: "Module Entry",
+            label: "Module",
             href: "/app-config/core/module-entry",
             description: "Create and manage application module entries.",
           },
@@ -62,22 +73,6 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             href: "/app-config/core/menu",
             description: "Create and manage organization-specific menu entries.",
           },
-          {
-            label: "Branding",
-            href: "/app-config/core/branding",
-            description: "Logo, theme, and email branding.",
-            children: [
-              {
-                label: "Logo assets",
-                href: "/app-config/core/branding/logo-assets",
-              },
-              { label: "Theme", href: "/app-config/core/branding/theme" },
-              {
-                label: "Email branding",
-                href: "/app-config/core/branding/email-branding",
-              },
-            ],
-          },
         ],
       },
       {
@@ -85,28 +80,19 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
         description: "Reference data for the platform.",
         items: [
           {
-            label: "Countries",
+            label: "Country Setup",
             href: "/app-config/data/countries",
-            children: [
-              { label: "Regions", href: "/app-config/data/countries/regions" },
-              { label: "Zones", href: "/app-config/data/countries/zones" },
-            ],
+            permissionMenuName: "Country Setup",
           },
           {
-            label: "Currencies",
+            label: "Currency Setup",
             href: "/app-config/data/currencies",
-            children: [
-              { label: "Exchange rates", href: "/app-config/data/currencies/rates" },
-              { label: "Base currency", href: "/app-config/data/currencies/base" },
-            ],
+            permissionMenuName: "Currency Setup",
           },
           {
-            label: "Units of measure",
+            label: "Unit Setup",
             href: "/app-config/data/uom",
-            children: [
-              { label: "Weight", href: "/app-config/data/uom/weight" },
-              { label: "Length", href: "/app-config/data/uom/length" },
-            ],
+            permissionMenuName: "Unit Setup",
           },
         ],
       },
@@ -164,16 +150,19 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             href: "",
             children: [
               {
-                label: "Color",
+                label: "Color Setup",
                 href: "/merchandising/masters/colors",
+                permissionMenuName: "Color Setup",
               },
               {
-                label: "Sizes",
+                label: "Size Setup",
                 href: "/merchandising/masters/sizes",
+                permissionMenuName: "Size Setup",
               },
               {
-                label: "Embellishments",
+                label: "Embellishment",
                 href: "/merchandising/masters/embellishments",
+                permissionMenuName: "Embellishment",
               },
             ],
           },
@@ -352,4 +341,116 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
 
 export function getModuleNavigation(key: ModuleNavigationItem["key"]) {
   return MODULE_NAVIGATION.find((module) => module.key === key)
+}
+
+function normalizeNavigationKey(value?: string | null) {
+  const normalizedValue = value?.trim().toLowerCase() ?? ""
+
+  if (!normalizedValue) {
+    return ""
+  }
+
+  return normalizedValue
+}
+
+export function filterModuleNavigationByPermissions(
+  modules: ModuleNavigationItem[],
+  permissions: NavigationPermissionRecord[],
+  isAdmin: boolean,
+) {
+  if (isAdmin) {
+    return modules
+  }
+
+  const visibleModuleSet = new Set<string>()
+
+  permissions.forEach((permission) => {
+    if (!permission.canView) {
+      return
+    }
+
+    const moduleName = normalizeNavigationKey(permission.menu?.moduleEntry?.moduleName)
+
+    if (moduleName) {
+      visibleModuleSet.add(moduleName)
+    }
+  })
+
+  return modules.filter((module) => {
+    const moduleName = normalizeNavigationKey(module.label)
+    if (!moduleName) {
+      return false
+    }
+
+    return visibleModuleSet.has(moduleName)
+  })
+}
+
+function buildVisibleMenuNameSet(permissions: NavigationPermissionRecord[]) {
+  const visibleMenuNameSet = new Set<string>()
+
+  permissions.forEach((permission) => {
+    if (!permission.canView) {
+      return
+    }
+
+    const menuName = normalizeNavigationKey(permission.menu?.menuName)
+
+    if (menuName) {
+      visibleMenuNameSet.add(menuName)
+    }
+  })
+
+  return visibleMenuNameSet
+}
+
+function filterSidebarItemsByPermissions(
+  items: ModuleNavItem[],
+  visibleMenuNameSet: Set<string>,
+): ModuleNavItem[] {
+  return items.flatMap((item) => {
+    const children = item.children?.length
+      ? filterSidebarItemsByPermissions(item.children, visibleMenuNameSet)
+      : []
+    const permissionMenuName = normalizeNavigationKey(item.permissionMenuName)
+    const canShowItem = permissionMenuName
+      ? visibleMenuNameSet.has(permissionMenuName)
+      : children.length > 0
+
+    if (!canShowItem) {
+      return []
+    }
+
+    return [
+      {
+        ...item,
+        children: children.length ? children : undefined,
+      },
+    ]
+  })
+}
+
+export function filterModuleSidebarGroupsByPermissions(
+  groups: ModuleGroup[],
+  permissions: NavigationPermissionRecord[],
+  isAdmin: boolean,
+) {
+  if (isAdmin) {
+    return groups
+  }
+
+  const visibleMenuNameSet = buildVisibleMenuNameSet(permissions)
+
+  return groups.flatMap((group) => {
+    const items = filterSidebarItemsByPermissions(group.items, visibleMenuNameSet)
+
+    return items.length
+      ? [
+        {
+          ...group,
+          items,
+        },
+      ]
+      : []
+  })
 }

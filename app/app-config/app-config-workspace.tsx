@@ -6,6 +6,7 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
+  useEffect,
   useMemo,
   useState,
 } from "react"
@@ -19,8 +20,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { fetchMenuPermissions } from "@/features/iam/menu-permissions/menu-permission.service"
+import { parseStoredAuthUser } from "@/lib/auth-session"
+import {
+  readSelectedOrganizationId,
+  SELECTED_ORGANIZATION_CHANGED_EVENT,
+} from "@/lib/organization-selection"
 import { cn } from "@/lib/utils"
-import { getModuleNavigation, type ModuleNavItem } from "@/lib/module-navigation"
+import {
+  filterModuleSidebarGroupsByPermissions,
+  getModuleNavigation,
+  type ModuleGroup,
+  type ModuleNavItem,
+} from "@/lib/module-navigation"
 
 function isPathActive(pathname: string, href: string) {
   return Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
@@ -148,8 +160,75 @@ export function AppConfigWorkspace({ children }: { children?: ReactNode }) {
   const [openItems, setOpenItems] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpenPathname, setMobileOpenPathname] = useState<string | null>(null)
+  const [visibleGroups, setVisibleGroups] = useState<ModuleGroup[]>([])
 
-  const groups = useMemo(() => appModule?.groups ?? [], [appModule])
+  useEffect(() => {
+    let active = true
+
+    async function loadVisibleGroups() {
+      if (!appModule) {
+        if (active) {
+          setVisibleGroups([])
+        }
+        return
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const accessToken = window.localStorage.getItem("access_token")
+      const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+      const selectedOrganizationId = readSelectedOrganizationId()
+      const isAdmin = storedUser?.role === "admin"
+
+      if (isAdmin) {
+        if (active) {
+          setVisibleGroups(appModule.groups)
+        }
+        return
+      }
+
+      if (!apiUrl || !accessToken || !storedUser?.id || !selectedOrganizationId) {
+        if (active) {
+          setVisibleGroups([])
+        }
+        return
+      }
+
+      try {
+        const permissions = await fetchMenuPermissions({
+          apiUrl,
+          accessToken,
+          userId: storedUser.id,
+          organizationId: selectedOrganizationId,
+        })
+
+        if (active) {
+          setVisibleGroups(
+            filterModuleSidebarGroupsByPermissions(appModule.groups, permissions, false),
+          )
+        }
+      } catch {
+        if (active) {
+          setVisibleGroups([])
+        }
+      }
+    }
+
+    const handleOrganizationChange = () => {
+      void loadVisibleGroups()
+    }
+
+    void loadVisibleGroups()
+    window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+    window.addEventListener("storage", handleOrganizationChange)
+
+    return () => {
+      active = false
+      window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+      window.removeEventListener("storage", handleOrganizationChange)
+    }
+  }, [appModule])
+
+  const groups = useMemo(() => visibleGroups, [visibleGroups])
   const activeOpenItems = useMemo(
     () =>
       Array.from(

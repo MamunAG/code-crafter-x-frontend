@@ -1,14 +1,9 @@
-import { ModuleRoutePage } from "@/components/module-route-page"
+import { EmbellishmentWorkspace } from "@/features/merchandising/embellishments/embellishment-workspace"
 
 export default function Page() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
+
   return (
-    <ModuleRoutePage
-      current="merchandising"
-      eyebrow="Merchandising"
-      title="Embellishments"
-      description="Dummy colors workspace for palettes, swatches, and other color master data."
-      pathLabel="/merchandising/masters/embellishments"
-      showModuleNavigation={false}
-    />
+    <EmbellishmentWorkspace apiUrl={apiUrl} />
   )
 }

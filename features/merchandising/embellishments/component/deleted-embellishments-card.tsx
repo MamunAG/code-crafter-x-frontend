@@ -35,26 +35,30 @@ import {
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 
-import type { PaginationMeta, SizeFilterValues, SizeRecord } from "../size.types"
+import type {
+  EmbellishmentFilterValues,
+  EmbellishmentRecord,
+  PaginationMeta,
+} from "../embellishment.types"
 
-type DeletedSizeActionMode = "restore" | "permanent"
+type DeletedEmbellishmentActionMode = "restore" | "permanent"
 
-type DeletedSizesCardProps = {
-  deletedSizes: SizeRecord[]
+type DeletedEmbellishmentsCardProps = {
+  deletedEmbellishments: EmbellishmentRecord[]
   deletedMeta: PaginationMeta | null
   deletedPage: number
   deletedLimit: number
-  loadingDeletedSizes: boolean
+  loadingDeletedEmbellishments: boolean
   deletedError: string
-  deletedDraftFilters: SizeFilterValues
-  deletedActiveFilters: SizeFilterValues
-  onDeletedDraftFiltersChange: (nextValues: SizeFilterValues) => void
-  onDeletedActiveFiltersChange: (nextValues: SizeFilterValues) => void
+  deletedDraftFilters: EmbellishmentFilterValues
+  deletedActiveFilters: EmbellishmentFilterValues
+  onDeletedDraftFiltersChange: (nextValues: EmbellishmentFilterValues) => void
+  onDeletedActiveFiltersChange: (nextValues: EmbellishmentFilterValues) => void
   onDeletedPageChange: (nextPage: number) => void
   onDeletedLimitChange: (nextPageSize: number) => void
-  onOpenAction: (size: SizeRecord, mode: DeletedSizeActionMode) => void
-  canRestoreSize: boolean
-  canPermanentlyDeleteSize: boolean
+  onOpenAction: (embellishment: EmbellishmentRecord, mode: DeletedEmbellishmentActionMode) => void
+  canRestoreEmbellishment: boolean
+  canPermanentlyDeleteEmbellishment: boolean
 }
 
 function formatDate(value?: string | null) {
@@ -78,13 +82,7 @@ function getUserLabel(user?: { name?: string | null } | null, fallback?: string 
   return user?.name?.trim() || fallback?.trim() || ""
 }
 
-function EmptyState({
-  title,
-  description,
-}: {
-  title: string
-  description: string
-}) {
+function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
       <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
@@ -97,12 +95,12 @@ function EmptyState({
   )
 }
 
-export function DeletedSizesCard({
-  deletedSizes,
+export function DeletedEmbellishmentsCard({
+  deletedEmbellishments,
   deletedMeta,
   deletedPage,
   deletedLimit,
-  loadingDeletedSizes,
+  loadingDeletedEmbellishments,
   deletedError,
   deletedDraftFilters,
   deletedActiveFilters,
@@ -111,12 +109,12 @@ export function DeletedSizesCard({
   onDeletedPageChange,
   onDeletedLimitChange,
   onOpenAction,
-  canRestoreSize,
-  canPermanentlyDeleteSize,
-}: DeletedSizesCardProps) {
+  canRestoreEmbellishment,
+  canPermanentlyDeleteEmbellishment,
+}: DeletedEmbellishmentsCardProps) {
   const deletedPageSummary = useMemo(() => {
     if (!deletedMeta || deletedMeta.total === 0) {
-      return "No deleted sizes found"
+      return "No deleted embellishments found"
     }
 
     const start = (deletedMeta.page - 1) * deletedMeta.limit + 1
@@ -125,46 +123,55 @@ export function DeletedSizesCard({
   }, [deletedMeta])
 
   const deletedFilterCount = useMemo(
-    () => [deletedDraftFilters.sizeName].filter((value) => value.trim()).length,
+    () => [deletedDraftFilters.name, deletedDraftFilters.remarks].filter((value) => value.trim()).length,
     [deletedDraftFilters],
   )
 
-  const deletedFiltersActive = Boolean(deletedActiveFilters.sizeName)
+  const deletedFiltersActive = Boolean(deletedActiveFilters.name || deletedActiveFilters.remarks)
 
-  const deletedColumns = useMemo<ColumnDef<SizeRecord>[]>(
+  const deletedColumns = useMemo<ColumnDef<EmbellishmentRecord>[]>(
     () => [
       {
-        id: "size",
-        header: "Size",
+        id: "embellishment",
+        header: "Embellishment",
         cell: ({ row }) => {
-          const size = row.original
+          const embellishment = row.original
 
           return (
             <div className="pl-4">
               <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">
-                {size.sizeName}
+                {embellishment.name}
               </p>
               <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                ID #{size.id}
+                ID #{embellishment.id}
               </p>
             </div>
           )
         },
       },
       {
+        id: "remarks",
+        header: "Remarks",
+        cell: ({ row }) => (
+          <p className="line-clamp-2 max-w-[24rem] whitespace-normal text-xs leading-5 text-slate-600 dark:text-slate-300">
+            {row.original.remarks || "No remarks provided."}
+          </p>
+        ),
+      },
+      {
         id: "deleted",
         header: "Deleted",
         cell: ({ row }) => {
-          const size = row.original
+          const embellishment = row.original
 
           return (
             <div className="space-y-1">
               <p className="text-xs text-slate-700 dark:text-slate-200">
-                {formatDate(size.deleted_at)}
+                {formatDate(embellishment.deleted_at)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {getUserLabel(size.deleted_by_user, size.deleted_by_id)
-                  ? `Deleted by ${getUserLabel(size.deleted_by_user, size.deleted_by_id)}`
+                {getUserLabel(embellishment.deleted_by_user, embellishment.deleted_by_id)
+                  ? `Deleted by ${getUserLabel(embellishment.deleted_by_user, embellishment.deleted_by_id)}`
                   : "Deleted item"}
               </p>
             </div>
@@ -175,8 +182,8 @@ export function DeletedSizesCard({
         id: "actions",
         header: () => <span className="pr-4">Actions</span>,
         cell: ({ row }) => {
-          const size = row.original
-          const hasActions = canRestoreSize || canPermanentlyDeleteSize
+          const embellishment = row.original
+          const hasActions = canRestoreEmbellishment || canPermanentlyDeleteEmbellishment
 
           if (!hasActions) {
             return (
@@ -195,15 +202,15 @@ export function DeletedSizesCard({
                     <span className="sr-only">Open deleted item actions</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {canRestoreSize ? (
-                    <DropdownMenuItem onSelect={() => onOpenAction(size, "restore")}>
-                      Restore size
+                <DropdownMenuContent align="end" className="w-56">
+                  {canRestoreEmbellishment ? (
+                    <DropdownMenuItem onSelect={() => onOpenAction(embellishment, "restore")}>
+                      Restore embellishment
                     </DropdownMenuItem>
                   ) : null}
-                  {canRestoreSize && canPermanentlyDeleteSize ? <DropdownMenuSeparator /> : null}
-                  {canPermanentlyDeleteSize ? (
-                    <DropdownMenuItem variant="destructive" onSelect={() => onOpenAction(size, "permanent")}>
+                  {canRestoreEmbellishment && canPermanentlyDeleteEmbellishment ? <DropdownMenuSeparator /> : null}
+                  {canPermanentlyDeleteEmbellishment ? (
+                    <DropdownMenuItem variant="destructive" onSelect={() => onOpenAction(embellishment, "permanent")}>
                       Delete permanently
                     </DropdownMenuItem>
                   ) : null}
@@ -214,11 +221,11 @@ export function DeletedSizesCard({
         },
       },
     ],
-    [canPermanentlyDeleteSize, canRestoreSize, onOpenAction],
+    [canPermanentlyDeleteEmbellishment, canRestoreEmbellishment, onOpenAction],
   )
 
   const deletedTable = useReactTable({
-    data: deletedSizes,
+    data: deletedEmbellishments,
     columns: deletedColumns,
     getCoreRowModel: getCoreRowModel(),
   })
@@ -228,35 +235,52 @@ export function DeletedSizesCard({
       <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-lg">Deleted sizes</CardTitle>
+            <CardTitle className="text-lg">Deleted embellishments</CardTitle>
             <CardDescription>
-              Restore old soft deleted sizes or remove them permanently.
+              Restore old soft deleted embellishments or remove them permanently.
             </CardDescription>
           </div>
           <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
-            {deletedMeta?.total ?? deletedSizes.length} deleted
+            {deletedMeta?.total ?? deletedEmbellishments.length} deleted
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="border-b border-slate-200/70 p-4 dark:border-white/10">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="grid w-full gap-3 sm:grid-cols-1 lg:max-w-xl">
+            <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-2xl">
               <div className="space-y-1">
-                <label htmlFor="deletedSizeName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Size name
+                <label htmlFor="deletedEmbellishmentName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Embellishment name
                 </label>
                 <Input
-                  id="deletedSizeName"
-                  value={deletedDraftFilters.sizeName}
+                  id="deletedEmbellishmentName"
+                  value={deletedDraftFilters.name}
                   className="h-9 rounded-md px-2 text-xs"
                   onChange={(event) =>
                     onDeletedDraftFiltersChange({
                       ...deletedDraftFilters,
-                      sizeName: event.target.value,
+                      name: event.target.value,
                     })
                   }
-                  placeholder="Input size name"
+                  placeholder="Input embellishment name"
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="deletedEmbellishmentRemarks" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Remarks
+                </label>
+                <Input
+                  id="deletedEmbellishmentRemarks"
+                  value={deletedDraftFilters.remarks}
+                  className="h-9 rounded-md px-2 text-xs"
+                  onChange={(event) =>
+                    onDeletedDraftFiltersChange({
+                      ...deletedDraftFilters,
+                      remarks: event.target.value,
+                    })
+                  }
+                  placeholder="Input remarks"
                 />
               </div>
             </div>
@@ -278,7 +302,7 @@ export function DeletedSizesCard({
                 variant="outline"
                 className="w-full rounded-xl sm:w-auto"
                 onClick={() => {
-                  const cleared = { sizeName: "" }
+                  const cleared = { name: "", remarks: "" }
                   onDeletedDraftFiltersChange(cleared)
                   onDeletedActiveFiltersChange(cleared)
                   onDeletedPageChange(1)
@@ -300,37 +324,34 @@ export function DeletedSizesCard({
 
         {deletedError ? (
           <div className="p-4">
-            <EmptyState title="Unable to load deleted sizes" description={deletedError} />
+            <EmptyState title="Unable to load deleted embellishments" description={deletedError} />
           </div>
         ) : null}
 
         {!deletedError ? (
           <>
             <div className="lg:hidden">
-              {loadingDeletedSizes ? (
+              {loadingDeletedEmbellishments ? (
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 5 }).map((_, index) => (
                     <Skeleton key={index} className="h-24 rounded-2xl" />
                   ))}
                 </div>
-              ) : deletedSizes.length > 0 ? (
+              ) : deletedEmbellishments.length > 0 ? (
                 <div className="space-y-3 p-4">
-                  {deletedSizes.map((size) => (
-                    <article
-                      key={size.id}
-                      className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
-                    >
+                  {deletedEmbellishments.map((embellishment) => (
+                    <article key={embellishment.id} className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">
-                            {size.sizeName}
+                            {embellishment.name}
                           </p>
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                            ID #{size.id}
+                            ID #{embellishment.id}
                           </p>
                         </div>
 
-                        {canRestoreSize || canPermanentlyDeleteSize ? (
+                        {canRestoreEmbellishment || canPermanentlyDeleteEmbellishment ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
@@ -338,15 +359,15 @@ export function DeletedSizesCard({
                                 <span className="sr-only">Open deleted item actions</span>
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              {canRestoreSize ? (
-                                <DropdownMenuItem onSelect={() => onOpenAction(size, "restore")}>
-                                  Restore size
+                            <DropdownMenuContent align="end" className="w-56">
+                              {canRestoreEmbellishment ? (
+                                <DropdownMenuItem onSelect={() => onOpenAction(embellishment, "restore")}>
+                                  Restore embellishment
                                 </DropdownMenuItem>
                               ) : null}
-                              {canRestoreSize && canPermanentlyDeleteSize ? <DropdownMenuSeparator /> : null}
-                              {canPermanentlyDeleteSize ? (
-                                <DropdownMenuItem variant="destructive" onSelect={() => onOpenAction(size, "permanent")}>
+                              {canRestoreEmbellishment && canPermanentlyDeleteEmbellishment ? <DropdownMenuSeparator /> : null}
+                              {canPermanentlyDeleteEmbellishment ? (
+                                <DropdownMenuItem variant="destructive" onSelect={() => onOpenAction(embellishment, "permanent")}>
                                   Delete permanently
                                 </DropdownMenuItem>
                               ) : null}
@@ -356,11 +377,11 @@ export function DeletedSizesCard({
                       </div>
 
                       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                        Deleted: {formatDate(size.deleted_at)}
+                        Deleted: {formatDate(embellishment.deleted_at)}
                       </p>
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {getUserLabel(size.deleted_by_user, size.deleted_by_id)
-                          ? `Deleted by ${getUserLabel(size.deleted_by_user, size.deleted_by_id)}`
+                        {getUserLabel(embellishment.deleted_by_user, embellishment.deleted_by_id)
+                          ? `Deleted by ${getUserLabel(embellishment.deleted_by_user, embellishment.deleted_by_id)}`
                           : "Deleted item"}
                       </p>
                     </article>
@@ -369,11 +390,11 @@ export function DeletedSizesCard({
               ) : (
                 <div className="p-4">
                   <EmptyState
-                    title="No deleted sizes found"
+                    title="No deleted embellishments found"
                     description={
                       deletedFiltersActive
                         ? "Try clearing or relaxing the current filters."
-                        : "Soft deleted sizes will appear here when users remove them."
+                        : "Soft deleted embellishments will appear here when users remove them."
                     }
                   />
                 </div>
@@ -384,19 +405,19 @@ export function DeletedSizesCard({
                   {deletedPageSummary}
                 </p>
                 <div className="flex items-center justify-between gap-2">
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(1)} disabled={loadingDeletedSizes || deletedPage <= 1}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(1)} disabled={loadingDeletedEmbellishments || deletedPage <= 1}>
                     <ChevronsLeft className="size-3.5" />
                     <span className="sr-only">Go to first page</span>
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(Math.max(1, deletedPage - 1))} disabled={loadingDeletedSizes || deletedPage <= 1}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(Math.max(1, deletedPage - 1))} disabled={loadingDeletedEmbellishments || deletedPage <= 1}>
                     <ChevronLeft className="size-3.5" />
                     <span className="sr-only">Previous page</span>
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(Math.min(deletedMeta?.totalPages ?? 1, deletedPage + 1))} disabled={loadingDeletedSizes || deletedPage >= (deletedMeta?.totalPages ?? 1)}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(Math.min(deletedMeta?.totalPages ?? 1, deletedPage + 1))} disabled={loadingDeletedEmbellishments || deletedPage >= (deletedMeta?.totalPages ?? 1)}>
                     <ChevronRight className="size-3.5" />
                     <span className="sr-only">Next page</span>
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(deletedMeta?.totalPages ?? 1)} disabled={loadingDeletedSizes || deletedPage >= (deletedMeta?.totalPages ?? 1)}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onDeletedPageChange(deletedMeta?.totalPages ?? 1)} disabled={loadingDeletedEmbellishments || deletedPage >= (deletedMeta?.totalPages ?? 1)}>
                     <ChevronsRight className="size-3.5" />
                     <span className="sr-only">Go to last page</span>
                   </Button>
@@ -411,7 +432,7 @@ export function DeletedSizesCard({
                 page={deletedPage}
                 totalPages={deletedMeta?.totalPages ?? 1}
                 pageSize={deletedLimit}
-                isLoading={loadingDeletedSizes}
+                isLoading={loadingDeletedEmbellishments}
                 pageSizeOptions={[5, 10, 25, 50]}
                 onPageChange={(nextPage) => onDeletedPageChange(nextPage)}
                 onPageSizeChange={(nextPageSize) => {
@@ -420,11 +441,11 @@ export function DeletedSizesCard({
                 }}
                 emptyState={
                   <EmptyState
-                    title="No deleted sizes found"
+                    title="No deleted embellishments found"
                     description={
                       deletedFiltersActive
                         ? "Try clearing or relaxing the current filters."
-                        : "Soft deleted sizes will appear here when users remove them."
+                        : "Soft deleted embellishments will appear here when users remove them."
                     }
                   />
                 }

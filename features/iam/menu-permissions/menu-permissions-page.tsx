@@ -54,6 +54,10 @@ function getUserLabel(user: UserOptionRecord) {
   return user.name || user.user_name || user.email || "User"
 }
 
+function getMenuModuleName(menu: MenuRecord) {
+  return menu.moduleEntry?.moduleName?.trim() || "No module set"
+}
+
 function buildDefaultPermissions(menus: MenuRecord[], records: MenuPermissionRecord[]) {
   const permissionByMenuId = new Map(records.map((record) => [record.menuId, record]))
 
@@ -125,7 +129,7 @@ export function MenuPermissionsPage() {
       const matchesSearch =
         !normalizedSearch
         || menu.menuName.toLowerCase().includes(normalizedSearch)
-        || menu.menuPath?.toLowerCase().includes(normalizedSearch)
+        || getMenuModuleName(menu).toLowerCase().includes(normalizedSearch)
         || menu.description?.toLowerCase().includes(normalizedSearch)
 
       return matchesMode && matchesSearch
@@ -551,7 +555,7 @@ export function MenuPermissionsPage() {
                 <Input
                   value={menuSearch}
                   onChange={(event) => setMenuSearch(event.target.value)}
-                  placeholder="Search menu by name, path, or description"
+                  placeholder="Search menu by name, module, or description"
                   className="h-11 rounded-xl bg-white pl-9 dark:bg-slate-950"
                 />
               </div>
@@ -626,7 +630,7 @@ export function MenuPermissionsPage() {
               <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/15">
                 <p className="font-bold">No menu matches your search.</p>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Try another name/path or clear the menu filters.
+                  Try another name/module or clear the menu filters.
                 </p>
                 <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={resetMenuFilters}>
                   Clear filters
@@ -649,8 +653,8 @@ export function MenuPermissionsPage() {
                         </div>
                         <div className="min-w-0">
                           <h3 className="truncate font-black">{menu.menuName}</h3>
-                          <p className="truncate font-mono text-xs text-violet-700 dark:text-violet-300">
-                            {menu.menuPath || "No path set"}
+                          <p className="truncate text-xs font-bold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300">
+                            {getMenuModuleName(menu)}
                           </p>
                         </div>
                       </div>

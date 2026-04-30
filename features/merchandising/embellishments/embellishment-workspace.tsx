@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Loader2,
+  Sparkles,
   Plus,
   RefreshCcw,
   Trash2,
@@ -24,55 +25,90 @@ import {
   SELECTED_ORGANIZATION_CHANGED_EVENT,
 } from "@/lib/organization-selection"
 
-import { DeletedSizesCard } from "./component/deleted-sizes-card"
-import { SizeFormDialog } from "./component/size-form-dialog"
-import { SizeTableSection } from "./component/size-table-section"
+import { EmbellishmentFormDialog } from "./component/embellishment-form-dialog"
+import { EmbellishmentTableSection } from "./component/embellishment-table-section"
+import { DeletedEmbellishmentsCard } from "./component/deleted-embellishments-card"
 import {
-  createSize,
-  fetchSize,
-  fetchSizes,
-  permanentlyDeleteSize,
-  restoreSize,
-  softDeleteSize,
-  updateSize,
-} from "./size.service"
-import type { SizeFilterValues, SizeFormValues, SizeRecord, PaginationMeta } from "./size.types"
+  createEmbellishment,
+  fetchEmbellishment,
+  fetchEmbellishments,
+  permanentlyDeleteEmbellishment,
+  restoreEmbellishment,
+  softDeleteEmbellishment,
+  updateEmbellishment,
+} from "./embellishment.service"
+import type {
+  EmbellishmentFilterValues,
+  EmbellishmentFormValues,
+  EmbellishmentRecord,
+  PaginationMeta,
+} from "./embellishment.types"
 
-type SizeEditorMode = "create" | "edit"
-type PendingDeleteMode = "restore" | "permanent"
-type SizeAccessRules = {
+type EmbellishmentEditorMode = "create" | "edit"
+type PendingDeleteMode = "soft" | "restore" | "permanent"
+type EmbellishmentAccessRules = {
   canView: boolean
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
 }
 
-const SIZE_MENU_NAME = "Size Setup"
-const EMPTY_ACCESS_RULES: SizeAccessRules = {
+const EMBELLISHMENT_MENU_NAME = "Embellishment Setup"
+const EMPTY_ACCESS_RULES: EmbellishmentAccessRules = {
   canView: false,
   canCreate: false,
   canUpdate: false,
   canDelete: false,
 }
 
-const DEFAULT_FILTERS: SizeFilterValues = {
-  sizeName: "",
+const DEFAULT_FILTERS: EmbellishmentFilterValues = {
+  name: "",
+  remarks: "",
 }
 
-const DEFAULT_FORM_VALUES: SizeFormValues = {
-  sizeName: "",
+const DEFAULT_FORM_VALUES: EmbellishmentFormValues = {
+  name: "",
+  remarks: "",
   isActive: true,
 }
 
-function getSizeLabel(size: SizeRecord) {
-  return size.sizeName
+function getEmbellishmentLabel(embellishment: EmbellishmentRecord) {
+  return embellishment.name
 }
 
 function normalizeAuthFailure(message: string) {
   return (
     message.toLowerCase().includes("session expired") ||
-    message.toLowerCase().includes("unauthorized") ||
-    message.toLowerCase().includes("forbidden")
+    message.toLowerCase().includes("unauthorized")
+  )
+}
+
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string
+  description: string
+  actionLabel: string
+  onAction: () => void
+}) {
+  return (
+    <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+        <Sparkles className="size-5" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">
+        {title}
+      </h3>
+      <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600 dark:text-slate-300">
+        {description}
+      </p>
+      <Button type="button" onClick={onAction} className="mt-6 rounded-xl">
+        {actionLabel}
+      </Button>
+    </div>
   )
 }
 
@@ -113,13 +149,13 @@ function WorkspaceSkeleton() {
 
 function DeleteConfirmDialog({
   open,
-  size,
+  embellishment,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
-  size: SizeRecord | null
+  embellishment: EmbellishmentRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
@@ -128,11 +164,11 @@ function DeleteConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete size</AlertDialogTitle>
+          <AlertDialogTitle>Delete embellishment</AlertDialogTitle>
           <AlertDialogDescription>
             This will soft delete{" "}
             <span className="font-medium text-slate-900 dark:text-slate-100">
-              {size ? getSizeLabel(size) : "this size"}
+              {embellishment ? getEmbellishmentLabel(embellishment) : "this embellishment"}
             </span>
             . You can restore it from the recently deleted card before removing it permanently.
           </AlertDialogDescription>
@@ -156,23 +192,26 @@ function DeleteConfirmDialog({
 function RecentlyDeletedDialog({
   open,
   action,
-  size,
+  embellishment,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
   action: PendingDeleteMode
-  size: SizeRecord | null
+  embellishment: EmbellishmentRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }) {
-  const title = action === "restore" ? "Restore size" : "Delete size permanently"
+  const title =
+    action === "restore"
+      ? "Restore embellishment"
+      : "Delete embellishment permanently"
   const description =
     action === "restore"
-      ? "Bring this size back into the active merchandising list."
-      : "This will permanently remove the size record and cannot be undone."
+      ? "Bring this embellishment back into the active merchandising list."
+      : "This will permanently remove the embellishment record and cannot be undone."
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -182,7 +221,7 @@ function RecentlyDeletedDialog({
           <AlertDialogDescription>
             {description}{" "}
             <span className="font-medium text-slate-900 dark:text-slate-100">
-              {size ? getSizeLabel(size) : "this size"}
+              {embellishment ? getEmbellishmentLabel(embellishment) : "this embellishment"}
             </span>
             .
           </AlertDialogDescription>
@@ -203,45 +242,45 @@ function RecentlyDeletedDialog({
   )
 }
 
-export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
+export function EmbellishmentWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
-  const [loadingSizes, setLoadingSizes] = useState(true)
-  const [loadingDeletedSizes, setLoadingDeletedSizes] = useState(true)
+  const [loadingEmbellishments, setLoadingEmbellishments] = useState(true)
+  const [loadingDeletedEmbellishments, setLoadingDeletedEmbellishments] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
-  const [accessRules, setAccessRules] = useState<SizeAccessRules | null>(null)
+  const [accessRules, setAccessRules] = useState<EmbellishmentAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
 
-  const [sizes, setSizes] = useState<SizeRecord[]>([])
+  const [embellishments, setEmbellishments] = useState<EmbellishmentRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
-  const [deletedSizes, setDeletedSizes] = useState<SizeRecord[]>([])
+  const [deletedEmbellishments, setDeletedEmbellishments] = useState<EmbellishmentRecord[]>([])
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
 
-  const [draftFilters, setDraftFilters] = useState<SizeFilterValues>(DEFAULT_FILTERS)
-  const [activeFilters, setActiveFilters] = useState<SizeFilterValues>(DEFAULT_FILTERS)
-  const [deletedDraftFilters, setDeletedDraftFilters] = useState<SizeFilterValues>(DEFAULT_FILTERS)
-  const [deletedActiveFilters, setDeletedActiveFilters] = useState<SizeFilterValues>(DEFAULT_FILTERS)
+  const [draftFilters, setDraftFilters] = useState<EmbellishmentFilterValues>(DEFAULT_FILTERS)
+  const [activeFilters, setActiveFilters] = useState<EmbellishmentFilterValues>(DEFAULT_FILTERS)
+  const [deletedDraftFilters, setDeletedDraftFilters] = useState<EmbellishmentFilterValues>(DEFAULT_FILTERS)
+  const [deletedActiveFilters, setDeletedActiveFilters] = useState<EmbellishmentFilterValues>(DEFAULT_FILTERS)
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [editorMode, setEditorMode] = useState<SizeEditorMode>("create")
+  const [editorMode, setEditorMode] = useState<EmbellishmentEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorInitialValues, setEditorInitialValues] = useState<SizeFormValues>(DEFAULT_FORM_VALUES)
+  const [editorInitialValues, setEditorInitialValues] = useState<EmbellishmentFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<number | null>(null)
 
-  const [deleteTarget, setDeleteTarget] = useState<SizeRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<EmbellishmentRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
 
-  const [recentlyDeletedSize, setRecentlyDeletedSize] = useState<SizeRecord | null>(null)
-  const [pendingActionTarget, setPendingActionTarget] = useState<SizeRecord | null>(null)
+  const [recentlyDeletedEmbellishment, setRecentlyDeletedEmbellishment] = useState<EmbellishmentRecord | null>(null)
+  const [pendingActionTarget, setPendingActionTarget] = useState<EmbellishmentRecord | null>(null)
   const [pendingActionMode, setPendingActionMode] = useState<PendingDeleteMode | null>(null)
   const [pendingActionWorking, setPendingActionWorking] = useState(false)
 
@@ -318,7 +357,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           organizationId: selectedOrganizationId || undefined,
-          menuName: SIZE_MENU_NAME,
+          menuName: EMBELLISHMENT_MENU_NAME,
         })
 
         if (!active) {
@@ -339,7 +378,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         const message =
           caughtError instanceof Error
             ? caughtError.message
-            : "Unable to load your size menu access right now."
+            : "Unable to load your embellishment menu access right now."
 
         if (handleAuthFailure(message)) {
           return
@@ -361,14 +400,14 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [apiUrl, handleAuthFailure, refreshVersion, selectedOrganizationId])
 
-  const openEditDialog = useCallback(async (sizeId: number) => {
+  const openEditDialog = useCallback(async (embellishmentId: number) => {
     if (!accessRules?.canUpdate) {
-      toast.error("You do not have permission to update sizes.")
+      toast.error("You do not have permission to update embellishments.")
       return
     }
 
     setEditorMode("edit")
-    setEditingId(sizeId)
+    setEditingId(embellishmentId)
     setEditorError("")
     setEditorSubmitting(false)
     setEditorLoading(true)
@@ -382,22 +421,23 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      const record = await fetchSize({
+      const record = await fetchEmbellishment({
         apiUrl,
         accessToken: token,
+        id: embellishmentId,
         organizationId: selectedOrganizationId || undefined,
-        id: sizeId,
       })
 
       setEditorInitialValues({
-        sizeName: record.sizeName ?? "",
-        isActive: record.isActive !== false,
+        name: record.name ?? "",
+        remarks: record.remarks ?? "",
+        isActive: record.isActive !== "N",
       })
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to load the size record right now."
+          : "Unable to load the embellishment record right now."
 
       if (!handleAuthFailure(message)) {
         setEditorError(message)
@@ -409,18 +449,18 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
   }, [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId])
 
   const openPendingActionDialog = useCallback(
-    (size: SizeRecord, mode: PendingDeleteMode) => {
+    (embellishment: EmbellishmentRecord, mode: PendingDeleteMode) => {
       if (mode === "restore" && !accessRules?.canUpdate) {
-        toast.error("You do not have permission to restore sizes.")
+        toast.error("You do not have permission to restore embellishments.")
         return
       }
 
       if (mode === "permanent" && !accessRules?.canDelete) {
-        toast.error("You do not have permission to permanently delete sizes.")
+        toast.error("You do not have permission to permanently delete embellishments.")
         return
       }
 
-      setPendingActionTarget(size)
+      setPendingActionTarget(embellishment)
       setPendingActionMode(mode)
     },
     [accessRules?.canDelete, accessRules?.canUpdate],
@@ -433,19 +473,19 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
 
     let active = true
 
-    async function loadSizes() {
+    async function loadEmbellishments() {
       if (loadingAccessRules) {
         return
       }
 
       if (!accessRules?.canView) {
-        setSizes([])
+        setEmbellishments([])
         setMeta(null)
-        setLoadingSizes(false)
+        setLoadingEmbellishments(false)
         return
       }
 
-      setLoadingSizes(true)
+      setLoadingEmbellishments(true)
       setError("")
 
       try {
@@ -459,20 +499,20 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const response = await fetchSizes({
+        const response = await fetchEmbellishments({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           page,
           limit,
           filters: activeFilters,
+          organizationId: selectedOrganizationId || undefined,
         })
 
         if (!active) {
           return
         }
 
-        setSizes(response.items)
+        setEmbellishments(response.items)
         setMeta(response.meta)
       } catch (caughtError) {
         if (!active) {
@@ -482,7 +522,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         const message =
           caughtError instanceof Error
             ? caughtError.message
-            : "Unable to load sizes right now."
+            : "Unable to load embellishments right now."
 
         if (normalizeAuthFailure(message)) {
           window.localStorage.removeItem("access_token")
@@ -495,12 +535,12 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         setError(message)
       } finally {
         if (active) {
-          setLoadingSizes(false)
+          setLoadingEmbellishments(false)
         }
       }
     }
 
-    void loadSizes()
+    void loadEmbellishments()
 
     return () => {
       active = false
@@ -524,19 +564,19 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
 
     let active = true
 
-    async function loadDeletedSizes() {
+    async function loadDeletedEmbellishments() {
       if (loadingAccessRules) {
         return
       }
 
       if (!accessRules?.canView || !accessRules.canDelete) {
-        setDeletedSizes([])
+        setDeletedEmbellishments([])
         setDeletedMeta(null)
-        setLoadingDeletedSizes(false)
+        setLoadingDeletedEmbellishments(false)
         return
       }
 
-      setLoadingDeletedSizes(true)
+      setLoadingDeletedEmbellishments(true)
       setDeletedError("")
 
       try {
@@ -550,21 +590,21 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const response = await fetchSizes({
+        const response = await fetchEmbellishments({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           page: deletedPage,
           limit: deletedLimit,
           filters: deletedActiveFilters,
           deletedOnly: true,
+          organizationId: selectedOrganizationId || undefined,
         })
 
         if (!active) {
           return
         }
 
-        setDeletedSizes(response.items)
+        setDeletedEmbellishments(response.items)
         setDeletedMeta(response.meta)
       } catch (caughtError) {
         if (!active) {
@@ -574,7 +614,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         const message =
           caughtError instanceof Error
             ? caughtError.message
-            : "Unable to load deleted sizes right now."
+            : "Unable to load deleted embellishments right now."
 
         if (normalizeAuthFailure(message)) {
           window.localStorage.removeItem("access_token")
@@ -587,12 +627,12 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         setDeletedError(message)
       } finally {
         if (active) {
-          setLoadingDeletedSizes(false)
+          setLoadingDeletedEmbellishments(false)
         }
       }
     }
 
-    void loadDeletedSizes()
+    void loadDeletedEmbellishments()
 
     return () => {
       active = false
@@ -611,8 +651,8 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
   ])
 
   const activeCount = useMemo(
-    () => sizes.filter((size) => size.isActive !== false && !size.deleted_at).length,
-    [sizes],
+    () => embellishments.filter((embellishment) => embellishment.isActive !== "N" && !embellishment.deleted_at).length,
+    [embellishments],
   )
 
   function triggerRefresh() {
@@ -627,7 +667,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
 
   function openCreateDialog() {
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to create sizes.")
+      toast.error("You do not have permission to create embellishments.")
       return
     }
 
@@ -640,27 +680,27 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorOpen(true)
   }
 
-  function requestSoftDelete(size: SizeRecord) {
+  function requestSoftDelete(embellishment: EmbellishmentRecord) {
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete sizes.")
+      toast.error("You do not have permission to delete embellishments.")
       return
     }
 
-    setDeleteTarget(size)
+    setDeleteTarget(embellishment)
   }
 
-  async function submitEditor(values: SizeFormValues) {
+  async function submitEditor(values: EmbellishmentFormValues) {
     if (editorSubmitting || editorLoading) {
       return
     }
 
     if (editorMode === "create" && !accessRules?.canCreate) {
-      toast.error("You do not have permission to create sizes.")
+      toast.error("You do not have permission to create embellishments.")
       return
     }
 
     if (editorMode === "edit" && !accessRules?.canUpdate) {
-      toast.error("You do not have permission to update sizes.")
+      toast.error("You do not have permission to update embellishments.")
       return
     }
 
@@ -675,32 +715,33 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       if (editorMode === "create") {
-        await createSize({
+        await createEmbellishment({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           payload: values,
+          organizationId: selectedOrganizationId || undefined,
         })
-      } else if (editingId !== null) {
-        await updateSize({
+        toast.success("embellishment created successfully.")
+      } else if (editingId != null) {
+        await updateEmbellishment({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           id: editingId,
           payload: values,
+          organizationId: selectedOrganizationId || undefined,
         })
+        toast.success("embellishment updated successfully.")
       }
 
       setEditorOpen(false)
       setEditorInitialValues(DEFAULT_FORM_VALUES)
       setEditingId(null)
       triggerRefresh()
-      toast.success(editorMode === "create" ? "Size saved successfully" : "Size updated successfully")
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to save the size right now."
+          : "Unable to save the embellishment right now."
 
       if (!handleAuthFailure(message)) {
         setEditorError(message)
@@ -717,7 +758,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete sizes.")
+      toast.error("You do not have permission to delete embellishments.")
       return
     }
 
@@ -730,22 +771,22 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      await softDeleteSize({
+      await softDeleteEmbellishment({
         apiUrl,
         accessToken: token,
-        organizationId: selectedOrganizationId || undefined,
         id: deleteTarget.id,
+        organizationId: selectedOrganizationId || undefined,
       })
 
-      setRecentlyDeletedSize(deleteTarget)
+      setRecentlyDeletedEmbellishment(deleteTarget)
       setDeleteTarget(null)
+      toast.success("embellishment moved to recently deleted.")
       triggerRefresh()
-      toast.success("Size deleted successfully")
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to delete the size right now."
+          : "Unable to delete the embellishment right now."
 
       if (!handleAuthFailure(message)) {
         toast.error(message)
@@ -771,33 +812,36 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
 
       if (pendingActionMode === "restore") {
         if (!accessRules?.canUpdate) {
-          toast.error("You do not have permission to restore sizes.")
+          toast.error("You do not have permission to restore embellishments.")
           return
         }
 
-        await restoreSize({
+        await restoreEmbellishment({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Size restored successfully")
+        toast.success("embellishment restored successfully.")
       } else {
         if (!accessRules?.canDelete) {
-          toast.error("You do not have permission to permanently delete sizes.")
+          toast.error("You do not have permission to permanently delete embellishments.")
           return
         }
 
-        await permanentlyDeleteSize({
+        await permanentlyDeleteEmbellishment({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Size deleted permanently")
+        toast.success("embellishment deleted permanently.")
       }
 
-      setRecentlyDeletedSize(null)
+      if (recentlyDeletedEmbellishment?.id === pendingActionTarget.id) {
+        setRecentlyDeletedEmbellishment(null)
+      }
+
       setPendingActionTarget(null)
       setPendingActionMode(null)
       triggerRefresh()
@@ -815,14 +859,14 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  const deletedTotal = deletedMeta?.total ?? deletedSizes.length
-  const activeTotal = meta?.total ?? sizes.length
+  const deletedTotal = deletedMeta?.total ?? deletedEmbellishments.length
+  const activeTotal = meta?.total ?? embellishments.length
 
   if (
-    (loadingAccessRules || loadingSizes) &&
-    sizes.length === 0 &&
-    (loadingAccessRules || loadingDeletedSizes) &&
-    deletedSizes.length === 0 &&
+    (loadingAccessRules || loadingEmbellishments) &&
+    embellishments.length === 0 &&
+    (loadingAccessRules || loadingDeletedEmbellishments) &&
+    deletedEmbellishments.length === 0 &&
     !error &&
     !deletedError &&
     !accessError
@@ -841,10 +885,10 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                   Merchandising
                 </p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                  Sizes
+                  Embellishments
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Manage merchandising size master data.
+                  Manage merchandising embellishment master data.
                 </p>
               </div>
               <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
@@ -854,22 +898,13 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-          <CardContent className="p-6 sm:p-8">
-            <div className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-slate-200 px-6 py-12 text-center dark:border-white/10">
-              <p className="text-lg font-semibold text-slate-950 dark:text-white">
-                Size access unavailable
-              </p>
-              <p className="max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {accessError || "You do not have permission to view the Sizes menu for the selected organization."}
-              </p>
-              <Button type="button" variant="outline" onClick={triggerRefresh} className="mt-4 rounded-xl">
-                <RefreshCcw className="size-3.5" />
-                Retry
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
+        <EmptyState
+          title="embellishment access unavailable"
+          description={accessError || "You do not have permission to view the embellishments menu for the selected organization."}
+          actionLabel="Retry"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
@@ -885,10 +920,10 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                   Merchandising
                 </p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                  Sizes
+                  Embellishments
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Manage merchandising size master data.
+                  Manage merchandising embellishment master data.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -900,22 +935,13 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-          <CardContent className="p-6 sm:p-8">
-            <div className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-slate-200 px-6 py-12 text-center dark:border-white/10">
-              <p className="text-lg font-semibold text-slate-950 dark:text-white">
-                Unable to load sizes
-              </p>
-              <p className="max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {error}
-              </p>
-              <Button type="button" variant="outline" onClick={triggerRefresh} className="mt-4 rounded-xl">
-                <RefreshCcw className="size-3.5" />
-                Try again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
+        <EmptyState
+          title="Unable to load embellishments"
+          description={error}
+          actionLabel="Try again"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
@@ -932,10 +958,10 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                     Merchandising master data
                   </p>
                   <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-                    Sizes
+                    Embellishments
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Create, review, and maintain merchandising size records across the catalog.
+                    Create, review, and maintain merchandising embellishment records across the catalog.
                   </p>
 
                   <div className="flex flex-wrap gap-2 pt-2">
@@ -948,7 +974,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                     <Badge variant="outline" className="rounded-full px-3 py-1">
                       Deleted {deletedTotal}
                     </Badge>
-                    {recentlyDeletedSize ? (
+                    {recentlyDeletedEmbellishment ? (
                       <Badge variant="destructive" className="rounded-full px-3 py-1">
                         Recently deleted
                       </Badge>
@@ -964,7 +990,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                   {accessRules?.canCreate ? (
                     <Button type="button" onClick={openCreateDialog} className="rounded-xl">
                       <Plus className="size-3.5" />
-                      New size
+                      New embellishment
                     </Button>
                   ) : null}
                 </div>
@@ -972,16 +998,16 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
             </CardContent>
           </Card>
 
-          {recentlyDeletedSize ? (
+          {recentlyDeletedEmbellishment ? (
             <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">
-                      Recently deleted size
+                      Recently deleted embellishment
                     </p>
                     <p className="text-sm text-amber-900/80 dark:text-amber-100/85">
-                      {getSizeLabel(recentlyDeletedSize)} was soft deleted and can still be restored.
+                      {getEmbellishmentLabel(recentlyDeletedEmbellishment)} was soft deleted and can still be restored.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -990,7 +1016,9 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                         type="button"
                         variant="outline"
                         className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50"
-                        onClick={() => openPendingActionDialog(recentlyDeletedSize, "restore")}
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedEmbellishment, "restore")
+                        }
                       >
                         <Undo2 className="size-3.5" />
                         Restore
@@ -1001,7 +1029,9 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
                         type="button"
                         variant="destructive"
                         className="rounded-xl"
-                        onClick={() => openPendingActionDialog(recentlyDeletedSize, "permanent")}
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedEmbellishment, "permanent")
+                        }
                       >
                         <Trash2 className="size-3.5" />
                         Delete permanently
@@ -1012,35 +1042,34 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
               </CardContent>
             </Card>
           ) : null}
-
-          <SizeTableSection
-            sizes={sizes}
+          <EmbellishmentTableSection
+            embellishments={embellishments}
             meta={meta}
             page={page}
             limit={limit}
-            loadingSizes={loadingSizes}
+            loadingEmbellishments={loadingEmbellishments}
             draftFilters={draftFilters}
             activeFilters={activeFilters}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}
             onLimitChange={setLimit}
-            onCreateSize={openCreateDialog}
-            onEditSize={openEditDialog}
-            onDeleteSize={requestSoftDelete}
+            onCreateEmbellishment={openCreateDialog}
+            onEditEmbellishment={openEditDialog}
+            onDeleteEmbellishment={requestSoftDelete}
             onResetFilters={resetActiveFilters}
-            canCreateSize={Boolean(accessRules?.canCreate)}
-            canUpdateSize={Boolean(accessRules?.canUpdate)}
-            canDeleteSize={Boolean(accessRules?.canDelete)}
+            canCreateEmbellishment={Boolean(accessRules?.canCreate)}
+            canUpdateEmbellishment={Boolean(accessRules?.canUpdate)}
+            canDeleteEmbellishment={Boolean(accessRules?.canDelete)}
           />
 
           {accessRules?.canDelete ? (
-            <DeletedSizesCard
-              deletedSizes={deletedSizes}
+            <DeletedEmbellishmentsCard
+              deletedEmbellishments={deletedEmbellishments}
               deletedMeta={deletedMeta}
               deletedPage={deletedPage}
               deletedLimit={deletedLimit}
-              loadingDeletedSizes={loadingDeletedSizes}
+              loadingDeletedEmbellishments={loadingDeletedEmbellishments}
               deletedError={deletedError}
               deletedDraftFilters={deletedDraftFilters}
               deletedActiveFilters={deletedActiveFilters}
@@ -1049,14 +1078,14 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
               onDeletedPageChange={setDeletedPage}
               onDeletedLimitChange={setDeletedLimit}
               onOpenAction={openPendingActionDialog}
-              canRestoreSize={Boolean(accessRules?.canUpdate)}
-              canPermanentlyDeleteSize={Boolean(accessRules?.canDelete)}
+              canRestoreEmbellishment={Boolean(accessRules?.canUpdate)}
+              canPermanentlyDeleteEmbellishment={Boolean(accessRules?.canDelete)}
             />
           ) : null}
         </div>
       </ScrollArea>
 
-      <SizeFormDialog
+      <EmbellishmentFormDialog
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
@@ -1078,7 +1107,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
-        size={deleteTarget}
+        embellishment={deleteTarget}
         working={deleteWorking}
         onOpenChange={(open) => {
           if (!open) {
@@ -1091,7 +1120,7 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
       <RecentlyDeletedDialog
         open={Boolean(pendingActionTarget && pendingActionMode)}
         action={pendingActionMode ?? "restore"}
-        size={pendingActionTarget}
+        embellishment={pendingActionTarget}
         working={pendingActionWorking}
         onOpenChange={(open) => {
           if (!open) {
@@ -1104,3 +1133,6 @@ export function SizeWorkspace({ apiUrl }: { apiUrl: string }) {
     </div>
   )
 }
+
+
+

@@ -1,6 +1,23 @@
-Using the color page as the blueprint, so you can mirror the same 
-table, filters, popup, soft-delete, and deleted-items pattern without guessing.
-while create new record then update_at column should null.
-created_by_id should store in db from logged in user jwt token.
-updated_by_id should store in db from logged in user jwt token.
-please make size page.
+Use the existing Color page as the blueprint. Mirror the same table, filters, popup/modal, soft-delete, and deleted-items pattern. Do not guess the structure; follow the Color page implementation.
+
+Requirements:
+
+1. Create Record
+   - When creating a new record, `updated_at` must be `null`.
+   - `created_by_id` must be stored from the logged-in user’s JWT token.
+   - `updated_by_id` must be `null` during creation.
+
+2. Update Record
+   - When updating a record, set `updated_at` to the current date/time.
+   - `updated_by_id` must be stored from the logged-in user’s JWT token.
+
+3. Permission
+   - Apply the existing `menu-permission` logic in both frontend and backend.
+   - Respect create, update, delete, restore, and view permissions based on the current menu permission.
+
+4. Delete Pattern
+   - Follow the Color page soft-delete pattern.
+   - Deleted records should appear in the deleted-items view.
+   - Restore/permanent delete behavior should match the Color page if already implemented.
+
+Use the same UI/UX, API pattern, validation style, and state management approach as the Color page.

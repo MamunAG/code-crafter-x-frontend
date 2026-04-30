@@ -1,10 +1,10 @@
 import type {
   ApiResponse,
+  EmbellishmentFilterValues,
+  EmbellishmentFormValues,
+  EmbellishmentRecord,
   PaginatedResponse,
-  SizeFilterValues,
-  SizeFormValues,
-  SizeRecord,
-} from "./size.types"
+} from "./embellishment.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -44,43 +44,56 @@ async function readJsonResponse<T>(response: Response) {
     payload = null
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     throw new Error("Your session expired. Please sign in again.")
   }
 
+  if (response.status === 403) {
+    throw new Error(payload?.message || "You do not have permission to complete this embellishment action.")
+  }
+
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || "Unable to complete the size request right now.")
+    throw new Error(payload?.message || "Unable to complete the embellishment request right now.")
   }
 
   return payload
 }
 
-function appendFilterParams(url: URL, filters: Partial<SizeFilterValues>) {
-  const sizeName = filters.sizeName?.trim() ?? ""
+function appendFilterParams(url: URL, filters: Partial<EmbellishmentFilterValues>) {
+  const name = filters.name?.trim() ?? ""
+  const remarks = filters.remarks?.trim() ?? ""
 
-  if (sizeName) {
-    url.searchParams.set("sizeName", sizeName)
+  if (name) {
+    url.searchParams.set("name", name)
+  }
+
+  if (remarks) {
+    url.searchParams.set("remarks", remarks)
   }
 }
 
-export async function fetchSizes({
+function mapActiveStatus(value: boolean) {
+  return value ? "Y" : "N"
+}
+
+export async function fetchEmbellishments({
   apiUrl,
   accessToken,
-  organizationId,
   page,
   limit,
   filters,
   deletedOnly = false,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   page: number
   limit: number
-  filters: Partial<SizeFilterValues>
+  filters: Partial<EmbellishmentFilterValues>
   deletedOnly?: boolean
-}): Promise<PaginatedResponse<SizeRecord>> {
-  const url = buildApiUrl(apiUrl, "/api/v1/size")
+  organizationId?: string
+}): Promise<PaginatedResponse<EmbellishmentRecord>> {
+  const url = buildApiUrl(apiUrl, "/api/v1/embellishment")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
   if (deletedOnly) {
@@ -94,53 +107,53 @@ export async function fetchSizes({
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<PaginatedResponse<SizeRecord>>(response)
+  const payload = await readJsonResponse<PaginatedResponse<EmbellishmentRecord>>(response)
 
   if (!payload.data?.items || !payload.data?.meta) {
-    throw new Error("The size list was returned without pagination data.")
+    throw new Error("The embellishment list was returned without pagination data.")
   }
 
   return payload.data
 }
 
-export async function fetchSize({
+export async function fetchEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   id: number
-}): Promise<SizeRecord> {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/size/${id}`), {
+  organizationId?: string
+}): Promise<EmbellishmentRecord> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/embellishment/${id}`), {
     method: "GET",
     headers: buildRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<SizeRecord>(response)
+  const payload = await readJsonResponse<EmbellishmentRecord>(response)
 
   if (!payload.data) {
-    throw new Error("The size record was returned without data.")
+    throw new Error("The embellishment record was returned without data.")
   }
 
   return payload.data
 }
 
-export async function createSize({
+export async function createEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   payload,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
+  payload: EmbellishmentFormValues
   organizationId?: string
-  payload: SizeFormValues
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/size"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/embellishment"), {
     method: "POST",
     headers: buildRequestHeaders({
       accessToken,
@@ -148,34 +161,35 @@ export async function createSize({
       contentType: "application/json",
     }),
     body: JSON.stringify({
-      sizeName: payload.sizeName.trim(),
-      isActive: payload.isActive,
+      name: payload.name.trim(),
+      remarks: payload.remarks.trim() || undefined,
+      isActive: mapActiveStatus(payload.isActive),
     }),
   })
 
-  const payloadData = await readJsonResponse<SizeRecord>(response)
+  const payloadData = await readJsonResponse<EmbellishmentRecord>(response)
 
   if (!payloadData.data) {
-    throw new Error("The size was saved, but the created record was not returned.")
+    throw new Error("The embellishment was saved, but the created record was not returned.")
   }
 
   return payloadData.data
 }
 
-export async function updateSize({
+export async function updateEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   id,
   payload,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   id: number
-  payload: SizeFormValues
+  payload: EmbellishmentFormValues
+  organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/size/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/embellishment/${id}`), {
     method: "PATCH",
     headers: buildRequestHeaders({
       accessToken,
@@ -183,32 +197,33 @@ export async function updateSize({
       contentType: "application/json",
     }),
     body: JSON.stringify({
-      sizeName: payload.sizeName.trim(),
-      isActive: payload.isActive,
+      name: payload.name.trim(),
+      remarks: payload.remarks.trim() || undefined,
+      isActive: mapActiveStatus(payload.isActive),
     }),
   })
 
-  const payloadData = await readJsonResponse<SizeRecord>(response)
+  const payloadData = await readJsonResponse<EmbellishmentRecord>(response)
 
   if (!payloadData.data) {
-    throw new Error("The size was updated, but the updated record was not returned.")
+    throw new Error("The embellishment was updated, but the updated record was not returned.")
   }
 
   return payloadData.data
 }
 
-export async function softDeleteSize({
+export async function softDeleteEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   id: number
+  organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/size/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/embellishment/${id}`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
@@ -216,18 +231,18 @@ export async function softDeleteSize({
   await readJsonResponse(response)
 }
 
-export async function restoreSize({
+export async function restoreEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   id: number
+  organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/size/${id}/restore`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/embellishment/${id}/restore`), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
@@ -235,18 +250,18 @@ export async function restoreSize({
   await readJsonResponse(response)
 }
 
-export async function permanentlyDeleteSize({
+export async function permanentlyDeleteEmbellishment({
   apiUrl,
   accessToken,
-  organizationId,
   id,
+  organizationId,
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
   id: number
+  organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/size/${id}/permanent`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/embellishment/${id}/permanent`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
