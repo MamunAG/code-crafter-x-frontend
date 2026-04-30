@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Download, Flag, Loader2, Plus, RefreshCcw, Trash2, Undo2, Upload } from "lucide-react"
+import { Banknote, Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -15,44 +15,41 @@ import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
-import { CountryFormDialog } from "./component/country-form-dialog"
-import { CountryTableSection } from "./component/country-table-section"
-import { DeletedCountriesCard } from "./component/deleted-countries-card"
-import {
-  createCountry,
-  downloadCountryUploadTemplate,
-  fetchCountries,
-  fetchCountry,
-  permanentlyDeleteCountry,
-  restoreCountry,
-  softDeleteCountry,
-  updateCountry,
-  uploadCountryTemplate,
-} from "./country.service"
-import type { CountryFilterValues, CountryFormValues, CountryRecord, PaginationMeta } from "./country.types"
+import { CurrencyFormDialog } from "./component/currency-form-dialog"
+import { CurrencyTableSection } from "./component/currency-table-section"
+import { DeletedCurrenciesCard } from "./component/deleted-currencies-card"
+import { createCurrency, fetchCurrencies, fetchCurrency, permanentlyDeleteCurrency, restoreCurrency, softDeleteCurrency, updateCurrency } from "./currency.service"
+import type { CurrencyFilterValues, CurrencyFormValues, CurrencyRecord, PaginationMeta } from "./currency.types"
 
-type CountryEditorMode = "create" | "edit"
+type CurrencyEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
-type CountryAccessRules = {
+type CurrencyAccessRules = {
   canView: boolean
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
 }
 
-const COUNTRY_MENU_NAME = "Country Setup"
-const EMPTY_ACCESS_RULES: CountryAccessRules = {
+const CURRENCY_MENU_NAME = "Currency Setup"
+const EMPTY_ACCESS_RULES: CurrencyAccessRules = {
   canView: false,
   canCreate: false,
   canUpdate: false,
   canDelete: false,
 }
 
-const DEFAULT_FILTERS: CountryFilterValues = { name: "" }
-const DEFAULT_FORM_VALUES: CountryFormValues = { name: "", isActive: true }
+const DEFAULT_FILTERS: CurrencyFilterValues = { currencyName: "", currencyCode: "", symbol: "" }
+const DEFAULT_FORM_VALUES: CurrencyFormValues = {
+  currencyName: "",
+  currencyCode: "",
+  rate: "",
+  symbol: "",
+  isDefault: false,
+  isActive: true,
+}
 
-function getCountryLabel(country: CountryRecord) {
-  return country.name
+function getCurrencyLabel(currency: CurrencyRecord) {
+  return `${currency.currencyName} (${currency.currencyCode})`
 }
 
 function normalizeAuthFailure(message: string) {
@@ -63,7 +60,7 @@ function EmptyState({ title, description, actionLabel, onAction }: { title: stri
   return (
     <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
-        <Flag className="size-5" />
+        <Banknote className="size-5" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">{title}</h3>
       <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
@@ -105,14 +102,14 @@ function WorkspaceSkeleton() {
   )
 }
 
-function DeleteConfirmDialog({ open, country, working, onOpenChange, onConfirm }: { open: boolean; country: CountryRecord | null; working: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+function DeleteConfirmDialog({ open, currency, working, onOpenChange, onConfirm }: { open: boolean; currency: CurrencyRecord | null; working: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete country</AlertDialogTitle>
+          <AlertDialogTitle>Delete currency</AlertDialogTitle>
           <AlertDialogDescription>
-            This will soft delete <span className="font-medium text-slate-900 dark:text-slate-100">{country ? getCountryLabel(country) : "this country"}</span>.
+            This will soft delete <span className="font-medium text-slate-900 dark:text-slate-100">{currency ? getCurrencyLabel(currency) : "this currency"}</span>.
             You can restore it from the recently deleted card before removing it permanently.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -128,9 +125,9 @@ function DeleteConfirmDialog({ open, country, working, onOpenChange, onConfirm }
   )
 }
 
-function RecentlyDeletedDialog({ open, action, country, working, onOpenChange, onConfirm }: { open: boolean; action: PendingDeleteMode; country: CountryRecord | null; working: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
-  const title = action === "restore" ? "Restore country" : "Delete country permanently"
-  const description = action === "restore" ? "Bring this country back into the active app configuration list." : "This will permanently remove the country record and cannot be undone."
+function RecentlyDeletedDialog({ open, action, currency, working, onOpenChange, onConfirm }: { open: boolean; action: PendingDeleteMode; currency: CurrencyRecord | null; working: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+  const title = action === "restore" ? "Restore currency" : "Delete currency permanently"
+  const description = action === "restore" ? "Bring this currency back into the active app configuration list." : "This will permanently remove the currency record and cannot be undone."
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -138,7 +135,7 @@ function RecentlyDeletedDialog({ open, action, country, working, onOpenChange, o
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            {description} <span className="font-medium text-slate-900 dark:text-slate-100">{country ? getCountryLabel(country) : "this country"}</span>.
+            {description} <span className="font-medium text-slate-900 dark:text-slate-100">{currency ? getCurrencyLabel(currency) : "this currency"}</span>.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -153,47 +150,44 @@ function RecentlyDeletedDialog({ open, action, country, working, onOpenChange, o
   )
 }
 
-export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
+export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
-  const uploadInputRef = useRef<HTMLInputElement | null>(null)
-  const [loadingCountries, setLoadingCountries] = useState(true)
-  const [loadingDeletedCountries, setLoadingDeletedCountries] = useState(true)
+  const [loadingCurrencies, setLoadingCurrencies] = useState(true)
+  const [loadingDeletedCurrencies, setLoadingDeletedCurrencies] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
-  const [accessRules, setAccessRules] = useState<CountryAccessRules | null>(null)
+  const [accessRules, setAccessRules] = useState<CurrencyAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
 
-  const [countries, setCountries] = useState<CountryRecord[]>([])
+  const [currencies, setCurrencies] = useState<CurrencyRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
-  const [deletedCountries, setDeletedCountries] = useState<CountryRecord[]>([])
+  const [deletedCurrencies, setDeletedCurrencies] = useState<CurrencyRecord[]>([])
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
 
-  const [draftFilters, setDraftFilters] = useState<CountryFilterValues>(DEFAULT_FILTERS)
-  const [activeFilters, setActiveFilters] = useState<CountryFilterValues>(DEFAULT_FILTERS)
-  const [deletedDraftFilters, setDeletedDraftFilters] = useState<CountryFilterValues>(DEFAULT_FILTERS)
-  const [deletedActiveFilters, setDeletedActiveFilters] = useState<CountryFilterValues>(DEFAULT_FILTERS)
+  const [draftFilters, setDraftFilters] = useState<CurrencyFilterValues>(DEFAULT_FILTERS)
+  const [activeFilters, setActiveFilters] = useState<CurrencyFilterValues>(DEFAULT_FILTERS)
+  const [deletedDraftFilters, setDeletedDraftFilters] = useState<CurrencyFilterValues>(DEFAULT_FILTERS)
+  const [deletedActiveFilters, setDeletedActiveFilters] = useState<CurrencyFilterValues>(DEFAULT_FILTERS)
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [editorMode, setEditorMode] = useState<CountryEditorMode>("create")
+  const [editorMode, setEditorMode] = useState<CurrencyEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorInitialValues, setEditorInitialValues] = useState<CountryFormValues>(DEFAULT_FORM_VALUES)
+  const [editorInitialValues, setEditorInitialValues] = useState<CurrencyFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [uploadingTemplate, setUploadingTemplate] = useState(false)
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
-  const [deleteTarget, setDeleteTarget] = useState<CountryRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CurrencyRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
-  const [recentlyDeletedCountry, setRecentlyDeletedCountry] = useState<CountryRecord | null>(null)
-  const [pendingActionTarget, setPendingActionTarget] = useState<CountryRecord | null>(null)
+  const [recentlyDeletedCurrency, setRecentlyDeletedCurrency] = useState<CurrencyRecord | null>(null)
+  const [pendingActionTarget, setPendingActionTarget] = useState<CurrencyRecord | null>(null)
   const [pendingActionMode, setPendingActionMode] = useState<PendingDeleteMode | null>(null)
   const [pendingActionWorking, setPendingActionWorking] = useState(false)
 
@@ -240,7 +234,7 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           organizationId: selectedOrganizationId || undefined,
-          menuName: COUNTRY_MENU_NAME,
+          menuName: CURRENCY_MENU_NAME,
         })
         if (!active) return
         setAccessRules({
@@ -251,7 +245,7 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
         })
       } catch (caughtError) {
         if (!active) return
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load your country menu access right now."
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load your currency menu access right now."
         if (handleAuthFailure(message)) return
         setAccessRules(EMPTY_ACCESS_RULES)
         setAccessError(message)
@@ -265,13 +259,13 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [apiUrl, handleAuthFailure, refreshVersion, selectedOrganizationId])
 
-  const openEditDialog = useCallback(async (countryId: number) => {
+  const openEditDialog = useCallback(async (currencyId: number) => {
     if (!accessRules?.canUpdate) {
-      toast.error("You do not have permission to update countries.")
+      toast.error("You do not have permission to update currencies.")
       return
     }
     setEditorMode("edit")
-    setEditingId(countryId)
+    setEditingId(currencyId)
     setEditorError("")
     setEditorSubmitting(false)
     setEditorLoading(true)
@@ -283,10 +277,17 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
-      const record = await fetchCountry({ apiUrl, accessToken: token, id: countryId, organizationId: selectedOrganizationId || undefined })
-      setEditorInitialValues({ name: record.name ?? "", isActive: record.isActive !== false })
+      const record = await fetchCurrency({ apiUrl, accessToken: token, id: currencyId, organizationId: selectedOrganizationId || undefined })
+      setEditorInitialValues({
+        currencyName: record.currencyName ?? "",
+        currencyCode: record.currencyCode ?? "",
+        rate: record.rate !== null && record.rate !== undefined ? String(record.rate) : "",
+        symbol: record.symbol ?? "",
+        isDefault: Boolean(record.isDefault),
+        isActive: record.isActive !== false,
+      })
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the country record right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the currency record right now."
       if (!handleAuthFailure(message)) {
         setEditorError(message)
         toast.error(message)
@@ -296,31 +297,31 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId])
 
-  const openPendingActionDialog = useCallback((country: CountryRecord, mode: PendingDeleteMode) => {
+  const openPendingActionDialog = useCallback((currency: CurrencyRecord, mode: PendingDeleteMode) => {
     if (mode === "restore" && !accessRules?.canUpdate) {
-      toast.error("You do not have permission to restore countries.")
+      toast.error("You do not have permission to restore currencies.")
       return
     }
     if (mode === "permanent" && !accessRules?.canDelete) {
-      toast.error("You do not have permission to permanently delete countries.")
+      toast.error("You do not have permission to permanently delete currencies.")
       return
     }
-    setPendingActionTarget(country)
+    setPendingActionTarget(currency)
     setPendingActionMode(mode)
   }, [accessRules?.canDelete, accessRules?.canUpdate])
 
   useEffect(() => {
     if (typeof window === "undefined") return
     let active = true
-    async function loadCountries() {
+    async function loadCurrencies() {
       if (loadingAccessRules) return
       if (!accessRules?.canView) {
-        setCountries([])
+        setCurrencies([])
         setMeta(null)
-        setLoadingCountries(false)
+        setLoadingCurrencies(false)
         return
       }
-      setLoadingCountries(true)
+      setLoadingCurrencies(true)
       setError("")
       try {
         const token = window.localStorage.getItem("access_token")
@@ -328,20 +329,20 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
-        const response = await fetchCountries({ apiUrl, accessToken: token, page, limit, filters: activeFilters, organizationId: selectedOrganizationId || undefined })
+        const response = await fetchCurrencies({ apiUrl, accessToken: token, page, limit, filters: activeFilters, organizationId: selectedOrganizationId || undefined })
         if (!active) return
-        setCountries(response.items)
+        setCurrencies(response.items)
         setMeta(response.meta)
       } catch (caughtError) {
         if (!active) return
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load countries right now."
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load currencies right now."
         if (handleAuthFailure(message)) return
         setError(message)
       } finally {
-        if (active) setLoadingCountries(false)
+        if (active) setLoadingCurrencies(false)
       }
     }
-    void loadCountries()
+    void loadCurrencies()
     return () => {
       active = false
     }
@@ -350,15 +351,15 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
   useEffect(() => {
     if (typeof window === "undefined") return
     let active = true
-    async function loadDeletedCountries() {
+    async function loadDeletedCurrencies() {
       if (loadingAccessRules) return
       if (!accessRules?.canView || !accessRules.canDelete) {
-        setDeletedCountries([])
+        setDeletedCurrencies([])
         setDeletedMeta(null)
-        setLoadingDeletedCountries(false)
+        setLoadingDeletedCurrencies(false)
         return
       }
-      setLoadingDeletedCountries(true)
+      setLoadingDeletedCurrencies(true)
       setDeletedError("")
       try {
         const token = window.localStorage.getItem("access_token")
@@ -366,7 +367,7 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
-        const response = await fetchCountries({
+        const response = await fetchCurrencies({
           apiUrl,
           accessToken: token,
           page: deletedPage,
@@ -376,24 +377,24 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
           organizationId: selectedOrganizationId || undefined,
         })
         if (!active) return
-        setDeletedCountries(response.items)
+        setDeletedCurrencies(response.items)
         setDeletedMeta(response.meta)
       } catch (caughtError) {
         if (!active) return
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load deleted countries right now."
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load deleted currencies right now."
         if (handleAuthFailure(message)) return
         setDeletedError(message)
       } finally {
-        if (active) setLoadingDeletedCountries(false)
+        if (active) setLoadingDeletedCurrencies(false)
       }
     }
-    void loadDeletedCountries()
+    void loadDeletedCurrencies()
     return () => {
       active = false
     }
   }, [accessRules?.canDelete, accessRules?.canView, apiUrl, deletedActiveFilters, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
 
-  const activeCount = useMemo(() => countries.filter((country) => country.isActive !== false && !country.deleted_at).length, [countries])
+  const activeCount = useMemo(() => currencies.filter((currency) => currency.isActive !== false && !currency.deleted_at).length, [currencies])
 
   function triggerRefresh() {
     setRefreshVersion((current) => current + 1)
@@ -407,7 +408,7 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
 
   function openCreateDialog() {
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to create countries.")
+      toast.error("You do not have permission to create currencies.")
       return
     }
     setEditorMode("create")
@@ -419,96 +420,22 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorOpen(true)
   }
 
-  async function downloadTemplate() {
-    if (!accessRules?.canCreate || downloadingTemplate) {
-      if (!accessRules?.canCreate) {
-        toast.error("You do not have permission to download the country template.")
-      }
-      return
-    }
-
-    setDownloadingTemplate(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const blob = await downloadCountryUploadTemplate({
-        apiUrl,
-        accessToken: token,
-        organizationId: selectedOrganizationId || undefined,
-      })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = "country-upload-template.csv"
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the country template right now."
-      if (!handleAuthFailure(message)) toast.error(message)
-    } finally {
-      setDownloadingTemplate(false)
-    }
-  }
-
-  async function uploadTemplate(file: File | null | undefined) {
-    if (!file || uploadingTemplate) return
-
-    if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to upload countries.")
-      return
-    }
-
-    setUploadingTemplate(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const result = await uploadCountryTemplate({
-        apiUrl,
-        accessToken: token,
-        file,
-        organizationId: selectedOrganizationId || undefined,
-      })
-      toast.success(`Country upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`)
-      triggerRefresh()
-    } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the country template right now."
-      if (!handleAuthFailure(message)) toast.error(message)
-    } finally {
-      setUploadingTemplate(false)
-      if (uploadInputRef.current) {
-        uploadInputRef.current.value = ""
-      }
-    }
-  }
-
-  function requestSoftDelete(country: CountryRecord) {
+  function requestSoftDelete(currency: CurrencyRecord) {
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete countries.")
+      toast.error("You do not have permission to delete currencies.")
       return
     }
-    setDeleteTarget(country)
+    setDeleteTarget(currency)
   }
 
-  async function submitEditor(values: CountryFormValues) {
+  async function submitEditor(values: CurrencyFormValues) {
     if (editorSubmitting || editorLoading) return
     if (editorMode === "create" && !accessRules?.canCreate) {
-      toast.error("You do not have permission to create countries.")
+      toast.error("You do not have permission to create currencies.")
       return
     }
     if (editorMode === "edit" && !accessRules?.canUpdate) {
-      toast.error("You do not have permission to update countries.")
+      toast.error("You do not have permission to update currencies.")
       return
     }
     setEditorSubmitting(true)
@@ -520,18 +447,18 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
       if (editorMode === "create") {
-        await createCountry({ apiUrl, accessToken: token, payload: values, organizationId: selectedOrganizationId || undefined })
-        toast.success("Country created successfully.")
+        await createCurrency({ apiUrl, accessToken: token, payload: values, organizationId: selectedOrganizationId || undefined })
+        toast.success("Currency created successfully.")
       } else if (editingId !== null) {
-        await updateCountry({ apiUrl, accessToken: token, id: editingId, payload: values, organizationId: selectedOrganizationId || undefined })
-        toast.success("Country updated successfully.")
+        await updateCurrency({ apiUrl, accessToken: token, id: editingId, payload: values, organizationId: selectedOrganizationId || undefined })
+        toast.success("Currency updated successfully.")
       }
       setEditorOpen(false)
       setEditorInitialValues(DEFAULT_FORM_VALUES)
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to save the country right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to save the currency right now."
       if (!handleAuthFailure(message)) {
         setEditorError(message)
         toast.error(message)
@@ -544,7 +471,7 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
   async function confirmSoftDelete() {
     if (!deleteTarget || deleteWorking) return
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete countries.")
+      toast.error("You do not have permission to delete currencies.")
       return
     }
     setDeleteWorking(true)
@@ -554,13 +481,13 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
-      await softDeleteCountry({ apiUrl, accessToken: token, id: deleteTarget.id, organizationId: selectedOrganizationId || undefined })
-      setRecentlyDeletedCountry(deleteTarget)
+      await softDeleteCurrency({ apiUrl, accessToken: token, id: deleteTarget.id, organizationId: selectedOrganizationId || undefined })
+      setRecentlyDeletedCurrency(deleteTarget)
       setDeleteTarget(null)
-      toast.success("Country moved to recently deleted.")
+      toast.success("Currency moved to recently deleted.")
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to delete the country right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to delete the currency right now."
       if (!handleAuthFailure(message)) toast.error(message)
     } finally {
       setDeleteWorking(false)
@@ -578,20 +505,20 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
       }
       if (pendingActionMode === "restore") {
         if (!accessRules?.canUpdate) {
-          toast.error("You do not have permission to restore countries.")
+          toast.error("You do not have permission to restore currencies.")
           return
         }
-        await restoreCountry({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
-        toast.success("Country restored successfully.")
+        await restoreCurrency({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
+        toast.success("Currency restored successfully.")
       } else {
         if (!accessRules?.canDelete) {
-          toast.error("You do not have permission to permanently delete countries.")
+          toast.error("You do not have permission to permanently delete currencies.")
           return
         }
-        await permanentlyDeleteCountry({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
-        toast.success("Country deleted permanently.")
+        await permanentlyDeleteCurrency({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
+        toast.success("Currency deleted permanently.")
       }
-      if (recentlyDeletedCountry?.id === pendingActionTarget.id) setRecentlyDeletedCountry(null)
+      if (recentlyDeletedCurrency?.id === pendingActionTarget.id) setRecentlyDeletedCurrency(null)
       setPendingActionTarget(null)
       setPendingActionMode(null)
       triggerRefresh()
@@ -603,10 +530,10 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  const deletedTotal = deletedMeta?.total ?? deletedCountries.length
-  const activeTotal = meta?.total ?? countries.length
+  const deletedTotal = deletedMeta?.total ?? deletedCurrencies.length
+  const activeTotal = meta?.total ?? currencies.length
 
-  if ((loadingAccessRules || loadingCountries) && countries.length === 0 && (loadingAccessRules || loadingDeletedCountries) && deletedCountries.length === 0 && !error && !deletedError && !accessError) {
+  if ((loadingAccessRules || loadingCurrencies) && currencies.length === 0 && (loadingAccessRules || loadingDeletedCurrencies) && deletedCurrencies.length === 0 && !error && !deletedError && !accessError) {
     return <WorkspaceSkeleton />
   }
 
@@ -618,14 +545,14 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Countries</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage country reference data.</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Currencies</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage currency reference data.</p>
               </div>
               <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Retry</Button>
             </div>
           </CardContent>
         </Card>
-        <EmptyState title="Country access unavailable" description={accessError || "You do not have permission to view the Countries menu for the selected organization."} actionLabel="Retry" onAction={triggerRefresh} />
+        <EmptyState title="Currency access unavailable" description={accessError || "You do not have permission to view the Currencies menu for the selected organization."} actionLabel="Retry" onAction={triggerRefresh} />
       </div>
     )
   }
@@ -638,14 +565,14 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Countries</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage country reference data.</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Currencies</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage currency reference data.</p>
               </div>
               <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Retry</Button>
             </div>
           </CardContent>
         </Card>
-        <EmptyState title="Unable to load countries" description={error} actionLabel="Try again" onAction={triggerRefresh} />
+        <EmptyState title="Unable to load currencies" description={error} actionLabel="Try again" onAction={triggerRefresh} />
       </div>
     )
   }
@@ -659,87 +586,68 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App configuration reference data</p>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Countries</h1>
-                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain country records across the platform.</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Currencies</h1>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain currency records across the platform.</p>
                   <div className="flex flex-wrap gap-2 pt-2">
                     <Badge variant="secondary" className="rounded-full px-3 py-1">Total {activeTotal}</Badge>
                     <Badge variant="outline" className="rounded-full px-3 py-1">Active {activeCount}</Badge>
                     <Badge variant="outline" className="rounded-full px-3 py-1">Deleted {deletedTotal}</Badge>
-                    {recentlyDeletedCountry ? <Badge variant="destructive" className="rounded-full px-3 py-1">Recently deleted</Badge> : null}
+                    {recentlyDeletedCurrency ? <Badge variant="destructive" className="rounded-full px-3 py-1">Recently deleted</Badge> : null}
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Refresh</Button>
-                  {accessRules?.canCreate ? (
-                    <>
-                      <Button type="button" variant="outline" onClick={downloadTemplate} disabled={downloadingTemplate} className="rounded-xl">
-                        {downloadingTemplate ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-                        Template
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => uploadInputRef.current?.click()} disabled={uploadingTemplate} className="rounded-xl">
-                        {uploadingTemplate ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-                        Upload
-                      </Button>
-                      <input
-                        ref={uploadInputRef}
-                        type="file"
-                        accept=".csv,text/csv,application/vnd.ms-excel"
-                        className="hidden"
-                        onChange={(event) => void uploadTemplate(event.target.files?.[0])}
-                      />
-                      <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New country</Button>
-                    </>
-                  ) : null}
+                  {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New currency</Button> : null}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {recentlyDeletedCountry ? (
+          {recentlyDeletedCurrency ? (
             <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">Recently deleted country</p>
-                    <p className="text-sm text-amber-900/80 dark:text-amber-100/85">{getCountryLabel(recentlyDeletedCountry)} was soft deleted and can still be restored.</p>
+                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">Recently deleted currency</p>
+                    <p className="text-sm text-amber-900/80 dark:text-amber-100/85">{getCurrencyLabel(recentlyDeletedCurrency)} was soft deleted and can still be restored.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {accessRules?.canUpdate ? <Button type="button" variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50" onClick={() => openPendingActionDialog(recentlyDeletedCountry, "restore")}><Undo2 className="size-3.5" />Restore</Button> : null}
-                    {accessRules?.canDelete ? <Button type="button" variant="destructive" className="rounded-xl" onClick={() => openPendingActionDialog(recentlyDeletedCountry, "permanent")}><Trash2 className="size-3.5" />Delete permanently</Button> : null}
+                    {accessRules?.canUpdate ? <Button type="button" variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50" onClick={() => openPendingActionDialog(recentlyDeletedCurrency, "restore")}><Undo2 className="size-3.5" />Restore</Button> : null}
+                    {accessRules?.canDelete ? <Button type="button" variant="destructive" className="rounded-xl" onClick={() => openPendingActionDialog(recentlyDeletedCurrency, "permanent")}><Trash2 className="size-3.5" />Delete permanently</Button> : null}
                   </div>
                 </div>
               </CardContent>
             </Card>
           ) : null}
 
-          <CountryTableSection
-            countries={countries}
+          <CurrencyTableSection
+            currencies={currencies}
             meta={meta}
             page={page}
             limit={limit}
-            loadingCountries={loadingCountries}
+            loadingCurrencies={loadingCurrencies}
             draftFilters={draftFilters}
             activeFilters={activeFilters}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}
             onLimitChange={setLimit}
-            onCreateCountry={openCreateDialog}
-            onEditCountry={openEditDialog}
-            onDeleteCountry={requestSoftDelete}
+            onCreateCurrency={openCreateDialog}
+            onEditCurrency={openEditDialog}
+            onDeleteCurrency={requestSoftDelete}
             onResetFilters={resetActiveFilters}
-            canCreateCountry={Boolean(accessRules?.canCreate)}
-            canUpdateCountry={Boolean(accessRules?.canUpdate)}
-            canDeleteCountry={Boolean(accessRules?.canDelete)}
+            canCreateCurrency={Boolean(accessRules?.canCreate)}
+            canUpdateCurrency={Boolean(accessRules?.canUpdate)}
+            canDeleteCurrency={Boolean(accessRules?.canDelete)}
           />
 
           {accessRules?.canDelete ? (
-            <DeletedCountriesCard
-              deletedCountries={deletedCountries}
+            <DeletedCurrenciesCard
+              deletedCurrencies={deletedCurrencies}
               deletedMeta={deletedMeta}
               deletedPage={deletedPage}
               deletedLimit={deletedLimit}
-              loadingDeletedCountries={loadingDeletedCountries}
+              loadingDeletedCurrencies={loadingDeletedCurrencies}
               deletedError={deletedError}
               deletedDraftFilters={deletedDraftFilters}
               deletedActiveFilters={deletedActiveFilters}
@@ -748,14 +656,14 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
               onDeletedPageChange={setDeletedPage}
               onDeletedLimitChange={setDeletedLimit}
               onOpenAction={openPendingActionDialog}
-              canRestoreCountry={Boolean(accessRules?.canUpdate)}
-              canPermanentlyDeleteCountry={Boolean(accessRules?.canDelete)}
+              canRestoreCurrency={Boolean(accessRules?.canUpdate)}
+              canPermanentlyDeleteCurrency={Boolean(accessRules?.canDelete)}
             />
           ) : null}
         </div>
       </ScrollArea>
 
-      <CountryFormDialog
+      <CurrencyFormDialog
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
@@ -775,8 +683,8 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
         onSubmit={submitEditor}
       />
 
-      <DeleteConfirmDialog open={Boolean(deleteTarget)} country={deleteTarget} working={deleteWorking} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }} onConfirm={confirmSoftDelete} />
-      <RecentlyDeletedDialog open={Boolean(pendingActionTarget && pendingActionMode)} action={pendingActionMode ?? "restore"} country={pendingActionTarget} working={pendingActionWorking} onOpenChange={(open) => { if (!open) { setPendingActionTarget(null); setPendingActionMode(null) } }} onConfirm={confirmPendingAction} />
+      <DeleteConfirmDialog open={Boolean(deleteTarget)} currency={deleteTarget} working={deleteWorking} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }} onConfirm={confirmSoftDelete} />
+      <RecentlyDeletedDialog open={Boolean(pendingActionTarget && pendingActionMode)} action={pendingActionMode ?? "restore"} currency={pendingActionTarget} working={pendingActionWorking} onOpenChange={(open) => { if (!open) { setPendingActionTarget(null); setPendingActionMode(null) } }} onConfirm={confirmPendingAction} />
     </div>
   )
 }
