@@ -44,25 +44,25 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
         label: "Core",
         description: "Primary application controls.",
         items: [
-          {
-            label: "General settings",
-            href: "/app-config/core/general",
-            description: "Company name, locale, and default system rules.",
-            children: [
-              {
-                label: "Company profile",
-                href: "/app-config/core/general/company-profile",
-              },
-              {
-                label: "Locale defaults",
-                href: "/app-config/core/general/locale-defaults",
-              },
-              {
-                label: "Fiscal calendar",
-                href: "/app-config/core/general/fiscal-calendar",
-              },
-            ],
-          },
+          // {
+          //   label: "General settings",
+          //   href: "/app-config/core/general",
+          //   description: "Company name, locale, and default system rules.",
+          //   children: [
+          //     {
+          //       label: "Company profile",
+          //       href: "/app-config/core/general/company-profile",
+          //     },
+          //     {
+          //       label: "Locale defaults",
+          //       href: "/app-config/core/general/locale-defaults",
+          //     },
+          //     {
+          //       label: "Fiscal calendar",
+          //       href: "/app-config/core/general/fiscal-calendar",
+          //     },
+          //   ],
+          // },
           {
             label: "Module",
             href: "/app-config/core/module-entry",
@@ -96,43 +96,43 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           },
         ],
       },
-      {
-        label: "Integrations",
-        description: "External services and delivery channels.",
-        items: [
-          {
-            label: "Email",
-            href: "/app-config/integrations/email",
-            children: [
-              { label: "SMTP", href: "/app-config/integrations/email/smtp" },
-              { label: "Templates", href: "/app-config/integrations/email/templates" },
-            ],
-          },
-          {
-            label: "Storage",
-            href: "/app-config/integrations/storage",
-            children: [
-              { label: "Uploads", href: "/app-config/integrations/storage/uploads" },
-              { label: "Media", href: "/app-config/integrations/storage/media" },
-            ],
-          },
-          {
-            label: "Dummy settings",
-            href: "/app-config/integrations/dummy-settings",
-            description: "Temporary placeholder submenu for layout testing.",
-            children: [
-              {
-                label: "Dummy child A",
-                href: "/app-config/integrations/dummy-settings/dummy-child-a",
-              },
-              {
-                label: "Dummy child B",
-                href: "/app-config/integrations/dummy-settings/dummy-child-b",
-              },
-            ],
-          },
-        ],
-      },
+      // {
+      //   label: "Integrations",
+      //   description: "External services and delivery channels.",
+      //   items: [
+      //     {
+      //       label: "Email",
+      //       href: "/app-config/integrations/email",
+      //       children: [
+      //         { label: "SMTP", href: "/app-config/integrations/email/smtp" },
+      //         { label: "Templates", href: "/app-config/integrations/email/templates" },
+      //       ],
+      //     },
+      //     {
+      //       label: "Storage",
+      //       href: "/app-config/integrations/storage",
+      //       children: [
+      //         { label: "Uploads", href: "/app-config/integrations/storage/uploads" },
+      //         { label: "Media", href: "/app-config/integrations/storage/media" },
+      //       ],
+      //     },
+      //     {
+      //       label: "Dummy settings",
+      //       href: "/app-config/integrations/dummy-settings",
+      //       description: "Temporary placeholder submenu for layout testing.",
+      //       children: [
+      //         {
+      //           label: "Dummy child A",
+      //           href: "/app-config/integrations/dummy-settings/dummy-child-a",
+      //         },
+      //         {
+      //           label: "Dummy child B",
+      //           href: "/app-config/integrations/dummy-settings/dummy-child-b",
+      //         },
+      //       ],
+      //     },
+      //   ],
+      // },
     ],
   },
   {
