@@ -150,7 +150,15 @@ export type StyleFormValues = {
   embellishments: StyleChildOptionValue[]
 }
 
+export type StyleDialogSectionId =
+  | "basic-info"
+  | "production-smv"
+  | "colors"
+  | "sizes"
+  | "embellishments"
+  | "remarks-status"
+
 export type StyleFormError = {
   message: string
-  section: "basic-info" | "production-smv" | "colors" | "sizes" | "embellishments" | "remarks-status"
+  section: StyleDialogSectionId
 }
