@@ -1317,6 +1317,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
             draftFilters={draftFilters}
             activeFilters={activeFilters}
             countryOptions={countryOptions}
+            loadCountryOptions={loadBuyerCountries}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}

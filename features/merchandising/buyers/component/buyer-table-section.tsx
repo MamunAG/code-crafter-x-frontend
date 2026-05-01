@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 
 import {
   ChevronLeft,
@@ -20,6 +20,12 @@ import {
 } from "@tanstack/react-table"
 
 import { AppDataTable } from "@/components/app-data-table"
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxLoadResult,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,8 +48,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import type { CountrySummary, PaginationMeta, BuyerFilterValues, BuyerRecord } from "../buyer.types"
 
-const ALL_COUNTRY_VALUE = "__all_countries__"
 const ALL_STATUS_VALUE = "__all_statuses__"
+
+type CountryFilterOption = CountrySummary & AppComboboxOption
 
 type BuyerTableSectionProps = {
   buyers: BuyerRecord[]
@@ -54,6 +61,7 @@ type BuyerTableSectionProps = {
   draftFilters: BuyerFilterValues
   activeFilters: BuyerFilterValues
   countryOptions: CountrySummary[]
+  loadCountryOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<CountryFilterOption>>
   onDraftFiltersChange: (nextValues: BuyerFilterValues) => void
   onActiveFiltersChange: (nextValues: BuyerFilterValues) => void
   onPageChange: (nextPage: number | ((current: number) => number)) => void
@@ -126,6 +134,7 @@ export function BuyerTableSection({
   draftFilters,
   activeFilters,
   countryOptions,
+  loadCountryOptions,
   onDraftFiltersChange,
   onActiveFiltersChange,
   onPageChange,
@@ -142,10 +151,26 @@ export function BuyerTableSection({
   downloadingTemplate,
   uploadingTemplate,
 }: BuyerTableSectionProps) {
+  const [selectedFilterCountry, setSelectedFilterCountry] = useState<CountryFilterOption | null>(null)
   const selectableCountries = useMemo(
-    () => countryOptions.filter((country) => country.id != null),
+    () =>
+      countryOptions
+        .filter((country) => country.id != null)
+        .map<CountryFilterOption>((country) => ({
+          ...country,
+          label: country.name ?? "",
+          value: String(country.id),
+        })),
     [countryOptions],
   )
+  const derivedFilterCountry = useMemo(
+    () => selectableCountries.find((country) => country.value === draftFilters.countryId) ?? null,
+    [draftFilters.countryId, selectableCountries],
+  )
+  const filterCountryValue =
+    draftFilters.countryId && selectedFilterCountry?.value === draftFilters.countryId
+      ? selectedFilterCountry
+      : derivedFilterCountry
 
   const filterCount = useMemo(
     () =>
@@ -164,13 +189,13 @@ export function BuyerTableSection({
 
   const filtersActive = Boolean(
     activeFilters.name ||
-      activeFilters.displayName ||
-      activeFilters.contact ||
-      activeFilters.email ||
-      activeFilters.countryId ||
-      activeFilters.address ||
-      activeFilters.isActive ||
-      activeFilters.remarks,
+    activeFilters.displayName ||
+    activeFilters.contact ||
+    activeFilters.email ||
+    activeFilters.countryId ||
+    activeFilters.address ||
+    activeFilters.isActive ||
+    activeFilters.remarks,
   )
 
   const pageSummary = useMemo(() => {
@@ -321,18 +346,21 @@ export function BuyerTableSection({
       <CardHeader className="border-b border-slate-200/70 py-0 dark:border-white/10">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-base">Filters</CardTitle>
-            <CardDescription className="text-xs">Search by buyer name, display name, contact, email, country, or status.</CardDescription>
+            <CardTitle className="text-base">Buyers table</CardTitle>
+            <CardDescription>{pageSummary}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
+              Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}
+            </Badge>
             <Badge variant="outline" className="w-fit rounded-full px-2.5 py-0.5 text-[11px]">
               {filterCount} active filter{filterCount === 1 ? "" : "s"}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" className="rounded-xl" disabled={!canCreateBuyer}>
-                  <MoreHorizontal className="size-3.5" />
-                  Bulk actions
+                <Button type="button" variant="outline" className="rounded-full" disabled={!canCreateBuyer}>
+                  <MoreHorizontal className="size-2.5" />
+                  {/* Bulk actions */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
@@ -360,38 +388,39 @@ export function BuyerTableSection({
         >
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Buyer name</label>
-            <Input id="filterBuyerName" value={draftFilters.name} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, name: event.target.value })} placeholder="Input buyer name" />
+            <Input id="filterBuyerName" value={draftFilters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, name: event.target.value })} placeholder="Input buyer name" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-            <Input id="filterBuyerDisplayName" value={draftFilters.displayName} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, displayName: event.target.value })} placeholder="Input display name" />
+            <Input id="filterBuyerDisplayName" value={draftFilters.displayName} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, displayName: event.target.value })} placeholder="Input display name" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerContact" className="text-xs font-medium text-slate-700 dark:text-slate-300">Contact</label>
-            <Input id="filterBuyerContact" value={draftFilters.contact} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, contact: event.target.value })} placeholder="Input contact" />
+            <Input id="filterBuyerContact" value={draftFilters.contact} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, contact: event.target.value })} placeholder="Input contact" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerEmail" className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input id="filterBuyerEmail" value={draftFilters.email} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, email: event.target.value })} placeholder="Input email" />
+            <Input id="filterBuyerEmail" value={draftFilters.email} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, email: event.target.value })} placeholder="Input email" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerCountry" className="text-xs font-medium text-slate-700 dark:text-slate-300">Country</label>
-            <Select
-              value={draftFilters.countryId || ALL_COUNTRY_VALUE}
-              onValueChange={(value) => onDraftFiltersChange({ ...draftFilters, countryId: value === ALL_COUNTRY_VALUE ? "" : value })}
-            >
-              <SelectTrigger id="filterBuyerCountry" className="h-9 w-full rounded-md px-2 text-xs">
-                <SelectValue placeholder="All countries" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_COUNTRY_VALUE}>All countries</SelectItem>
-                {selectableCountries.map((country) => (
-                  <SelectItem key={country.id ?? country.name ?? "country"} value={String(country.id)}>
-                    {country.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AppCombobox
+              value={filterCountryValue}
+              onValueChange={(country) => {
+                setSelectedFilterCountry(country)
+                onDraftFiltersChange({ ...draftFilters, countryId: country?.value ?? "" })
+              }}
+              loadItems={loadCountryOptions}
+              initialLimit={10}
+              searchLimit={10}
+              inputProps={{ id: "filterBuyerCountry" }}
+              placeholder="All countries"
+              loadingMessage="Loading countries..."
+              emptyMessage="No countries match your search."
+              showClear={Boolean(draftFilters.countryId)}
+              inputClassName="h-7 rounded-md px-2 text-xs"
+              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+            />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterBuyerStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
@@ -399,7 +428,7 @@ export function BuyerTableSection({
               value={draftFilters.isActive || ALL_STATUS_VALUE}
               onValueChange={(value) => onDraftFiltersChange({ ...draftFilters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
             >
-              <SelectTrigger id="filterBuyerStatus" className="h-9 w-full rounded-md px-2 text-xs">
+              <SelectTrigger id="filterBuyerStatus" className="h-7 w-full rounded-md px-2 text-xs">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -427,7 +456,7 @@ export function BuyerTableSection({
         </form>
       </CardContent>
 
-      <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
+      {/* <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-lg">Buyers table</CardTitle>
@@ -437,8 +466,8 @@ export function BuyerTableSection({
             Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}
           </Badge>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
+      </CardHeader> */}
+      <CardContent className="p-0 border-t border-slate-200/70 dark:border-white/10">
         <div className="lg:hidden">
           {loadingBuyers ? (
             <div className="space-y-3 p-4">

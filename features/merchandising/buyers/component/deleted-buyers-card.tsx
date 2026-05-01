@@ -138,10 +138,10 @@ export function DeletedBuyersCard({
 
   const deletedFiltersActive = Boolean(
     deletedActiveFilters.name ||
-      deletedActiveFilters.displayName ||
-      deletedActiveFilters.email ||
-      deletedActiveFilters.countryId ||
-      deletedActiveFilters.isActive,
+    deletedActiveFilters.displayName ||
+    deletedActiveFilters.email ||
+    deletedActiveFilters.countryId ||
+    deletedActiveFilters.isActive,
   )
 
   const deletedColumns = useMemo<ColumnDef<BuyerRecord>[]>(
@@ -249,15 +249,15 @@ export function DeletedBuyersCard({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-1">
               <label htmlFor="deletedBuyerName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Buyer name</label>
-              <Input id="deletedBuyerName" value={deletedDraftFilters.name} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, name: event.target.value })} placeholder="Input buyer name" />
+              <Input id="deletedBuyerName" value={deletedDraftFilters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, name: event.target.value })} placeholder="Input buyer name" />
             </div>
             <div className="space-y-1">
               <label htmlFor="deletedBuyerDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-              <Input id="deletedBuyerDisplayName" value={deletedDraftFilters.displayName} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, displayName: event.target.value })} placeholder="Input display name" />
+              <Input id="deletedBuyerDisplayName" value={deletedDraftFilters.displayName} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, displayName: event.target.value })} placeholder="Input display name" />
             </div>
             <div className="space-y-1">
               <label htmlFor="deletedBuyerEmail" className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</label>
-              <Input id="deletedBuyerEmail" value={deletedDraftFilters.email} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, email: event.target.value })} placeholder="Input email" />
+              <Input id="deletedBuyerEmail" value={deletedDraftFilters.email} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, email: event.target.value })} placeholder="Input email" />
             </div>
             <div className="space-y-1">
               <label htmlFor="deletedBuyerCountry" className="text-xs font-medium text-slate-700 dark:text-slate-300">Country</label>
@@ -265,17 +265,17 @@ export function DeletedBuyersCard({
                 value={deletedDraftFilters.countryId || ALL_COUNTRY_VALUE}
                 onValueChange={(value) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, countryId: value === ALL_COUNTRY_VALUE ? "" : value })}
               >
-                <SelectTrigger id="deletedBuyerCountry" className="h-9 w-full rounded-md px-2 text-xs">
+                <SelectTrigger id="deletedBuyerCountry" className="h-7 w-full rounded-md px-2 text-xs">
                   <SelectValue placeholder="All countries" />
                 </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_COUNTRY_VALUE}>All countries</SelectItem>
-                {selectableCountries.map((country) => (
-                  <SelectItem key={country.id ?? country.name ?? "country"} value={String(country.id)}>
-                    {country.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+                <SelectContent>
+                  <SelectItem value={ALL_COUNTRY_VALUE}>All countries</SelectItem>
+                  {selectableCountries.map((country) => (
+                    <SelectItem key={country.id ?? country.name ?? "country"} value={String(country.id)}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
@@ -284,7 +284,7 @@ export function DeletedBuyersCard({
                 value={deletedDraftFilters.isActive || ALL_STATUS_VALUE}
                 onValueChange={(value) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
               >
-                <SelectTrigger id="deletedBuyerStatus" className="h-9 w-full rounded-md px-2 text-xs">
+                <SelectTrigger id="deletedBuyerStatus" className="h-7 w-full rounded-md px-2 text-xs">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
