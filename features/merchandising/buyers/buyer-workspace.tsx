@@ -723,7 +723,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      if (!accessRules?.canView || !accessRules.canDelete) {
+      if (!accessRules?.canView) {
         setDeletedBuyers([])
         setDeletedMeta(null)
         setLoadingDeletedBuyers(false)
@@ -785,7 +785,6 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
       active = false
     }
   }, [
-    accessRules?.canDelete,
     accessRules?.canView,
     apiUrl,
     deletedActiveFilters,
@@ -1343,7 +1342,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
             onChange={(event) => void uploadTemplate(event.target.files?.[0])}
           />
 
-          {accessRules?.canDelete ? (
+          {accessRules?.canView ? (
             <DeletedBuyersSection
               deletedBuyers={deletedBuyers}
               deletedMeta={deletedMeta}
