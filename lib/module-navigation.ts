@@ -155,6 +155,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 permissionMenuName: "Buyer Setup",
               },
               {
+                label: "Style Setup",
+                href: "/merchandising/masters/styles",
+                permissionMenuName: "Style Setup",
+              },
+              {
                 label: "Color Setup",
                 href: "/merchandising/masters/colors",
                 permissionMenuName: "Color Setup",
