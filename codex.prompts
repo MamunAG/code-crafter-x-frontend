@@ -21,8 +21,8 @@ Requirements:
    - Restore/permanent delete behavior should match the Color page if already implemented.
 
 5. Bulk Upload
-   - Follow the Color page soft-delete pattern.
-   - Deleted records should appear in the deleted-items view.
-   - Restore/permanent delete behavior should match the Color page if already implemented.
+   - Follow the Country page bulk upload.
+   - If data already exist then do not show error message for existing data.
+   - User should see the upload details how many added and how many exist like Country page bulk upload.
 
 Use the same UI/UX, API pattern, validation style, and state management approach as the Color page.

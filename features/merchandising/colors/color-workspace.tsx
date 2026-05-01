@@ -252,7 +252,9 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(() =>
+    typeof window === "undefined" ? "" : readSelectedOrganizationId(),
+  )
   const [accessRules, setAccessRules] = useState<ColorAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
@@ -306,8 +308,6 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
     if (typeof window === "undefined") {
       return
     }
-
-    setSelectedOrganizationId(readSelectedOrganizationId())
 
     function handleOrganizationChange(event: Event) {
       const nextOrganizationId = event instanceof CustomEvent
@@ -966,7 +966,7 @@ export function ColorWorkspace({ apiUrl }: { apiUrl: string }) {
                     Colors
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Create, review, and maintain merchandising color records across the catalog.
+                    Create, review, and maintain merchandising color records for the selected organization.
                   </p>
 
                   <div className="flex flex-wrap gap-2 pt-2">

@@ -666,7 +666,7 @@ export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App configuration reference data</p>
                   <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Currencies</h1>
-                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain currency records across the platform.</p>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain currency records for the selected organization.</p>
                   <div className="flex flex-wrap gap-2 pt-2">
                     <Badge variant="secondary" className="rounded-full px-3 py-1">Total {activeTotal}</Badge>
                     <Badge variant="outline" className="rounded-full px-3 py-1">Active {activeCount}</Badge>

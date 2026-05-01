@@ -91,7 +91,7 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           },
           {
             label: "Unit Setup",
-            href: "/app-config/data/uom",
+            href: "/app-config/data/units",
             permissionMenuName: "Unit Setup",
           },
         ],
