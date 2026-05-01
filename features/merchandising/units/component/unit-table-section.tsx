@@ -84,7 +84,13 @@ function formatDate(value?: string | null) {
 function sizeBadgeTone(unit?: UnitRecord | null) {
   if (!unit) return "outline" as const
   if (unit.deleted_at) return "destructive" as const
-  return unit.isActive === "N" || unit.isActive === false ? "outline" : "secondary"
+  return unit.isActive === false ? "outline" : "secondary"
+}
+
+function getUnitStatusLabel(unit?: UnitRecord | null) {
+  if (!unit) return "Inactive"
+  if (unit.deleted_at) return "Deleted"
+  return unit.isActive === false ? "Inactive" : "Active"
 }
 
 function getUserLabel(user?: { name?: string | null } | null, fallback?: string | null) {
@@ -141,11 +147,11 @@ export function UnitTableSection({
   uploadingTemplate,
 }: UnitTableSectionProps) {
   const filterCount = useMemo(
-    () => [draftFilters.name, draftFilters.shortName, draftFilters.isActive].filter((value) => value.trim()).length,
+    () => [draftFilters.name, draftFilters.shortName, draftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
     [draftFilters],
   )
 
-  const filtersActive = Boolean(activeFilters.name || activeFilters.shortName || activeFilters.isActive)
+  const filtersActive = Boolean(activeFilters.name || activeFilters.shortName || activeFilters.isActive !== "all")
 
   const pageSummary = useMemo(() => {
     if (!meta || meta.total === 0) {
@@ -195,7 +201,7 @@ export function UnitTableSection({
         cell: ({ row }) => {
           const unit = row.original
           const tone = sizeBadgeTone(unit)
-          const label = unit.deleted_at ? "Deleted" : unit.isActive === "N" || unit.isActive === false ? "Inactive" : "Active"
+          const label = getUnitStatusLabel(unit)
           return <Badge variant={tone} className="rounded-full px-3 py-1">{label}</Badge>
         },
       },
@@ -359,11 +365,16 @@ export function UnitTableSection({
               Status
             </label>
             <Select
-              value={draftFilters.isActive || ALL_STATUSES_VALUE}
+              value={draftFilters.isActive === "all" ? ALL_STATUSES_VALUE : draftFilters.isActive}
               onValueChange={(value) =>
                 onDraftFiltersChange({
                   ...draftFilters,
-                  isActive: value === ALL_STATUSES_VALUE ? "" : value,
+                  isActive:
+                    value === ALL_STATUSES_VALUE
+                      ? "all"
+                      : value === "true"
+                        ? "active"
+                        : "inactive",
                 })
               }
             >
@@ -372,8 +383,8 @@ export function UnitTableSection({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_STATUSES_VALUE}>All statuses</SelectItem>
-                <SelectItem value="Y">Active</SelectItem>
-                <SelectItem value="N">Inactive</SelectItem>
+                <SelectItem value="true">Active</SelectItem>
+                <SelectItem value="false">Inactive</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -412,7 +423,7 @@ export function UnitTableSection({
             <div className="space-y-3 p-4">
               {units.map((unit) => {
                 const tone = sizeBadgeTone(unit)
-                const label = unit.deleted_at ? "Deleted" : unit.isActive === "N" || unit.isActive === false ? "Inactive" : "Active"
+                const label = getUnitStatusLabel(unit)
 
                 return (
                   <article

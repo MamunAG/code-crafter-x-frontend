@@ -26,11 +26,22 @@ export type PaginatedResponse<T> = {
   meta: PaginationMeta
 }
 
-export type UnitRecord = {
-  id: number
+export type CountrySummary = {
+  id?: number | null
+  name?: string | null
+}
+
+export type BuyerRecord = {
+  id: string
   name: string
-  shortName: string
-  isActive?: boolean | null
+  displayName: string
+  contact: string
+  email: string
+  countryId: number
+  address: string
+  remarks?: string | null
+  isActive?: boolean
+  country?: CountrySummary | null
   created_by_id?: string | null
   updated_by_id?: string | null
   deleted_by_id?: string | null
@@ -42,14 +53,24 @@ export type UnitRecord = {
   deleted_at?: string | null
 }
 
-export type UnitFilterValues = {
+export type BuyerFilterValues = {
   name: string
-  shortName: string
-  isActive: "all" | "active" | "inactive"
+  displayName: string
+  contact: string
+  email: string
+  countryId: string
+  address: string
+  isActive: string
+  remarks: string
 }
 
-export type UnitFormValues = {
+export type BuyerFormValues = {
   name: string
-  shortName: string
+  displayName: string
+  contact: string
+  email: string
+  countryId: string
+  address: string
+  remarks: string
   isActive: boolean
 }

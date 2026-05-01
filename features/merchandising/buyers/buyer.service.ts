@@ -1,10 +1,10 @@
 import type {
   ApiResponse,
+  BuyerFilterValues,
+  BuyerFormValues,
+  BuyerRecord,
   PaginatedResponse,
-  UnitFilterValues,
-  UnitFormValues,
-  UnitRecord,
-} from "./unit.types"
+} from "./buyer.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -49,37 +49,37 @@ async function readJsonResponse<T>(response: Response) {
   }
 
   if (response.status === 403) {
-    throw new Error(payload?.message || "You do not have permission to complete this unit action.")
+    throw new Error(payload?.message || "You do not have permission to complete this buyer action.")
   }
 
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || "Unable to complete the unit request right now.")
+    throw new Error(payload?.message || "Unable to complete the buyer request right now.")
   }
 
   return payload
 }
 
-function appendFilterParams(url: URL, filters: Partial<UnitFilterValues>) {
+function appendFilterParams(url: URL, filters: Partial<BuyerFilterValues>) {
   const name = filters.name?.trim() ?? ""
-  const shortName = filters.shortName?.trim() ?? ""
-  const isActive = filters.isActive ?? "all"
+  const displayName = filters.displayName?.trim() ?? ""
+  const contact = filters.contact?.trim() ?? ""
+  const email = filters.email?.trim() ?? ""
+  const countryId = filters.countryId?.trim() ?? ""
+  const address = filters.address?.trim() ?? ""
+  const isActive = filters.isActive?.trim() ?? ""
+  const remarks = filters.remarks?.trim() ?? ""
 
-  if (name) {
-    url.searchParams.set("name", name)
-  }
-
-  if (shortName) {
-    url.searchParams.set("shortName", shortName)
-  }
-
-  if (isActive === "active") {
-    url.searchParams.set("isActive", "true")
-  } else if (isActive === "inactive") {
-    url.searchParams.set("isActive", "false")
-  }
+  if (name) url.searchParams.set("name", name)
+  if (displayName) url.searchParams.set("displayName", displayName)
+  if (contact) url.searchParams.set("contact", contact)
+  if (email) url.searchParams.set("email", email)
+  if (countryId) url.searchParams.set("countryId", countryId)
+  if (address) url.searchParams.set("address", address)
+  if (isActive) url.searchParams.set("isActive", isActive)
+  if (remarks) url.searchParams.set("remarks", remarks)
 }
 
-export async function fetchUnits({
+export async function fetchBuyers({
   apiUrl,
   accessToken,
   page,
@@ -92,16 +92,18 @@ export async function fetchUnits({
   accessToken: string
   page: number
   limit: number
-  filters: Partial<UnitFilterValues>
+  filters: Partial<BuyerFilterValues>
   deletedOnly?: boolean
   organizationId?: string
-}): Promise<PaginatedResponse<UnitRecord>> {
-  const url = buildApiUrl(apiUrl, "/api/v1/unit")
+}): Promise<PaginatedResponse<BuyerRecord>> {
+  const url = buildApiUrl(apiUrl, "/api/v1/buyer")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
+
   if (deletedOnly) {
     url.searchParams.set("deletedOnly", "true")
   }
+
   appendFilterParams(url, filters)
 
   const response = await fetch(url, {
@@ -110,16 +112,16 @@ export async function fetchUnits({
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<PaginatedResponse<UnitRecord>>(response)
+  const payload = await readJsonResponse<PaginatedResponse<BuyerRecord>>(response)
 
   if (!payload.data?.items || !payload.data?.meta) {
-    throw new Error("The unit list was returned without pagination data.")
+    throw new Error("The buyer list was returned without pagination data.")
   }
 
   return payload.data
 }
 
-export async function fetchUnit({
+export async function fetchBuyer({
   apiUrl,
   accessToken,
   id,
@@ -127,25 +129,25 @@ export async function fetchUnit({
 }: {
   apiUrl: string
   accessToken: string
-  id: number
+  id: string
   organizationId?: string
-}): Promise<UnitRecord> {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/unit/${id}`), {
+}): Promise<BuyerRecord> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}`), {
     method: "GET",
     headers: buildRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<UnitRecord>(response)
+  const payload = await readJsonResponse<BuyerRecord>(response)
 
   if (!payload.data) {
-    throw new Error("The unit record was returned without data.")
+    throw new Error("The buyer record was returned without data.")
   }
 
   return payload.data
 }
 
-export async function createUnit({
+export async function createBuyer({
   apiUrl,
   accessToken,
   payload,
@@ -153,29 +155,34 @@ export async function createUnit({
 }: {
   apiUrl: string
   accessToken: string
-  payload: UnitFormValues
+  payload: BuyerFormValues
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/unit"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/buyer"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      shortName: payload.shortName.trim(),
+      displayName: payload.displayName.trim(),
+      contact: payload.contact.trim(),
+      email: payload.email.trim(),
+      countryId: Number(payload.countryId),
+      address: payload.address.trim(),
+      remarks: payload.remarks.trim(),
       isActive: payload.isActive,
     }),
   })
 
-  const payloadData = await readJsonResponse<UnitRecord>(response)
+  const payloadData = await readJsonResponse<BuyerRecord>(response)
 
   if (!payloadData.data) {
-    throw new Error("The unit was saved, but the created record was not returned.")
+    throw new Error("The buyer was saved, but the created record was not returned.")
   }
 
   return payloadData.data
 }
 
-export async function downloadUnitUploadTemplate({
+export async function downloadBuyerUploadTemplate({
   apiUrl,
   accessToken,
   organizationId,
@@ -184,7 +191,7 @@ export async function downloadUnitUploadTemplate({
   accessToken: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/unit/template/upload"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/buyer/template/upload"), {
     method: "GET",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
@@ -194,17 +201,17 @@ export async function downloadUnitUploadTemplate({
   }
 
   if (response.status === 403) {
-    throw new Error("You do not have permission to download the unit template.")
+    throw new Error("You do not have permission to download the buyer template.")
   }
 
   if (!response.ok) {
-    throw new Error("Unable to download the unit upload template right now.")
+    throw new Error("Unable to download the buyer upload template right now.")
   }
 
   return response.blob()
 }
 
-export async function uploadUnitTemplate({
+export async function uploadBuyerTemplate({
   apiUrl,
   accessToken,
   file,
@@ -218,7 +225,7 @@ export async function uploadUnitTemplate({
   const formData = new FormData()
   formData.append("file", file)
 
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/unit/upload"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/buyer/upload"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId }),
     body: formData,
@@ -227,13 +234,13 @@ export async function uploadUnitTemplate({
   const payload = await readJsonResponse<{ inserted: number; skipped: number }>(response)
 
   if (!payload.data) {
-    throw new Error("The unit upload completed without a summary.")
+    throw new Error("The buyer upload completed without a summary.")
   }
 
   return payload.data
 }
 
-export async function updateUnit({
+export async function updateBuyer({
   apiUrl,
   accessToken,
   id,
@@ -242,30 +249,35 @@ export async function updateUnit({
 }: {
   apiUrl: string
   accessToken: string
-  id: number
-  payload: UnitFormValues
+  id: string
+  payload: BuyerFormValues
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/unit/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}`), {
     method: "PATCH",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      shortName: payload.shortName.trim(),
+      displayName: payload.displayName.trim(),
+      contact: payload.contact.trim(),
+      email: payload.email.trim(),
+      countryId: Number(payload.countryId),
+      address: payload.address.trim(),
+      remarks: payload.remarks.trim(),
       isActive: payload.isActive,
     }),
   })
 
-  const payloadData = await readJsonResponse<UnitRecord>(response)
+  const payloadData = await readJsonResponse<BuyerRecord>(response)
 
   if (!payloadData.data) {
-    throw new Error("The unit was updated, but the updated record was not returned.")
+    throw new Error("The buyer was updated, but the updated record was not returned.")
   }
 
   return payloadData.data
 }
 
-export async function softDeleteUnit({
+export async function softDeleteBuyer({
   apiUrl,
   accessToken,
   id,
@@ -273,10 +285,10 @@ export async function softDeleteUnit({
 }: {
   apiUrl: string
   accessToken: string
-  id: number
+  id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/unit/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
@@ -284,7 +296,7 @@ export async function softDeleteUnit({
   await readJsonResponse(response)
 }
 
-export async function restoreUnit({
+export async function restoreBuyer({
   apiUrl,
   accessToken,
   id,
@@ -292,10 +304,10 @@ export async function restoreUnit({
 }: {
   apiUrl: string
   accessToken: string
-  id: number
+  id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/unit/${id}/restore`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}/restore`), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
@@ -303,7 +315,7 @@ export async function restoreUnit({
   await readJsonResponse(response)
 }
 
-export async function permanentlyDeleteUnit({
+export async function permanentlyDeleteBuyer({
   apiUrl,
   accessToken,
   id,
@@ -311,10 +323,10 @@ export async function permanentlyDeleteUnit({
 }: {
   apiUrl: string
   accessToken: string
-  id: number
+  id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/unit/${id}/permanent`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}/permanent`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })

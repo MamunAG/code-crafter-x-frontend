@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
+import { Loader2, Plus, RefreshCcw, Trash2, Undo2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -14,60 +15,72 @@ import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
-import { DeletedUnitsCard } from "./component/deleted-units-card"
-import { UnitFormDialog } from "./component/unit-form-dialog"
-import { UnitTableSection } from "./component/unit-table-section"
-import {
-  createUnit,
-  downloadUnitUploadTemplate,
-  fetchUnit,
-  fetchUnits,
-  permanentlyDeleteUnit,
-  restoreUnit,
-  softDeleteUnit,
-  updateUnit,
-  uploadUnitTemplate,
-} from "./unit.service"
-import type { PaginationMeta, UnitFilterValues, UnitFormValues, UnitRecord } from "./unit.types"
+import { fetchCountries } from "@/features/app-config/countries/country.service"
+import type { CountryRecord } from "@/features/app-config/countries/country.types"
 
-type UnitEditorMode = "create" | "edit"
+import { BuyerFormDialog } from "./component/buyer-form-dialog"
+import { BuyerTableSection } from "./component/buyer-table-section"
+import { DeletedBuyersCard } from "./component/deleted-buyers-card"
+import {
+  createBuyer,
+  downloadBuyerUploadTemplate,
+  fetchBuyer,
+  fetchBuyers,
+  permanentlyDeleteBuyer,
+  restoreBuyer,
+  softDeleteBuyer,
+  updateBuyer,
+  uploadBuyerTemplate,
+} from "./buyer.service"
+import type { BuyerFilterValues, BuyerFormValues, BuyerRecord, PaginationMeta } from "./buyer.types"
+
+type BuyerEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
-type UnitAccessRules = {
+type BuyerAccessRules = {
   canView: boolean
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
 }
 
-const UNIT_MENU_NAME = "Uom Setup"
-const EMPTY_ACCESS_RULES: UnitAccessRules = {
+const BUYER_MENU_NAME = "Buyer Setup"
+const EMPTY_ACCESS_RULES: BuyerAccessRules = {
   canView: false,
   canCreate: false,
   canUpdate: false,
   canDelete: false,
 }
 
-const DEFAULT_FILTERS: UnitFilterValues = {
+const DEFAULT_FILTERS: BuyerFilterValues = {
   name: "",
-  shortName: "",
-  isActive: "all",
+  displayName: "",
+  contact: "",
+  email: "",
+  countryId: "",
+  address: "",
+  isActive: "",
+  remarks: "",
 }
 
-const DEFAULT_FORM_VALUES: UnitFormValues = {
+const DEFAULT_FORM_VALUES: BuyerFormValues = {
   name: "",
-  shortName: "",
+  displayName: "",
+  contact: "",
+  email: "",
+  countryId: "",
+  address: "",
+  remarks: "",
   isActive: true,
 }
 
-function getUnitLabel(unit: UnitRecord) {
-  return unit.name
+function getBuyerLabel(buyer: BuyerRecord) {
+  return buyer.displayName?.trim() || buyer.name
 }
 
 function normalizeAuthFailure(message: string) {
   return (
     message.toLowerCase().includes("session expired") ||
-    message.toLowerCase().includes("unauthorized") ||
-    message.toLowerCase().includes("forbidden")
+    message.toLowerCase().includes("unauthorized")
   )
 }
 
@@ -85,7 +98,7 @@ function EmptyState({
   return (
     <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
-        <Plus className="size-5" />
+        <Users className="size-5" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">{title}</h3>
       <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
@@ -117,6 +130,12 @@ function WorkspaceSkeleton() {
             </CardContent>
           </Card>
 
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-28 rounded-3xl" />
+            <Skeleton className="h-28 rounded-3xl" />
+            <Skeleton className="h-28 rounded-3xl" />
+          </div>
+
           <Skeleton className="h-64 rounded-3xl" />
           <Skeleton className="h-[32rem] rounded-3xl" />
         </div>
@@ -127,13 +146,13 @@ function WorkspaceSkeleton() {
 
 function DeleteConfirmDialog({
   open,
-  unit,
+  buyer,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
-  unit: UnitRecord | null
+  buyer: BuyerRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
@@ -142,18 +161,22 @@ function DeleteConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete unit</AlertDialogTitle>
+          <AlertDialogTitle>Delete buyer</AlertDialogTitle>
           <AlertDialogDescription>
             This will soft delete{" "}
             <span className="font-medium text-slate-900 dark:text-slate-100">
-              {unit ? getUnitLabel(unit) : "this unit"}
+              {buyer ? getBuyerLabel(buyer) : "this buyer"}
             </span>
             . You can restore it from the recently deleted card before removing it permanently.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm} disabled={working}>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={working}
+          >
             {working ? <Loader2 className="size-3.5 animate-spin" /> : null}
             Delete
           </AlertDialogAction>
@@ -166,23 +189,23 @@ function DeleteConfirmDialog({
 function RecentlyDeletedDialog({
   open,
   action,
-  unit,
+  buyer,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
   action: PendingDeleteMode
-  unit: UnitRecord | null
+  buyer: BuyerRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }) {
-  const title = action === "restore" ? "Restore unit" : "Delete unit permanently"
+  const title = action === "restore" ? "Restore buyer" : "Delete buyer permanently"
   const description =
     action === "restore"
-      ? "Bring this unit back into the active merchandising list."
-      : "This will permanently remove the unit record and cannot be undone."
+      ? "Bring this buyer back into the active merchandising list."
+      : "This will permanently remove the buyer record and cannot be undone."
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -192,7 +215,7 @@ function RecentlyDeletedDialog({
           <AlertDialogDescription>
             {description}{" "}
             <span className="font-medium text-slate-900 dark:text-slate-100">
-              {unit ? getUnitLabel(unit) : "this unit"}
+              {buyer ? getBuyerLabel(buyer) : "this buyer"}
             </span>
             .
           </AlertDialogDescription>
@@ -213,67 +236,72 @@ function RecentlyDeletedDialog({
   )
 }
 
-export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
+export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
-
-  const [loadingUnits, setLoadingUnits] = useState(true)
-  const [loadingDeletedUnits, setLoadingDeletedUnits] = useState(true)
+  const [loadingBuyers, setLoadingBuyers] = useState(true)
+  const [loadingDeletedBuyers, setLoadingDeletedBuyers] = useState(true)
+  const [countryLoading, setCountryLoading] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
+  const [countryError, setCountryError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(() =>
     typeof window === "undefined" ? "" : readSelectedOrganizationId(),
   )
-  const [accessRules, setAccessRules] = useState<UnitAccessRules | null>(null)
+  const [accessRules, setAccessRules] = useState<BuyerAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
 
-  const [units, setUnits] = useState<UnitRecord[]>([])
+  const [buyers, setBuyers] = useState<BuyerRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
-  const [deletedUnits, setDeletedUnits] = useState<UnitRecord[]>([])
+  const [deletedBuyers, setDeletedBuyers] = useState<BuyerRecord[]>([])
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
+  const [countryOptions, setCountryOptions] = useState<CountryRecord[]>([])
 
-  const [draftFilters, setDraftFilters] = useState<UnitFilterValues>(DEFAULT_FILTERS)
-  const [activeFilters, setActiveFilters] = useState<UnitFilterValues>(DEFAULT_FILTERS)
-  const [deletedDraftFilters, setDeletedDraftFilters] = useState<UnitFilterValues>(DEFAULT_FILTERS)
-  const [deletedActiveFilters, setDeletedActiveFilters] = useState<UnitFilterValues>(DEFAULT_FILTERS)
+  const [draftFilters, setDraftFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
+  const [activeFilters, setActiveFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
+  const [deletedDraftFilters, setDeletedDraftFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
+  const [deletedActiveFilters, setDeletedActiveFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [editorMode, setEditorMode] = useState<UnitEditorMode>("create")
+  const [editorMode, setEditorMode] = useState<BuyerEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorInitialValues, setEditorInitialValues] = useState<UnitFormValues>(DEFAULT_FORM_VALUES)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+  const [editorInitialValues, setEditorInitialValues] = useState<BuyerFormValues>(DEFAULT_FORM_VALUES)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
-  const [deleteTarget, setDeleteTarget] = useState<UnitRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<BuyerRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
-  const [recentlyDeletedUnit, setRecentlyDeletedUnit] = useState<UnitRecord | null>(null)
-  const [pendingActionTarget, setPendingActionTarget] = useState<UnitRecord | null>(null)
+  const [recentlyDeletedBuyer, setRecentlyDeletedBuyer] = useState<BuyerRecord | null>(null)
+  const [pendingActionTarget, setPendingActionTarget] = useState<BuyerRecord | null>(null)
   const [pendingActionMode, setPendingActionMode] = useState<PendingDeleteMode | null>(null)
   const [pendingActionWorking, setPendingActionWorking] = useState(false)
 
-  const handleAuthFailure = useCallback((message: string) => {
-    if (!normalizeAuthFailure(message)) {
-      return false
-    }
+  const handleAuthFailure = useCallback(
+    (message: string) => {
+      if (!normalizeAuthFailure(message)) {
+        return false
+      }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("access_token")
-      window.localStorage.removeItem("refresh_token")
-      window.localStorage.removeItem("auth_user")
-    }
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("access_token")
+        window.localStorage.removeItem("refresh_token")
+        window.localStorage.removeItem("auth_user")
+      }
 
-    router.replace("/sign-in")
-    return true
-  }, [router])
+      router.replace("/sign-in")
+      return true
+    },
+    [router],
+  )
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -281,15 +309,24 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     function handleOrganizationChange(event: Event) {
-      const nextOrganizationId = event instanceof CustomEvent
-        ? event.detail?.organizationId
-        : readSelectedOrganizationId()
+      const nextOrganizationId =
+        event instanceof CustomEvent
+          ? event.detail?.organizationId
+          : readSelectedOrganizationId()
+
       setSelectedOrganizationId(nextOrganizationId || "")
     }
 
-    window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+    window.addEventListener(
+      SELECTED_ORGANIZATION_CHANGED_EVENT,
+      handleOrganizationChange,
+    )
+
     return () => {
-      window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+      window.removeEventListener(
+        SELECTED_ORGANIZATION_CHANGED_EVENT,
+        handleOrganizationChange,
+      )
     }
   }, [])
 
@@ -306,12 +343,15 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
       try {
         const token = window.localStorage.getItem("access_token")
+
         if (!token) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
 
-        const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+        const storedUser = parseStoredAuthUser(
+          window.localStorage.getItem("auth_user"),
+        )
 
         if (storedUser?.role === "admin") {
           if (active) {
@@ -329,7 +369,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           organizationId: selectedOrganizationId || undefined,
-          menuName: UNIT_MENU_NAME,
+          menuName: BUYER_MENU_NAME,
         })
 
         if (!active) {
@@ -347,7 +387,11 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load your unit menu access right now."
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load your buyer menu access right now."
+
         if (handleAuthFailure(message)) {
           return
         }
@@ -362,69 +406,11 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     void loadAccessRules()
+
     return () => {
       active = false
     }
   }, [apiUrl, handleAuthFailure, refreshVersion, selectedOrganizationId])
-
-  const openEditDialog = useCallback(async (unitId: number) => {
-    if (!accessRules?.canUpdate) {
-      toast.error("You do not have permission to update units.")
-      return
-    }
-
-    setEditorMode("edit")
-    setEditingId(unitId)
-    setEditorError("")
-    setEditorSubmitting(false)
-    setEditorLoading(true)
-    setEditorInitialValues(DEFAULT_FORM_VALUES)
-    setEditorOpen(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const record = await fetchUnit({
-        apiUrl,
-        accessToken: token,
-        organizationId: selectedOrganizationId || undefined,
-        id: unitId,
-      })
-
-      setEditorInitialValues({
-        name: record.name ?? "",
-        shortName: record.shortName ?? "",
-        isActive: record.isActive !== false,
-      })
-    } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the unit record right now."
-      if (!handleAuthFailure(message)) {
-        setEditorError(message)
-        toast.error(message)
-      }
-    } finally {
-      setEditorLoading(false)
-    }
-  }, [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId])
-
-  const openPendingActionDialog = useCallback((unit: UnitRecord, mode: PendingDeleteMode) => {
-    if (mode === "restore" && !accessRules?.canUpdate) {
-      toast.error("You do not have permission to restore units.")
-      return
-    }
-
-    if (mode === "permanent" && !accessRules?.canDelete) {
-      toast.error("You do not have permission to permanently delete units.")
-      return
-    }
-
-    setPendingActionTarget(unit)
-    setPendingActionMode(mode)
-  }, [accessRules?.canDelete, accessRules?.canUpdate])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -433,67 +419,241 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     let active = true
 
-    async function loadUnits() {
+    async function loadCountries() {
       if (loadingAccessRules) {
         return
       }
 
       if (!accessRules?.canView) {
-        setUnits([])
-        setMeta(null)
-        setLoadingUnits(false)
+        setCountryOptions([])
+        setCountryError("")
+        setCountryLoading(false)
         return
       }
 
-      setLoadingUnits(true)
-      setError("")
+      setCountryLoading(true)
+      setCountryError("")
 
       try {
         const token = window.localStorage.getItem("access_token")
+
         if (!token) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
 
-        const response = await fetchUnits({
+        const response = await fetchCountries({
           apiUrl,
           accessToken: token,
+          page: 1,
+          limit: 1000,
+          filters: { name: "" },
           organizationId: selectedOrganizationId || undefined,
-          page,
-          limit,
-          filters: activeFilters,
         })
 
         if (!active) {
           return
         }
 
-        setUnits(response.items)
+        setCountryOptions(
+          response.items.filter(
+            (country) => country.deleted_at == null && country.isActive !== false,
+          ),
+        )
+      } catch (caughtError) {
+        if (!active) {
+          return
+        }
+
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load buyer countries right now."
+
+        if (handleAuthFailure(message)) {
+          return
+        }
+
+        setCountryError(message)
+      } finally {
+        if (active) {
+          setCountryLoading(false)
+        }
+      }
+    }
+
+    void loadCountries()
+
+    return () => {
+      active = false
+    }
+  }, [
+    accessRules?.canView,
+    apiUrl,
+    handleAuthFailure,
+    loadingAccessRules,
+    refreshVersion,
+    selectedOrganizationId,
+  ])
+
+  const openEditDialog = useCallback(
+    async (buyerId: string) => {
+      if (!accessRules?.canUpdate) {
+        toast.error("You do not have permission to update buyers.")
+        return
+      }
+
+      setEditorMode("edit")
+      setEditingId(buyerId)
+      setEditorError("")
+      setEditorSubmitting(false)
+      setEditorLoading(true)
+      setEditorInitialValues(DEFAULT_FORM_VALUES)
+      setEditorOpen(true)
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+
+        const record = await fetchBuyer({
+          apiUrl,
+          accessToken: token,
+          id: buyerId,
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        setEditorInitialValues({
+          name: record.name ?? "",
+          displayName: record.displayName ?? "",
+          contact: record.contact ?? "",
+          email: record.email ?? "",
+          countryId: record.countryId ? String(record.countryId) : "",
+          address: record.address ?? "",
+          remarks: record.remarks ?? "",
+          isActive: record.isActive !== false,
+        })
+      } catch (caughtError) {
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load the buyer record right now."
+
+        if (!handleAuthFailure(message)) {
+          setEditorError(message)
+          toast.error(message)
+        }
+      } finally {
+        setEditorLoading(false)
+      }
+    },
+    [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const openPendingActionDialog = useCallback(
+    (buyer: BuyerRecord, mode: PendingDeleteMode) => {
+      if (mode === "restore" && !accessRules?.canUpdate) {
+        toast.error("You do not have permission to restore buyers.")
+        return
+      }
+
+      if (mode === "permanent" && !accessRules?.canDelete) {
+        toast.error("You do not have permission to permanently delete buyers.")
+        return
+      }
+
+      setPendingActionTarget(buyer)
+      setPendingActionMode(mode)
+    },
+    [accessRules?.canDelete, accessRules?.canUpdate],
+  )
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    let active = true
+
+    async function loadBuyers() {
+      if (loadingAccessRules) {
+        return
+      }
+
+      if (!accessRules?.canView) {
+        setBuyers([])
+        setMeta(null)
+        setLoadingBuyers(false)
+        return
+      }
+
+      setLoadingBuyers(true)
+      setError("")
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+
+        const response = await fetchBuyers({
+          apiUrl,
+          accessToken: token,
+          page,
+          limit,
+          filters: activeFilters,
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        if (!active) {
+          return
+        }
+
+        setBuyers(response.items)
         setMeta(response.meta)
       } catch (caughtError) {
         if (!active) {
           return
         }
 
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load units right now."
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load buyers right now."
+
         if (handleAuthFailure(message)) {
           return
         }
 
         setError(message)
-        toast.error(message)
       } finally {
         if (active) {
-          setLoadingUnits(false)
+          setLoadingBuyers(false)
         }
       }
     }
 
-    void loadUnits()
+    void loadBuyers()
+
     return () => {
       active = false
     }
-  }, [accessRules?.canView, activeFilters, apiUrl, handleAuthFailure, limit, loadingAccessRules, page, refreshVersion, selectedOrganizationId])
+  }, [
+    accessRules?.canView,
+    activeFilters,
+    apiUrl,
+    handleAuthFailure,
+    limit,
+    loadingAccessRules,
+    page,
+    refreshVersion,
+    selectedOrganizationId,
+  ])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -502,50 +662,55 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     let active = true
 
-    async function loadDeletedUnits() {
+    async function loadDeletedBuyers() {
       if (loadingAccessRules) {
         return
       }
 
-      if (!accessRules?.canView || !accessRules?.canDelete) {
-        setDeletedUnits([])
+      if (!accessRules?.canView || !accessRules.canDelete) {
+        setDeletedBuyers([])
         setDeletedMeta(null)
-        setLoadingDeletedUnits(false)
+        setLoadingDeletedBuyers(false)
         return
       }
 
-      setLoadingDeletedUnits(true)
+      setLoadingDeletedBuyers(true)
       setDeletedError("")
 
       try {
         const token = window.localStorage.getItem("access_token")
+
         if (!token) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
 
-        const response = await fetchUnits({
+        const response = await fetchBuyers({
           apiUrl,
           accessToken: token,
-          organizationId: selectedOrganizationId || undefined,
           page: deletedPage,
           limit: deletedLimit,
           filters: deletedActiveFilters,
           deletedOnly: true,
+          organizationId: selectedOrganizationId || undefined,
         })
 
         if (!active) {
           return
         }
 
-        setDeletedUnits(response.items)
+        setDeletedBuyers(response.items)
         setDeletedMeta(response.meta)
       } catch (caughtError) {
         if (!active) {
           return
         }
 
-        const message = caughtError instanceof Error ? caughtError.message : "Unable to load deleted units right now."
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load deleted buyers right now."
+
         if (handleAuthFailure(message)) {
           return
         }
@@ -553,20 +718,32 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
         setDeletedError(message)
       } finally {
         if (active) {
-          setLoadingDeletedUnits(false)
+          setLoadingDeletedBuyers(false)
         }
       }
     }
 
-    void loadDeletedUnits()
+    void loadDeletedBuyers()
+
     return () => {
       active = false
     }
-  }, [accessRules?.canDelete, accessRules?.canView, apiUrl, deletedActiveFilters, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
+  }, [
+    accessRules?.canDelete,
+    accessRules?.canView,
+    apiUrl,
+    deletedActiveFilters,
+    deletedLimit,
+    deletedPage,
+    handleAuthFailure,
+    loadingAccessRules,
+    refreshVersion,
+    selectedOrganizationId,
+  ])
 
   const activeCount = useMemo(
-    () => units.filter((unit) => unit.isActive !== false && !unit.deleted_at).length,
-    [units],
+    () => buyers.filter((buyer) => buyer.isActive !== false && !buyer.deleted_at).length,
+    [buyers],
   )
 
   function triggerRefresh() {
@@ -581,7 +758,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
   function openCreateDialog() {
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to create units.")
+      toast.error("You do not have permission to create buyers.")
       return
     }
 
@@ -597,7 +774,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
   async function downloadTemplate() {
     if (!accessRules?.canCreate || downloadingTemplate) {
       if (!accessRules?.canCreate) {
-        toast.error("You do not have permission to download the unit template.")
+        toast.error("You do not have permission to download the buyer template.")
       }
       return
     }
@@ -606,26 +783,32 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     try {
       const token = window.localStorage.getItem("access_token")
+
       if (!token) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
 
-      const blob = await downloadUnitUploadTemplate({
+      const blob = await downloadBuyerUploadTemplate({
         apiUrl,
         accessToken: token,
         organizationId: selectedOrganizationId || undefined,
       })
+
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = "unit-upload-template.csv"
+      link.download = "buyer-upload-template.csv"
       document.body.appendChild(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the unit template right now."
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to download the buyer template right now."
+
       if (!handleAuthFailure(message)) {
         toast.error(message)
       }
@@ -640,7 +823,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to upload units.")
+      toast.error("You do not have permission to upload buyers.")
       return
     }
 
@@ -648,53 +831,62 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     try {
       const token = window.localStorage.getItem("access_token")
+
       if (!token) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
 
-      const result = await uploadUnitTemplate({
+      const result = await uploadBuyerTemplate({
         apiUrl,
         accessToken: token,
         file,
         organizationId: selectedOrganizationId || undefined,
       })
-      toast.success(`Unit upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`)
+
+      toast.success(
+        `Buyer upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`,
+      )
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the unit template right now."
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to upload the buyer template right now."
+
       if (!handleAuthFailure(message)) {
         toast.error(message)
       }
     } finally {
       setUploadingTemplate(false)
+
       if (uploadInputRef.current) {
         uploadInputRef.current.value = ""
       }
     }
   }
 
-  function requestSoftDelete(unit: UnitRecord) {
+  function requestSoftDelete(buyer: BuyerRecord) {
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete units.")
+      toast.error("You do not have permission to delete buyers.")
       return
     }
 
-    setDeleteTarget(unit)
+    setDeleteTarget(buyer)
   }
 
-  async function submitEditor(values: UnitFormValues) {
+  async function submitEditor(values: BuyerFormValues) {
     if (editorSubmitting || editorLoading) {
       return
     }
 
     if (editorMode === "create" && !accessRules?.canCreate) {
-      toast.error("You do not have permission to create units.")
+      toast.error("You do not have permission to create buyers.")
       return
     }
 
     if (editorMode === "edit" && !accessRules?.canUpdate) {
-      toast.error("You do not have permission to update units.")
+      toast.error("You do not have permission to update buyers.")
       return
     }
 
@@ -703,28 +895,29 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     try {
       const token = window.localStorage.getItem("access_token")
+
       if (!token) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
 
       if (editorMode === "create") {
-        await createUnit({
+        await createBuyer({
           apiUrl,
           accessToken: token,
           payload: values,
           organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Unit created successfully.")
-      } else if (editingId !== null) {
-        await updateUnit({
+        toast.success("Buyer created successfully.")
+      } else if (editingId != null) {
+        await updateBuyer({
           apiUrl,
           accessToken: token,
           id: editingId,
           payload: values,
           organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Unit updated successfully.")
+        toast.success("Buyer updated successfully.")
       }
 
       setEditorOpen(false)
@@ -732,7 +925,11 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to save the unit right now."
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to save the buyer right now."
+
       if (!handleAuthFailure(message)) {
         setEditorError(message)
         toast.error(message)
@@ -748,7 +945,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     if (!accessRules?.canDelete) {
-      toast.error("You do not have permission to delete units.")
+      toast.error("You do not have permission to delete buyers.")
       return
     }
 
@@ -756,23 +953,29 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
     try {
       const token = window.localStorage.getItem("access_token")
+
       if (!token) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
 
-      await softDeleteUnit({
+      await softDeleteBuyer({
         apiUrl,
         accessToken: token,
         id: deleteTarget.id,
         organizationId: selectedOrganizationId || undefined,
       })
-      setRecentlyDeletedUnit(deleteTarget)
+
+      setRecentlyDeletedBuyer(deleteTarget)
       setDeleteTarget(null)
-      toast.success("Unit moved to recently deleted.")
+      toast.success("Buyer moved to recently deleted.")
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to delete the unit right now."
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to delete the buyer right now."
+
       if (!handleAuthFailure(message)) {
         toast.error(message)
       }
@@ -787,36 +990,56 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
 
     setPendingActionWorking(true)
+
     try {
       const token = window.localStorage.getItem("access_token")
+
       if (!token) {
         handleAuthFailure("Your session expired. Please sign in again.")
         return
       }
 
       if (pendingActionMode === "restore") {
-        await restoreUnit({
+        if (!accessRules?.canUpdate) {
+          toast.error("You do not have permission to restore buyers.")
+          return
+        }
+
+        await restoreBuyer({
           apiUrl,
           accessToken: token,
           id: pendingActionTarget.id,
           organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Unit restored successfully.")
+        toast.success("Buyer restored successfully.")
       } else {
-        await permanentlyDeleteUnit({
+        if (!accessRules?.canDelete) {
+          toast.error("You do not have permission to permanently delete buyers.")
+          return
+        }
+
+        await permanentlyDeleteBuyer({
           apiUrl,
           accessToken: token,
           id: pendingActionTarget.id,
           organizationId: selectedOrganizationId || undefined,
         })
-        toast.success("Unit deleted permanently.")
+        toast.success("Buyer deleted permanently.")
+      }
+
+      if (recentlyDeletedBuyer?.id === pendingActionTarget.id) {
+        setRecentlyDeletedBuyer(null)
       }
 
       setPendingActionTarget(null)
       setPendingActionMode(null)
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to complete this action right now."
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to complete the delete action right now."
+
       if (!handleAuthFailure(message)) {
         toast.error(message)
       }
@@ -825,62 +1048,98 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  if (loadingAccessRules) {
+  const deletedTotal = deletedMeta?.total ?? deletedBuyers.length
+  const activeTotal = meta?.total ?? buyers.length
+
+  if (
+    (loadingAccessRules || loadingBuyers) &&
+    buyers.length === 0 &&
+    (loadingAccessRules || loadingDeletedBuyers) &&
+    deletedBuyers.length === 0 &&
+    !error &&
+    !deletedError &&
+    !accessError &&
+    !countryError
+  ) {
     return <WorkspaceSkeleton />
   }
 
-  if (!accessRules?.canView) {
+  if (!loadingAccessRules && accessRules && !accessRules.canView) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <EmptyState
-              title="Unit access unavailable"
-              description={accessError || "You do not have permission to view the Unit Setup menu for the selected organization."}
-              actionLabel="Retry"
-              onAction={triggerRefresh}
-            />
-          </div>
-        </ScrollArea>
+      <div className="space-y-6">
+        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Merchandising
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Buyers
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Manage merchandising buyer master data.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={triggerRefresh}
+                className="rounded-xl"
+              >
+                <RefreshCcw className="size-3.5" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <EmptyState
+          title="Buyer access unavailable"
+          description={accessError || "You do not have permission to view the Buyers menu for the selected organization."}
+          actionLabel="Retry"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      App Config
-                    </p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                      Units
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      Create, update, soft delete, restore, and bulk import merchandising units for the selected organization.
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
-                    <RefreshCcw className="size-3.5" />
-                    Retry
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="space-y-6">
+        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Merchandising
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Buyers
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Manage merchandising buyer master data.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={triggerRefresh}
+                className="rounded-xl"
+              >
+                <RefreshCcw className="size-3.5" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-            <EmptyState
-              title="Unable to load units"
-              description={error}
-              actionLabel="Try again"
-              onAction={triggerRefresh}
-            />
-          </div>
-        </ScrollArea>
+        <EmptyState
+          title="Unable to load buyers"
+          description={error}
+          actionLabel="Try again"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
@@ -889,74 +1148,73 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-          <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-3">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                    App configuration reference data
+          <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+            <CardContent className="p-4 sm:p-8 sm:py-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Merchandising master data
                   </p>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
-                    Units
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                    Buyers
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Create, update, soft delete, restore, and bulk import merchandising units for the selected organization.
+                    Create, review, and maintain buyer records for the selected organization.
                   </p>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Badge variant="secondary" className="rounded-full px-3 py-1">
+                      Total {activeTotal}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Active {activeCount}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Deleted {deletedTotal}
+                    </Badge>
+                    {recentlyDeletedBuyer ? (
+                      <Badge variant="destructive" className="rounded-full px-3 py-1">
+                        Recently deleted
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
+
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={triggerRefresh}
                     className="rounded-xl"
-                    disabled={loadingUnits || loadingDeletedUnits}
                   >
-                    {loadingUnits || loadingDeletedUnits ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCcw className="size-3.5" />}
+                    <RefreshCcw className="size-3.5" />
                     Refresh
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={openCreateDialog}
-                    className="rounded-xl"
-                    disabled={Boolean(!accessRules?.canCreate)}
-                  >
-                    <Plus className="size-3.5" />
-                    New unit
-                  </Button>
+                  {accessRules?.canCreate ? (
+                    <Button
+                      type="button"
+                      onClick={openCreateDialog}
+                      className="rounded-xl"
+                    >
+                      <Plus className="size-3.5" />
+                      New buyer
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Active units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{activeCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Total units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{meta?.total ?? units.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Deleted units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{deletedMeta?.total ?? deletedUnits.length}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {recentlyDeletedUnit ? (
+          {recentlyDeletedBuyer ? (
             <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">Recently deleted unit</p>
+                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">
+                      Recently deleted buyer
+                    </p>
                     <p className="text-sm text-amber-900/80 dark:text-amber-100/85">
-                      {getUnitLabel(recentlyDeletedUnit)} was soft deleted and can still be restored.
+                      {getBuyerLabel(recentlyDeletedBuyer)} was soft deleted and can still be restored.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -965,7 +1223,9 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
                         type="button"
                         variant="outline"
                         className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50"
-                        onClick={() => openPendingActionDialog(recentlyDeletedUnit, "restore")}
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedBuyer, "restore")
+                        }
                       >
                         <Undo2 className="size-3.5" />
                         Restore
@@ -976,7 +1236,9 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
                         type="button"
                         variant="destructive"
                         className="rounded-xl"
-                        onClick={() => openPendingActionDialog(recentlyDeletedUnit, "permanent")}
+                        onClick={() =>
+                          openPendingActionDialog(recentlyDeletedBuyer, "permanent")
+                        }
                       >
                         <Trash2 className="size-3.5" />
                         Delete permanently
@@ -988,27 +1250,28 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
             </Card>
           ) : null}
 
-          <UnitTableSection
-            units={units}
+          <BuyerTableSection
+            buyers={buyers}
             meta={meta}
             page={page}
             limit={limit}
-            loadingUnits={loadingUnits}
+            loadingBuyers={loadingBuyers}
             draftFilters={draftFilters}
             activeFilters={activeFilters}
+            countryOptions={countryOptions}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}
             onLimitChange={setLimit}
-            onCreateUnit={openCreateDialog}
-            onEditUnit={openEditDialog}
-            onDeleteUnit={requestSoftDelete}
+            onCreateBuyer={openCreateDialog}
+            onEditBuyer={openEditDialog}
+            onDeleteBuyer={requestSoftDelete}
             onResetFilters={resetActiveFilters}
             onDownloadTemplate={downloadTemplate}
             onUploadTemplate={() => uploadInputRef.current?.click()}
-            canCreateUnit={Boolean(accessRules?.canCreate)}
-            canUpdateUnit={Boolean(accessRules?.canUpdate)}
-            canDeleteUnit={Boolean(accessRules?.canDelete)}
+            canCreateBuyer={Boolean(accessRules?.canCreate)}
+            canUpdateBuyer={Boolean(accessRules?.canUpdate)}
+            canDeleteBuyer={Boolean(accessRules?.canDelete)}
             downloadingTemplate={downloadingTemplate}
             uploadingTemplate={uploadingTemplate}
           />
@@ -1022,36 +1285,41 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
           />
 
           {accessRules?.canDelete ? (
-            <DeletedUnitsCard
-              deletedUnits={deletedUnits}
+            <DeletedBuyersCard
+              deletedBuyers={deletedBuyers}
               deletedMeta={deletedMeta}
               deletedPage={deletedPage}
               deletedLimit={deletedLimit}
-              loadingDeletedUnits={loadingDeletedUnits}
+              loadingDeletedBuyers={loadingDeletedBuyers}
               deletedError={deletedError}
               deletedDraftFilters={deletedDraftFilters}
               deletedActiveFilters={deletedActiveFilters}
+              countryOptions={countryOptions}
               onDeletedDraftFiltersChange={setDeletedDraftFilters}
               onDeletedActiveFiltersChange={setDeletedActiveFilters}
               onDeletedPageChange={setDeletedPage}
               onDeletedLimitChange={setDeletedLimit}
               onOpenAction={openPendingActionDialog}
-              canRestoreUnit={Boolean(accessRules?.canUpdate)}
-              canPermanentlyDeleteUnit={Boolean(accessRules?.canDelete)}
+              canRestoreBuyer={Boolean(accessRules?.canUpdate)}
+              canPermanentlyDeleteBuyer={Boolean(accessRules?.canDelete)}
             />
           ) : null}
         </div>
       </ScrollArea>
 
-      <UnitFormDialog
+      <BuyerFormDialog
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
         submitting={editorSubmitting}
         error={editorError}
+        countryOptions={countryOptions}
+        countryLoading={countryLoading}
+        countryError={countryError}
         initialValues={editorInitialValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
+
           if (!open) {
             setEditorInitialValues(DEFAULT_FORM_VALUES)
             setEditorError("")
@@ -1065,7 +1333,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
-        unit={deleteTarget}
+        buyer={deleteTarget}
         working={deleteWorking}
         onOpenChange={(open) => {
           if (!open) {
@@ -1078,7 +1346,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
       <RecentlyDeletedDialog
         open={Boolean(pendingActionTarget && pendingActionMode)}
         action={pendingActionMode ?? "restore"}
-        unit={pendingActionTarget}
+        buyer={pendingActionTarget}
         working={pendingActionWorking}
         onOpenChange={(open) => {
           if (!open) {

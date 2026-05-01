@@ -34,10 +34,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import type { PaginationMeta, UnitFilterValues, UnitRecord } from "../unit.types"
 
 type DeletedUnitActionMode = "restore" | "permanent"
+const ALL_STATUSES_VALUE = "__all_deleted_statuses__"
 
 type DeletedUnitsCardProps = {
   deletedUnits: UnitRecord[]
@@ -77,6 +79,12 @@ function EmptyState({ title, description }: { title: string; description: string
   )
 }
 
+function getUnitStatusLabel(unit?: UnitRecord | null) {
+  if (!unit) return "Inactive"
+  if (unit.deleted_at) return "Deleted"
+  return unit.isActive === false ? "Inactive" : "Active"
+}
+
 export function DeletedUnitsCard({
   deletedUnits,
   deletedMeta,
@@ -105,11 +113,11 @@ export function DeletedUnitsCard({
   }, [deletedMeta])
 
   const deletedFilterCount = useMemo(
-    () => [deletedDraftFilters.name, deletedDraftFilters.shortName, deletedDraftFilters.isActive].filter((value) => value.trim()).length,
+    () => [deletedDraftFilters.name, deletedDraftFilters.shortName, deletedDraftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
     [deletedDraftFilters],
   )
 
-  const deletedFiltersActive = Boolean(deletedActiveFilters.name || deletedActiveFilters.shortName || deletedActiveFilters.isActive)
+  const deletedFiltersActive = Boolean(deletedActiveFilters.name || deletedActiveFilters.shortName || deletedActiveFilters.isActive !== "all")
 
   const deletedColumns = useMemo<ColumnDef<UnitRecord>[]>(
     () => [
@@ -204,7 +212,7 @@ export function DeletedUnitsCard({
       <CardContent className="p-0">
         <div className="border-b border-slate-200/70 p-4 dark:border-white/10">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="grid w-full gap-3 sm:grid-cols-1 lg:max-w-2xl">
+            <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-2xl">
               <div className="space-y-1">
                 <label htmlFor="deletedUnitName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
                   Unit name
@@ -216,6 +224,34 @@ export function DeletedUnitsCard({
                   onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, name: event.target.value })}
                   placeholder="Input unit name"
                 />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="deletedUnitStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Status
+                </label>
+                <Select
+                  value={deletedDraftFilters.isActive === "all" ? ALL_STATUSES_VALUE : deletedDraftFilters.isActive}
+                  onValueChange={(value) =>
+                    onDeletedDraftFiltersChange({
+                      ...deletedDraftFilters,
+                      isActive:
+                        value === ALL_STATUSES_VALUE
+                          ? "all"
+                          : value === "true"
+                            ? "active"
+                            : "inactive",
+                    })
+                  }
+                >
+                  <SelectTrigger id="deletedUnitStatus" className="h-9 w-full rounded-md px-2 text-xs">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_STATUSES_VALUE}>All statuses</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -235,7 +271,7 @@ export function DeletedUnitsCard({
                 variant="outline"
                 className="w-full rounded-xl sm:w-auto"
                 onClick={() => {
-                  const cleared = { name: "", shortName: "", isActive: "" }
+                  const cleared = { name: "", shortName: "", isActive: "all" as const }
                   onDeletedDraftFiltersChange(cleared)
                   onDeletedActiveFiltersChange(cleared)
                   onDeletedPageChange(1)
@@ -291,6 +327,14 @@ export function DeletedUnitsCard({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : null}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge variant={unit.deleted_at ? "destructive" : unit.isActive === false ? "outline" : "secondary"} className="rounded-full px-3 py-1">
+                          {getUnitStatusLabel(unit)}
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full px-3 py-1">
+                          Deleted record
+                        </Badge>
                       </div>
                       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Deleted: {formatDate(unit.deleted_at)}</p>
                     </article>

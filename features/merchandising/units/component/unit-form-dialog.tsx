@@ -19,13 +19,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import type { UnitFormValues } from "../unit.types"
@@ -57,7 +51,7 @@ const UNIT_FIELD_ORDER: UnitFieldName[] = ["name", "shortName", "isActive"]
 const unitFormSchema = z.object({
   name: z.string().trim().min(1, "Unit name is required."),
   shortName: z.string().trim().min(1, "Unit short name is required."),
-  isActive: z.string().trim().min(1, "Active status is required."),
+  isActive: z.boolean(),
 })
 
 function getErrorMessage(error: unknown) {
@@ -290,24 +284,21 @@ export function UnitFormDialog({
                         id="unit-field-isActive"
                         className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]"
                       >
-                        <div className="space-y-1">
-                          <label htmlFor={field.name} className="text-sm font-medium">
-                            Active
-                          </label>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Active units can be used in merchandising records.
-                          </p>
-                        </div>
-                        <div className="mt-3">
-                          <Select value={field.value || "Y"} onValueChange={field.onChange}>
-                            <SelectTrigger id={field.name} className="w-full">
-                              <SelectValue placeholder="Select active status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Y">Active</SelectItem>
-                              <SelectItem value="N">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <label htmlFor={field.name} className="text-sm font-medium">
+                              Active
+                            </label>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Active units can be used in merchandising records.
+                            </p>
+                          </div>
+                          <Switch
+                            id={field.name}
+                            checked={Boolean(field.value)}
+                            onCheckedChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
                         </div>
                       </div>
                     )}
