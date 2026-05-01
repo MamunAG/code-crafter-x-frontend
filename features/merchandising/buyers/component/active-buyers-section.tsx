@@ -125,7 +125,7 @@ function EmptyState({
   )
 }
 
-export function BuyerTableSection({
+export function ActiveBuyersSection({
   buyers,
   meta,
   page,
@@ -456,17 +456,6 @@ export function BuyerTableSection({
         </form>
       </CardContent>
 
-      {/* <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-lg">Buyers table</CardTitle>
-            <CardDescription>{pageSummary}</CardDescription>
-          </div>
-          <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
-            Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}
-          </Badge>
-        </div>
-      </CardHeader> */}
       <CardContent className="p-0 border-t border-slate-200/70 dark:border-white/10">
         <div className="lg:hidden">
           {loadingBuyers ? (

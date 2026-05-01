@@ -20,8 +20,8 @@ import { fetchCountries } from "@/features/app-config/countries/country.service"
 import type { CountryRecord } from "@/features/app-config/countries/country.types"
 
 import { BuyerFormDialog } from "./component/buyer-form-dialog"
-import { BuyerTableSection } from "./component/buyer-table-section"
-import { DeletedBuyersCard } from "./component/deleted-buyers-card"
+import { ActiveBuyersSection } from "./component/active-buyers-section"
+import { DeletedBuyersSection } from "./component/deleted-buyers-section"
 import {
   createBuyer,
   downloadBuyerUploadTemplate,
@@ -1308,7 +1308,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
             </Card>
           ) : null}
 
-          <BuyerTableSection
+          <ActiveBuyersSection
             buyers={buyers}
             meta={meta}
             page={page}
@@ -1344,7 +1344,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
           />
 
           {accessRules?.canDelete ? (
-            <DeletedBuyersCard
+            <DeletedBuyersSection
               deletedBuyers={deletedBuyers}
               deletedMeta={deletedMeta}
               deletedPage={deletedPage}
