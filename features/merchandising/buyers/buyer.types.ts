@@ -35,10 +35,10 @@ export type BuyerRecord = {
   id: string
   name: string
   displayName: string
-  contact: string
-  email: string
-  countryId: number
-  address: string
+  contact?: string | null
+  email?: string | null
+  countryId?: number | null
+  address?: string | null
   remarks?: string | null
   isActive?: boolean
   country?: CountrySummary | null

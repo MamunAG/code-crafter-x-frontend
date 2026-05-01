@@ -73,10 +73,13 @@ const BUYER_FIELD_ORDER: BuyerFieldName[] = [
 const buyerFormSchema = z.object({
   name: z.string().trim().min(1, "Buyer name is required."),
   displayName: z.string().trim().min(1, "Buyer display name is required."),
-  contact: z.string().trim().min(1, "Buyer contact is required."),
-  email: z.string().trim().email("Please enter a valid email address."),
-  countryId: z.string().trim().min(1, "Country is required."),
-  address: z.string().trim().min(1, "Buyer address is required."),
+  contact: z.string().trim(),
+  email: z.string().trim().refine(
+    (value) => value === "" || z.string().email().safeParse(value).success,
+    "Please enter a valid email address.",
+  ),
+  countryId: z.string().trim(),
+  address: z.string().trim(),
   remarks: z.string().trim().max(500, "Remarks must be 500 characters or fewer."),
   isActive: z.boolean(),
 })
@@ -288,7 +291,6 @@ export function BuyerFormDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           placeholder="Input buyer name"
-                          required
                           aria-invalid={Boolean(errors.name)}
                         />
                         <FieldErrorMessage message={getErrorMessage(errors.name?.message)} />
@@ -312,7 +314,6 @@ export function BuyerFormDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           placeholder="Input buyer display name"
-                          required
                           aria-invalid={Boolean(errors.displayName)}
                         />
                         <FieldErrorMessage message={getErrorMessage(errors.displayName?.message)} />
@@ -327,7 +328,7 @@ export function BuyerFormDialog({
                       render={({ field }) => (
                         <div id="buyer-field-contact" className="space-y-2">
                           <label htmlFor={field.name} className="text-sm font-medium">
-                            Buyer contact <span className="text-destructive">*</span>
+                            Buyer contact
                           </label>
                           <Input
                             {...field}
@@ -337,7 +338,6 @@ export function BuyerFormDialog({
                             onChange={field.onChange}
                             onBlur={field.onBlur}
                             placeholder="Input buyer contact"
-                            required
                             aria-invalid={Boolean(errors.contact)}
                           />
                           <FieldErrorMessage message={getErrorMessage(errors.contact?.message)} />
@@ -351,7 +351,7 @@ export function BuyerFormDialog({
                       render={({ field }) => (
                         <div id="buyer-field-email" className="space-y-2">
                           <label htmlFor={field.name} className="text-sm font-medium">
-                            Buyer email <span className="text-destructive">*</span>
+                            Buyer email
                           </label>
                           <Input
                             {...field}
@@ -362,7 +362,6 @@ export function BuyerFormDialog({
                             onBlur={field.onBlur}
                             type="email"
                             placeholder="buyer@example.com"
-                            required
                             aria-invalid={Boolean(errors.email)}
                           />
                           <FieldErrorMessage message={getErrorMessage(errors.email?.message)} />
@@ -377,7 +376,7 @@ export function BuyerFormDialog({
                     render={({ field }) => (
                       <div id="buyer-field-countryId" className="space-y-2">
                         <label htmlFor="buyer-country-combobox" className="text-sm font-medium">
-                          Country <span className="text-destructive">*</span>
+                          Country
                         </label>
                         <AppCombobox
                           open={countryComboboxOpen}
@@ -422,7 +421,7 @@ export function BuyerFormDialog({
                     render={({ field }) => (
                       <div id="buyer-field-address" className="space-y-2">
                         <label htmlFor={field.name} className="text-sm font-medium">
-                          Buyer address <span className="text-destructive">*</span>
+                          Buyer address
                         </label>
                         <Textarea
                           {...field}
@@ -432,7 +431,6 @@ export function BuyerFormDialog({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           placeholder="Input buyer address"
-                          required
                           rows={4}
                           aria-invalid={Boolean(errors.address)}
                         />

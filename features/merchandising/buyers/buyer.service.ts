@@ -79,6 +79,29 @@ function appendFilterParams(url: URL, filters: Partial<BuyerFilterValues>) {
   if (remarks) url.searchParams.set("remarks", remarks)
 }
 
+function optionalString(value: string) {
+  const trimmedValue = value.trim()
+  return trimmedValue || null
+}
+
+function optionalNumber(value: string) {
+  const trimmedValue = value.trim()
+  return trimmedValue ? Number(trimmedValue) : null
+}
+
+function buildBuyerPayload(payload: BuyerFormValues) {
+  return {
+    name: payload.name.trim(),
+    displayName: payload.displayName.trim(),
+    contact: optionalString(payload.contact),
+    email: optionalString(payload.email),
+    countryId: optionalNumber(payload.countryId),
+    address: optionalString(payload.address),
+    remarks: optionalString(payload.remarks),
+    isActive: payload.isActive,
+  }
+}
+
 export async function fetchBuyers({
   apiUrl,
   accessToken,
@@ -161,16 +184,7 @@ export async function createBuyer({
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/buyer"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify({
-      name: payload.name.trim(),
-      displayName: payload.displayName.trim(),
-      contact: payload.contact.trim(),
-      email: payload.email.trim(),
-      countryId: Number(payload.countryId),
-      address: payload.address.trim(),
-      remarks: payload.remarks.trim(),
-      isActive: payload.isActive,
-    }),
+    body: JSON.stringify(buildBuyerPayload(payload)),
   })
 
   const payloadData = await readJsonResponse<BuyerRecord>(response)
@@ -256,16 +270,7 @@ export async function updateBuyer({
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/buyer/${id}`), {
     method: "PATCH",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify({
-      name: payload.name.trim(),
-      displayName: payload.displayName.trim(),
-      contact: payload.contact.trim(),
-      email: payload.email.trim(),
-      countryId: Number(payload.countryId),
-      address: payload.address.trim(),
-      remarks: payload.remarks.trim(),
-      isActive: payload.isActive,
-    }),
+    body: JSON.stringify(buildBuyerPayload(payload)),
   })
 
   const payloadData = await readJsonResponse<BuyerRecord>(response)

@@ -74,7 +74,7 @@ export function AppCombobox<T extends AppComboboxOption>({
   onValueChange,
   loadItems,
   initialPage = 1,
-  initialLimit = 10,
+  initialLimit = 20,
   searchLimit = 10,
   searchDebounceMs = 250,
   placeholder = "Search...",
@@ -106,15 +106,17 @@ export function AppCombobox<T extends AppComboboxOption>({
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const initialItemsRef = useRef<T[]>(items ?? [])
+  const initialHasMoreRef = useRef(false)
   const hasLoadedInitialRef = useRef(false)
   const requestIdRef = useRef(0)
   const ignoreNextInputChangeRef = useRef(false)
   const resolvedOpen = open ?? uncontrolledOpen
   const handleOpenChange = onOpenChange ?? setUncontrolledOpen
-  const resolvedDisabled = disabled || loading || remoteLoading
+  const resolvedDisabled = disabled || loading
   const resolvedShowClear = showClear ?? Boolean(value)
   const resolvedItems = loadItems ? remoteItems : items ?? []
   const resolvedLoading = loading || remoteLoading
+  const inputElementId = inputProps?.id ?? `app-combobox-${generatedInputName}-input`
 
   const runLoad = useCallback(
     async (query: string, page: number, limit: number, replace = true) => {
@@ -138,6 +140,7 @@ export function AppCombobox<T extends AppComboboxOption>({
 
         if (!query.trim() && page === initialPage && limit === initialLimit) {
           initialItemsRef.current = nextItems
+          initialHasMoreRef.current = nextHasNextPage
           hasLoadedInitialRef.current = true
         }
 
@@ -177,6 +180,23 @@ export function AppCombobox<T extends AppComboboxOption>({
   }, [initialLimit, initialPage, loadItems, runLoad])
 
   useEffect(() => {
+    if (!resolvedOpen || resolvedDisabled) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      const inputElement = document.getElementById(inputElementId)
+
+      if (inputElement instanceof HTMLInputElement) {
+        inputElement.focus()
+        inputElement.select()
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeout)
+  }, [inputElementId, resolvedDisabled, resolvedOpen])
+
+  useEffect(() => {
     if (!loadItems) {
       return
     }
@@ -188,7 +208,7 @@ export function AppCombobox<T extends AppComboboxOption>({
         const timeout = window.setTimeout(() => {
           setRemoteItems(initialItemsRef.current)
           setRemoteError("")
-          setHasMore(false)
+          setHasMore(initialHasMoreRef.current)
           setCurrentPage(initialPage)
         }, 0)
 
@@ -282,6 +302,7 @@ export function AppCombobox<T extends AppComboboxOption>({
     >
       <ComboboxInput
         {...inputProps}
+        id={inputElementId}
         placeholder={resolvedLoading ? loadingMessage : placeholder}
         name={inputProps?.name ?? `app-combobox-${generatedInputName}`}
         autoComplete="new-password"
