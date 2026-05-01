@@ -226,7 +226,7 @@ export function CountryTableSection({
               <Input
                 id="filterCountryName"
                 value={draftFilters.name}
-                className="h-9 rounded-md px-2 text-xs"
+                className="h-7 rounded-md px-2 text-xs"
                 onChange={(event) => onDraftFiltersChange({ ...draftFilters, name: event.target.value })}
                 placeholder="Input country name"
               />

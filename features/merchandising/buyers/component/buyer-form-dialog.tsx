@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
@@ -16,10 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { AppCombobox, type AppComboboxOption } from "@/components/app-combobox"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -51,6 +51,8 @@ type ValidationSummaryEntry = {
   label: string
   message: string
 }
+
+type CountryOption = CountryRecord & AppComboboxOption
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const BUYER_FIELD_ORDER: BuyerFieldName[] = [
@@ -158,6 +160,7 @@ export function BuyerFormDialog({
   onSubmit,
 }: BuyerFormDialogProps) {
   const isMobile = useIsMobile()
+  const [countryComboboxOpen, setCountryComboboxOpen] = useState(false)
   const title = mode === "create" ? "Create buyer" : "Edit buyer"
   const description =
     mode === "create"
@@ -178,8 +181,15 @@ export function BuyerFormDialog({
     reValidateMode: "onChange",
     shouldFocusError: true,
   })
-  const selectableCountries = useMemo(
-    () => countryOptions.filter((country) => country.id != null),
+  const selectableCountries = useMemo<CountryOption[]>(
+    () =>
+      countryOptions
+        .filter((country) => country.id != null)
+        .map((country) => ({
+          ...country,
+          label: country.name ?? "",
+          value: String(country.id),
+        })),
     [countryOptions],
   )
 
@@ -378,32 +388,53 @@ export function BuyerFormDialog({
                   <Controller
                     name="countryId"
                     control={control}
-                    render={({ field }) => (
-                      <div id="buyer-field-countryId" className="space-y-2">
-                        <label htmlFor={field.name} className="text-sm font-medium">
-                          Country <span className="text-destructive">*</span>
-                        </label>
-                        <Select
-                          value={field.value || ""}
-                          onValueChange={field.onChange}
-                          disabled={countryLoading || selectableCountries.length === 0}
-                        >
-                          <SelectTrigger id={field.name} className="w-full">
-                            <SelectValue
-                              placeholder={countryLoading ? "Loading countries..." : "Select country"}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {selectableCountries.map((country) => (
-                              <SelectItem key={country.id} value={String(country.id)}>
-                                {country.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FieldErrorMessage message={getErrorMessage(errors.countryId?.message)} />
-                      </div>
-                    )}
+                    render={({ field }) => {
+                      const selectedCountry =
+                        selectableCountries.find((country) => country.value === field.value) ?? null
+
+                      return (
+                        <div id="buyer-field-countryId" className="space-y-2">
+                          <label htmlFor="buyer-country-combobox" className="text-sm font-medium">
+                            Country <span className="text-destructive">*</span>
+                          </label>
+                          <AppCombobox
+                            open={countryComboboxOpen}
+                            onOpenChange={setCountryComboboxOpen}
+                            items={selectableCountries}
+                            value={selectedCountry}
+                            onValueChange={(country) => {
+                              field.onChange(country?.value ?? "")
+                              setCountryComboboxOpen(false)
+                            }}
+                            inputProps={{
+                              id: "buyer-country-combobox",
+                              "aria-invalid": Boolean(errors.countryId),
+                            }}
+                            placeholder={
+                              selectableCountries.length > 0 ? "Search country" : "No countries available"
+                            }
+                            loading={countryLoading}
+                            loadingMessage="Loading countries..."
+                            emptyMessage={countryError || "No countries match your search."}
+                            disabled={countryLoading || selectableCountries.length === 0}
+                            showClear={Boolean(field.value)}
+                            contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]"
+                            header={
+                              <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+                                <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                                  Country
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                                  Search and select the buyer country.
+                                </p>
+                              </div>
+                            }
+                            renderItem={(country) => country.label}
+                          />
+                          <FieldErrorMessage message={getErrorMessage(errors.countryId?.message)} />
+                        </div>
+                      )
+                    }}
                   />
 
                   <Controller

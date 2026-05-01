@@ -146,9 +146,14 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
         description: "Foundational product attributes.",
         items: [
           {
-            label: "Config",
+            label: "Core",
             href: "",
             children: [
+              {
+                label: "Buyer Setup",
+                href: "/merchandising/masters/buyers",
+                permissionMenuName: "Buyer Setup",
+              },
               {
                 label: "Color Setup",
                 href: "/merchandising/masters/colors",

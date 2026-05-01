@@ -442,23 +442,32 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const response = await fetchCountries({
-          apiUrl,
-          accessToken: token,
-          page: 1,
-          limit: 1000,
-          filters: { name: "" },
-          organizationId: selectedOrganizationId || undefined,
-        })
+        const pageSize = 100
+        const countryPages: CountryRecord[] = []
+        let currentPage = 1
+        let hasNextPage = true
 
-        if (!active) {
-          return
+        while (hasNextPage) {
+          const response = await fetchCountries({
+            apiUrl,
+            accessToken: token,
+            page: currentPage,
+            limit: pageSize,
+            filters: { name: "" },
+            organizationId: selectedOrganizationId || undefined,
+          })
+
+          if (!active) {
+            return
+          }
+
+          countryPages.push(...response.items)
+          hasNextPage = response.meta.hasNextPage
+          currentPage += 1
         }
 
         setCountryOptions(
-          response.items.filter(
-            (country) => country.deleted_at == null && country.isActive !== false,
-          ),
+          countryPages.filter((country) => country.deleted_at == null && country.isActive !== false),
         )
       } catch (caughtError) {
         if (!active) {

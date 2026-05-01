@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/incompatible-library */
 "use client"
 
 import { useMemo } from "react"
@@ -199,7 +200,7 @@ export function CurrencyTableSection({
             {(["currencyName", "currencyCode", "symbol"] as const).map((field) => (
               <div key={field} className="space-y-1">
                 <label className="text-xs font-medium">{field === "currencyName" ? "Currency name" : field === "currencyCode" ? "Currency code" : "Symbol"}</label>
-                <Input value={draftFilters[field]} onChange={(e) => onDraftFiltersChange({ ...draftFilters, [field]: e.target.value })} className="h-9 rounded-md px-2 text-xs" />
+                <Input value={draftFilters[field]} onChange={(e) => onDraftFiltersChange({ ...draftFilters, [field]: e.target.value })} className="h-7 rounded-md px-2 text-xs" />
               </div>
             ))}
             <div className="flex gap-2 sm:items-end">

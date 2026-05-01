@@ -6,6 +6,7 @@ import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -15,6 +16,7 @@ import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
 import { DeletedUnitsCard } from "./component/deleted-units-card"
+import { UnitFiltersSection } from "./component/unit-filters-section"
 import { UnitFormDialog } from "./component/unit-form-dialog"
 import { UnitTableSection } from "./component/unit-table-section"
 import {
@@ -39,7 +41,7 @@ type UnitAccessRules = {
   canDelete: boolean
 }
 
-const UNIT_MENU_NAME = "Uom Setup"
+const UNIT_MENU_NAME = "Unit Setup"
 const EMPTY_ACCESS_RULES: UnitAccessRules = {
   canView: false,
   canCreate: false,
@@ -116,8 +118,6 @@ function WorkspaceSkeleton() {
               </div>
             </CardContent>
           </Card>
-
-          <Skeleton className="h-64 rounded-3xl" />
           <Skeleton className="h-[32rem] rounded-3xl" />
         </div>
       </ScrollArea>
@@ -831,56 +831,70 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
   if (!accessRules?.canView) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <EmptyState
-              title="Unit access unavailable"
-              description={accessError || "You do not have permission to view the Unit Setup menu for the selected organization."}
-              actionLabel="Retry"
-              onAction={triggerRefresh}
-            />
-          </div>
-        </ScrollArea>
+      <div className="space-y-6">
+        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  App Config
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Units
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Manage unit reference data.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
+                <RefreshCcw className="size-3.5" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <EmptyState
+          title="Unit access unavailable"
+          description={accessError || "You do not have permission to view the Unit Setup menu for the selected organization."}
+          actionLabel="Retry"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      App Config
-                    </p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                      Units
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      Create, update, soft delete, restore, and bulk import merchandising units for the selected organization.
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
-                    <RefreshCcw className="size-3.5" />
-                    Retry
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="space-y-6">
+        <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  App Config
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Units
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Manage unit reference data.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
+                <RefreshCcw className="size-3.5" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-            <EmptyState
-              title="Unable to load units"
-              description={error}
-              actionLabel="Try again"
-              onAction={triggerRefresh}
-            />
-          </div>
-        </ScrollArea>
+        <EmptyState
+          title="Unable to load units"
+          description={error}
+          actionLabel="Try again"
+          onAction={triggerRefresh}
+        />
       </div>
     )
   }
@@ -889,65 +903,52 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-          <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-3">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+          <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+            <CardContent className="p-4 sm:p-8 sm:py-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     App configuration reference data
                   </p>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
                     Units
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Create, update, soft delete, restore, and bulk import merchandising units for the selected organization.
+                    Create, review, and maintain unit records for the selected organization.
                   </p>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Badge variant="secondary" className="rounded-full px-3 py-1">
+                      Total {meta?.total ?? units.length}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Active {activeCount}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Deleted {deletedMeta?.total ?? deletedUnits.length}
+                    </Badge>
+                    {recentlyDeletedUnit ? (
+                      <Badge variant="destructive" className="rounded-full px-3 py-1">
+                        Recently deleted
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
+
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={triggerRefresh}
-                    className="rounded-xl"
-                    disabled={loadingUnits || loadingDeletedUnits}
-                  >
-                    {loadingUnits || loadingDeletedUnits ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCcw className="size-3.5" />}
+                  <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl">
+                    <RefreshCcw className="size-3.5" />
                     Refresh
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={openCreateDialog}
-                    className="rounded-xl"
-                    disabled={Boolean(!accessRules?.canCreate)}
-                  >
-                    <Plus className="size-3.5" />
-                    New unit
-                  </Button>
+                  {accessRules?.canCreate ? (
+                    <Button type="button" onClick={openCreateDialog} className="rounded-xl">
+                      <Plus className="size-3.5" />
+                      New unit
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Active units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{activeCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Total units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{meta?.total ?? units.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Deleted units</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{deletedMeta?.total ?? deletedUnits.length}</p>
-              </CardContent>
-            </Card>
-          </div>
 
           {recentlyDeletedUnit ? (
             <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
@@ -988,16 +989,21 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
             </Card>
           ) : null}
 
+          <UnitFiltersSection
+            draftFilters={draftFilters}
+            onDraftFiltersChange={setDraftFilters}
+            onActiveFiltersChange={setActiveFilters}
+            onPageChange={setPage}
+            onResetFilters={resetActiveFilters}
+          />
+
           <UnitTableSection
             units={units}
             meta={meta}
             page={page}
             limit={limit}
             loadingUnits={loadingUnits}
-            draftFilters={draftFilters}
-            activeFilters={activeFilters}
-            onDraftFiltersChange={setDraftFilters}
-            onActiveFiltersChange={setActiveFilters}
+            filtersActive={Boolean(activeFilters.name || activeFilters.shortName || activeFilters.isActive !== "all")}
             onPageChange={setPage}
             onLimitChange={setLimit}
             onCreateUnit={openCreateDialog}
