@@ -25,6 +25,7 @@ import {
   type AppComboboxLoadResult,
   type AppComboboxOption,
 } from "@/components/app-combobox"
+import { AppSelect } from "@/components/app-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,7 +44,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import type { BuyerFilterValues, BuyerRecord, CountrySummary, PaginationMeta } from "../buyer.types"
 
@@ -317,19 +317,17 @@ export function DeletedBuyersSection({
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="deletedBuyerStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
-            <Select
+            <AppSelect
+              triggerId="deletedBuyerStatus"
               value={deletedDraftFilters.isActive || ALL_STATUS_VALUE}
               onValueChange={(value) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
-            >
-              <SelectTrigger id="deletedBuyerStatus" className="h-7 w-full rounded-md px-2 text-xs">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_STATUS_VALUE}>All statuses</SelectItem>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+              placeholder="All statuses"
+              options={[
+                { value: ALL_STATUS_VALUE, label: "All statuses" },
+                { value: "true", label: "Active" },
+                { value: "false", label: "Inactive" },
+              ]}
+            />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
             <Button type="submit" className="w-full rounded-xl sm:w-auto">
