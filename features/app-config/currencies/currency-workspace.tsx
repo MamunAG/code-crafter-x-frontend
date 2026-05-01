@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Banknote, Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
@@ -18,7 +18,7 @@ import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from 
 import { CurrencyFormDialog } from "./component/currency-form-dialog"
 import { CurrencyTableSection } from "./component/currency-table-section"
 import { DeletedCurrenciesCard } from "./component/deleted-currencies-card"
-import { createCurrency, fetchCurrencies, fetchCurrency, permanentlyDeleteCurrency, restoreCurrency, softDeleteCurrency, updateCurrency } from "./currency.service"
+import { createCurrency, downloadCurrencyUploadTemplate, fetchCurrencies, fetchCurrency, permanentlyDeleteCurrency, restoreCurrency, softDeleteCurrency, updateCurrency, uploadCurrencyTemplate } from "./currency.service"
 import type { CurrencyFilterValues, CurrencyFormValues, CurrencyRecord, PaginationMeta } from "./currency.types"
 
 type CurrencyEditorMode = "create" | "edit"
@@ -152,12 +152,16 @@ function RecentlyDeletedDialog({ open, action, currency, working, onOpenChange, 
 
 export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [loadingCurrencies, setLoadingCurrencies] = useState(true)
   const [loadingDeletedCurrencies, setLoadingDeletedCurrencies] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(() => {
+    if (typeof window === "undefined") return ""
+    return readSelectedOrganizationId()
+  })
   const [accessRules, setAccessRules] = useState<CurrencyAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
@@ -183,6 +187,8 @@ export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorError, setEditorError] = useState("")
   const [editorInitialValues, setEditorInitialValues] = useState<CurrencyFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<CurrencyRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
@@ -204,7 +210,6 @@ export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    setSelectedOrganizationId(readSelectedOrganizationId())
     function handleOrganizationChange(event: Event) {
       const nextOrganizationId = event instanceof CustomEvent ? event.detail?.organizationId : readSelectedOrganizationId()
       setSelectedOrganizationId(nextOrganizationId || "")
@@ -418,6 +423,80 @@ export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
+  }
+
+  async function downloadTemplate() {
+    if (!accessRules?.canCreate || downloadingTemplate) {
+      if (!accessRules?.canCreate) {
+        toast.error("You do not have permission to download the currency template.")
+      }
+      return
+    }
+
+    setDownloadingTemplate(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const blob = await downloadCurrencyUploadTemplate({
+        apiUrl,
+        accessToken: token,
+        organizationId: selectedOrganizationId || undefined,
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "currency-upload-template.csv"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the currency template right now."
+      if (!handleAuthFailure(message)) toast.error(message)
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
+
+  async function uploadTemplate(file: File | null | undefined) {
+    if (!file || uploadingTemplate) return
+
+    if (!accessRules?.canCreate) {
+      toast.error("You do not have permission to upload currencies.")
+      return
+    }
+
+    setUploadingTemplate(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const result = await uploadCurrencyTemplate({
+        apiUrl,
+        accessToken: token,
+        file,
+        organizationId: selectedOrganizationId || undefined,
+      })
+      toast.success(`Currency upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`)
+      triggerRefresh()
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the currency template right now."
+      if (!handleAuthFailure(message)) toast.error(message)
+    } finally {
+      setUploadingTemplate(false)
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = ""
+      }
+    }
   }
 
   function requestSoftDelete(currency: CurrencyRecord) {
@@ -636,9 +715,21 @@ export function CurrencyWorkspace({ apiUrl }: { apiUrl: string }) {
             onEditCurrency={openEditDialog}
             onDeleteCurrency={requestSoftDelete}
             onResetFilters={resetActiveFilters}
+            onDownloadTemplate={downloadTemplate}
+            onUploadTemplate={() => uploadInputRef.current?.click()}
             canCreateCurrency={Boolean(accessRules?.canCreate)}
             canUpdateCurrency={Boolean(accessRules?.canUpdate)}
             canDeleteCurrency={Boolean(accessRules?.canDelete)}
+            downloadingTemplate={downloadingTemplate}
+            uploadingTemplate={uploadingTemplate}
+          />
+
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".csv,text/csv,application/vnd.ms-excel"
+            className="hidden"
+            onChange={(event) => void uploadTemplate(event.target.files?.[0])}
           />
 
           {accessRules?.canDelete ? (

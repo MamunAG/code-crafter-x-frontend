@@ -1,4 +1,4 @@
-Use the existing Color page as the blueprint. Mirror the same table, filters, popup/modal, soft-delete, and deleted-items pattern. Do not guess the structure; follow the Color page implementation.
+Use the existing Color page as the blueprint of structure and functionality. Mirror the same table, filters, popup/modal, soft-delete, and deleted-items pattern. Do not guess the structure; follow the Color page implementation.
 
 Requirements:
 
@@ -16,6 +16,11 @@ Requirements:
    - Respect create, update, delete, restore, and view permissions based on the current menu permission.
 
 4. Delete Pattern
+   - Follow the Color page soft-delete pattern.
+   - Deleted records should appear in the deleted-items view.
+   - Restore/permanent delete behavior should match the Color page if already implemented.
+
+5. Bulk Upload
    - Follow the Color page soft-delete pattern.
    - Deleted records should appear in the deleted-items view.
    - Restore/permanent delete behavior should match the Color page if already implemented.

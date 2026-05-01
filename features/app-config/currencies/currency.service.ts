@@ -74,6 +74,53 @@ export async function createCurrency({ apiUrl, accessToken, payload, organizatio
   return payloadData.data
 }
 
+export async function downloadCurrencyUploadTemplate({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/currency/template/upload"), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+  })
+
+  if (response.status === 401) throw new Error("Your session expired. Please sign in again.")
+  if (response.status === 403) throw new Error("You do not have permission to download the currency template.")
+  if (!response.ok) throw new Error("Unable to download the currency upload template right now.")
+
+  return response.blob()
+}
+
+export async function uploadCurrencyTemplate({
+  apiUrl,
+  accessToken,
+  file,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+  organizationId?: string
+}): Promise<{ inserted: number; skipped: number }> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/currency/upload"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    body: formData,
+  })
+
+  const payload = await readJsonResponse<{ inserted: number; skipped: number }>(response)
+
+  if (!payload.data) throw new Error("The currency upload completed without a summary.")
+  return payload.data
+}
+
 export async function updateCurrency({ apiUrl, accessToken, id, payload, organizationId }: { apiUrl: string; accessToken: string; id: number; payload: CurrencyFormValues; organizationId?: string }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/currency/${id}`), {
     method: "PATCH",

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Flag, MoreHorizontal, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Flag, MoreHorizontal, Search, Upload } from "lucide-react"
 import { type ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table"
 
 import { AppDataTable } from "@/components/app-data-table"
@@ -30,9 +30,13 @@ type CountryTableSectionProps = {
   onEditCountry: (countryId: number) => void
   onDeleteCountry: (country: CountryRecord) => void
   onResetFilters: () => void
+  onDownloadTemplate: () => void
+  onUploadTemplate: () => void
   canCreateCountry: boolean
   canUpdateCountry: boolean
   canDeleteCountry: boolean
+  downloadingTemplate: boolean
+  uploadingTemplate: boolean
 }
 
 function formatDate(value?: string | null) {
@@ -81,9 +85,13 @@ export function CountryTableSection({
   onEditCountry,
   onDeleteCountry,
   onResetFilters,
+  onDownloadTemplate,
+  onUploadTemplate,
   canCreateCountry,
   canUpdateCountry,
   canDeleteCountry,
+  downloadingTemplate,
+  uploadingTemplate,
 }: CountryTableSectionProps) {
   const filterCount = useMemo(() => [draftFilters.name].filter((value) => value.trim()).length, [draftFilters])
   const filtersActive = Boolean(activeFilters.name)
@@ -238,7 +246,29 @@ export function CountryTableSection({
               <CardTitle className="text-lg">Countries table</CardTitle>
               <CardDescription>{pageSummary}</CardDescription>
             </div>
-            <Badge variant="outline" className="w-fit rounded-full px-3 py-1">Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}</Badge>
+            <div className="flex items-center gap-2">
+              {canCreateCountry ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="icon-sm" className="rounded-full">
+                      <MoreHorizontal className="size-3.5" />
+                      <span className="sr-only">Open country bulk actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onSelect={onDownloadTemplate} disabled={downloadingTemplate}>
+                      <Download className="size-3.5" />
+                      Download template
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={onUploadTemplate} disabled={uploadingTemplate}>
+                      <Upload className="size-3.5" />
+                      Upload countries
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              <Badge variant="outline" className="w-fit rounded-full px-3 py-1">Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">

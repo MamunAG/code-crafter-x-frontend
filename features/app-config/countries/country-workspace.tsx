@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Download, Flag, Loader2, Plus, RefreshCcw, Trash2, Undo2, Upload } from "lucide-react"
+import { Flag, Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -161,7 +161,10 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(() => {
+    if (typeof window === "undefined") return ""
+    return readSelectedOrganizationId()
+  })
   const [accessRules, setAccessRules] = useState<CountryAccessRules | null>(null)
   const [loadingAccessRules, setLoadingAccessRules] = useState(true)
   const [accessError, setAccessError] = useState("")
@@ -210,7 +213,6 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    setSelectedOrganizationId(readSelectedOrganizationId())
     function handleOrganizationChange(event: Event) {
       const nextOrganizationId = event instanceof CustomEvent ? event.detail?.organizationId : readSelectedOrganizationId()
       setSelectedOrganizationId(nextOrganizationId || "")
@@ -672,21 +674,6 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Refresh</Button>
                   {accessRules?.canCreate ? (
                     <>
-                      <Button type="button" variant="outline" onClick={downloadTemplate} disabled={downloadingTemplate} className="rounded-xl">
-                        {downloadingTemplate ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-                        Template
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => uploadInputRef.current?.click()} disabled={uploadingTemplate} className="rounded-xl">
-                        {uploadingTemplate ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-                        Upload
-                      </Button>
-                      <input
-                        ref={uploadInputRef}
-                        type="file"
-                        accept=".csv,text/csv,application/vnd.ms-excel"
-                        className="hidden"
-                        onChange={(event) => void uploadTemplate(event.target.files?.[0])}
-                      />
                       <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New country</Button>
                     </>
                   ) : null}
@@ -728,9 +715,21 @@ export function CountryWorkspace({ apiUrl }: { apiUrl: string }) {
             onEditCountry={openEditDialog}
             onDeleteCountry={requestSoftDelete}
             onResetFilters={resetActiveFilters}
+            onDownloadTemplate={downloadTemplate}
+            onUploadTemplate={() => uploadInputRef.current?.click()}
             canCreateCountry={Boolean(accessRules?.canCreate)}
             canUpdateCountry={Boolean(accessRules?.canUpdate)}
             canDeleteCountry={Boolean(accessRules?.canDelete)}
+            downloadingTemplate={downloadingTemplate}
+            uploadingTemplate={uploadingTemplate}
+          />
+
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".csv,text/csv,application/vnd.ms-excel"
+            className="hidden"
+            onChange={(event) => void uploadTemplate(event.target.files?.[0])}
           />
 
           {accessRules?.canDelete ? (
