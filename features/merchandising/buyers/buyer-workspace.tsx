@@ -112,35 +112,102 @@ function EmptyState({
   )
 }
 
+const FILTER_SKELETONS = Array.from({ length: 6 })
+const ROW_SKELETONS = Array.from({ length: 5 })
+
+function BuyerSectionSkeleton({ deleted = false }: { deleted?: boolean }) {
+  return (
+    <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+      <CardContent className="border-b border-slate-200/70 p-4 dark:border-white/10 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-32 rounded-full" />
+            <Skeleton className="h-4 w-44 rounded-full" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-7 w-20 rounded-full" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+            {!deleted ? <Skeleton className="h-8 w-8 rounded-full" /> : null}
+          </div>
+        </div>
+      </CardContent>
+      <CardContent className="p-3 sm:p-0 sm:px-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          {FILTER_SKELETONS.slice(0, deleted ? 5 : 6).map((_, index) => (
+            <div key={index} className="min-w-0 space-y-1">
+              <Skeleton className="h-3 w-20 rounded-full" />
+              <Skeleton className="h-7 w-full rounded-md" />
+            </div>
+          ))}
+          <div className={deleted ? "flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end" : "flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6"}>
+            <Skeleton className="h-9 w-full rounded-xl sm:w-24" />
+            <Skeleton className="h-9 w-full rounded-xl sm:w-20" />
+            {!deleted ? <Skeleton className="h-9 w-full rounded-xl sm:w-28" /> : null}
+          </div>
+        </div>
+      </CardContent>
+      <CardContent className="border-t border-slate-200/70 p-0 dark:border-white/10">
+        <div className="hidden lg:block">
+          <div className="space-y-3 p-4">
+            {ROW_SKELETONS.map((_, index) => (
+              <div key={index} className="grid grid-cols-[1.4fr_1fr_1.2fr_1fr_1fr_0.6fr] items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-8 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-28 rounded-full" />
+                    <Skeleton className="h-3 w-20 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-24 rounded-full" />
+                <Skeleton className="h-3 w-32 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-24 rounded-full" />
+                  <Skeleton className="h-3 w-20 rounded-full" />
+                </div>
+                <Skeleton className="ml-auto size-8 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3 p-4 lg:hidden">
+          {ROW_SKELETONS.map((_, index) => (
+            <Skeleton key={index} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function WorkspaceSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-          <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-3">
-                  <Skeleton className="h-4 w-28 sm:w-32" />
-                  <Skeleton className="h-10 w-full max-w-64 sm:max-w-72" />
-                  <Skeleton className="h-4 w-full max-w-full sm:max-w-2xl" />
+          <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+            <CardContent className="p-4 sm:p-8 sm:py-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-48 rounded-full" />
+                  <Skeleton className="h-10 w-44 rounded-full sm:w-56" />
+                  <Skeleton className="h-4 w-full max-w-2xl rounded-full" />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                    <Skeleton className="h-7 w-24 rounded-full" />
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Skeleton className="h-10 w-full rounded-xl sm:w-28" />
-                  <Skeleton className="h-10 w-full rounded-xl sm:w-24" />
+                  <Skeleton className="h-10 w-full rounded-xl sm:w-32" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Skeleton className="h-28 rounded-3xl" />
-            <Skeleton className="h-28 rounded-3xl" />
-            <Skeleton className="h-28 rounded-3xl" />
-          </div>
-
-          <Skeleton className="h-64 rounded-3xl" />
-          <Skeleton className="h-[32rem] rounded-3xl" />
+          <BuyerSectionSkeleton />
+          <BuyerSectionSkeleton deleted />
         </div>
       </ScrollArea>
     </div>
