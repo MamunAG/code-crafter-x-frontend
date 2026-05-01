@@ -461,7 +461,7 @@ export function ActiveStylesSection({
             onActiveFiltersChange(draftFilters)
             onPageChange(1)
           }}
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2"
         >
           {/* <div className="min-w-0 space-y-1">
             <label htmlFor="filterStyleName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Style name</label>
@@ -491,15 +491,15 @@ export function ActiveStylesSection({
               initialLimit={10}
               searchLimit={10}
               inputProps={{ id: "filterStyleBuyer" }}
-              placeholder="All countries"
-              loadingMessage="Loading countries..."
-              emptyMessage="No countries match your search."
+              placeholder="All buyers"
+              loadingMessage="Loading buyers..."
+              emptyMessage="No buyers match your search."
               showClear={Boolean(draftFilters.buyerId)}
               inputClassName="h-7 rounded-md px-2 text-xs"
               contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
-          <div className="min-w-0 space-y-1">
+          {/* <div className="min-w-0 space-y-1">
             <label htmlFor="filterStyleStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
             <AppSelect
               triggerId="filterStyleStatus"
@@ -512,8 +512,8 @@ export function ActiveStylesSection({
                 { value: "false", label: "Inactive" },
               ]}
             />
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6">
+          </div> */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
             <Button type="submit" className="w-full rounded-xl sm:w-auto">
               <Search className="size-3.5" />
               Search

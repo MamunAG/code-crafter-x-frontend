@@ -16,24 +16,36 @@ import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
 import { type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
-import { fetchCountries } from "@/features/app-config/countries/country.service"
-import type { CountryRecord } from "@/features/app-config/countries/country.types"
+import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
+import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
+import { fetchColors } from "@/features/merchandising/colors/color.service"
+import { fetchSizes } from "@/features/merchandising/sizes/size.service"
+import { fetchEmbellishments } from "@/features/merchandising/embellishments/embellishment.service"
+import type {
+  BuyerSummary,
+  ColorSummary,
+  CurrencySummary,
+  EmbellishmentSummary,
+  SizeSummary,
+  StyleFilterValues,
+  StyleFormError,
+  StyleFormValues,
+  StyleRecord,
+  PaginationMeta,
+} from "./style.types"
 
 import { StyleFormDialog } from "./component/style-form-dialog"
 import { ActiveStylesSection } from "./component/active-styles-section"
 import { DeletedStylesSection } from "./component/deleted-styles-section"
 import {
   createStyle,
-  // downloadStyleUploadTemplate,
   fetchStyle,
   fetchStyles,
   permanentlyDeleteStyle,
   restoreStyle,
   softDeleteStyle,
   updateStyle,
-  // uploadStyleTemplate,
 } from "./style.service"
-import type { StyleFilterValues, StyleFormValues, StyleRecord, PaginationMeta } from "./style.types"
 
 type StyleEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -44,7 +56,11 @@ type StyleAccessRules = {
   canDelete: boolean
 }
 
-type CountryOption = CountryRecord & AppComboboxOption
+type BuyerOption = BuyerSummary & AppComboboxOption
+type CurrencyOption = CurrencySummary & AppComboboxOption
+type ColorOption = ColorSummary & AppComboboxOption
+type SizeOption = SizeSummary & AppComboboxOption
+type EmbellishmentOption = EmbellishmentSummary & AppComboboxOption
 
 const STYLE_MENU_NAME = "Style Setup"
 const EMPTY_ACCESS_RULES: StyleAccessRules = {
@@ -101,6 +117,78 @@ const ITEM_UOM_OPTIONS = [
 
 function getStyleLabel(style: StyleRecord) {
   return style.styleNo?.trim() || style.styleName?.trim()
+}
+
+function getBuyerLabel(buyer?: BuyerSummary | null, buyerId?: string | null) {
+  return (
+    buyer?.displayName?.trim() ||
+    buyer?.name?.trim() ||
+    (buyerId ? `Buyer #${buyerId}` : "No buyer")
+  )
+}
+
+function getCurrencyLabel(currency?: CurrencySummary | null, currencyId?: number | null) {
+  return (
+    currency?.currencyName?.trim() ||
+    currency?.currencyCode?.trim() ||
+    (currencyId != null ? `Currency #${currencyId}` : "No currency")
+  )
+}
+
+function toBuyerOption(buyer: BuyerSummary | null | undefined): BuyerOption | null {
+  if (buyer?.id == null) {
+    return null
+  }
+
+  return {
+    ...buyer,
+    label: buyer.displayName?.trim() || buyer.name?.trim() || `Buyer #${buyer.id}`,
+    value: String(buyer.id),
+  }
+}
+
+function toCurrencyOption(currency: CurrencySummary | null | undefined): CurrencyOption | null {
+  if (currency?.id == null) {
+    return null
+  }
+
+  return {
+    ...currency,
+    label: currency.currencyName?.trim() || currency.currencyCode?.trim() || `Currency #${currency.id}`,
+    value: String(currency.id),
+  }
+}
+
+function mapChildOption(
+  value: string | number | null | undefined,
+  label: string | null | undefined,
+): AppComboboxOption | null {
+  if (value == null) {
+    return null
+  }
+
+  return {
+    value: String(value),
+    label: label?.trim() || String(value),
+  }
+}
+
+function normalizeStyleFormErrors(values: StyleFormValues): StyleFormError[] {
+  const errors: StyleFormError[] = []
+
+  if (!values.buyerId.trim()) {
+    errors.push({ section: "basic-info", message: "Buyer is required." })
+  }
+
+  if (!values.currencyId.trim()) {
+    errors.push({ section: "basic-info", message: "Currency is required." })
+  }
+
+  if (!values.styleNo.trim()) {
+    errors.push({ section: "basic-info", message: "Style No is required." })
+  }
+
+  return errors
 }
 
 function normalizeAuthFailure(message: string) {
@@ -334,10 +422,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [loadingStyles, setLoadingStyles] = useState(true)
   const [loadingDeletedStyles, setLoadingDeletedStyles] = useState(true)
-  const [countryLoading, setCountryLoading] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
-  const [countryError, setCountryError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(() =>
     typeof window === "undefined" ? "" : readSelectedOrganizationId(),
@@ -354,8 +440,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
-  const [countryOptions, setCountryOptions] = useState<CountryRecord[]>([])
-  const [editorCountry, setEditorCountry] = useState<CountryOption | null>(null)
+  const [buyerOptions, setBuyerOptions] = useState<BuyerSummary[]>([])
 
   const [draftFilters, setDraftFilters] = useState<StyleFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<StyleFilterValues>(DEFAULT_FILTERS)
@@ -366,11 +451,11 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorMode, setEditorMode] = useState<StyleEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
-  const [editorError, setEditorError] = useState("")
-  const [editorInitialValues, setEditorInitialValues] = useState<StyleFormValues>(DEFAULT_FORM_VALUES)
+  const [editorErrors, setEditorErrors] = useState<StyleFormError[]>([])
+  const [editorValues, setEditorValues] = useState<StyleFormValues>(DEFAULT_FORM_VALUES)
+  const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null)
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [uploadingTemplate, setUploadingTemplate] = useState(false)
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<StyleRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
@@ -513,20 +598,17 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
 
     let active = true
 
-    async function loadCountries() {
+    async function loadBuyerOptionsFromApi() {
       if (loadingAccessRules) {
         return
       }
 
       if (!accessRules?.canView) {
-        setCountryOptions([])
-        setCountryError("")
-        setCountryLoading(false)
+        if (active) {
+          setBuyerOptions([])
+        }
         return
       }
-
-      setCountryLoading(true)
-      setCountryError("")
 
       try {
         const token = window.localStorage.getItem("access_token")
@@ -537,12 +619,12 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         }
 
         const pageSize = 100
-        const countryPages: CountryRecord[] = []
+        const nextBuyerOptions: BuyerSummary[] = []
         let currentPage = 1
         let hasNextPage = true
 
         while (hasNextPage) {
-          const response = await fetchCountries({
+          const response = await fetchBuyers({
             apiUrl,
             accessToken: token,
             page: currentPage,
@@ -555,14 +637,16 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
             return
           }
 
-          countryPages.push(...response.items)
+          nextBuyerOptions.push(
+            ...response.items.filter((buyer) => buyer.deleted_at == null && buyer.isActive !== false),
+          )
           hasNextPage = response.meta.hasNextPage
           currentPage += 1
         }
 
-        setCountryOptions(
-          countryPages.filter((country) => country.deleted_at == null && country.isActive !== false),
-        )
+        if (active) {
+          setBuyerOptions(nextBuyerOptions)
+        }
       } catch (caughtError) {
         if (!active) {
           return
@@ -571,33 +655,20 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         const message =
           caughtError instanceof Error
             ? caughtError.message
-            : "Unable to load style countries right now."
+            : "Unable to load style buyers right now."
 
-        if (handleAuthFailure(message)) {
-          return
-        }
-
-        setCountryError(message)
-      } finally {
-        if (active) {
-          setCountryLoading(false)
+        if (!handleAuthFailure(message)) {
+          setBuyerOptions([])
         }
       }
     }
 
-    void loadCountries()
+    void loadBuyerOptionsFromApi()
 
     return () => {
       active = false
     }
-  }, [
-    accessRules?.canView,
-    apiUrl,
-    handleAuthFailure,
-    loadingAccessRules,
-    refreshVersion,
-    selectedOrganizationId,
-  ])
+  }, [accessRules?.canView, apiUrl, handleAuthFailure, loadingAccessRules, selectedOrganizationId])
 
   const openEditDialog = useCallback(
     async (styleId: string) => {
@@ -608,11 +679,12 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
 
       setEditorMode("edit")
       setEditingId(styleId)
-      setEditorError("")
+      setEditorErrors([])
       setEditorSubmitting(false)
       setEditorLoading(true)
-      setEditorInitialValues(DEFAULT_FORM_VALUES)
-      setEditorCountry(null)
+      setEditorValues(DEFAULT_FORM_VALUES)
+      setSelectedBuyer(null)
+      setSelectedCurrency(null)
       setEditorOpen(true)
 
       try {
@@ -630,51 +702,46 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
           organizationId: selectedOrganizationId || undefined,
         })
 
-        setEditorInitialValues({
-          buyerId: record.buyer?.id ?? "",
+        const nextBuyer = toBuyerOption(record.buyer) ?? mapChildOption(record.buyerId, getBuyerLabel(record.buyer, record.buyerId))
+        const nextCurrency = toCurrencyOption(record.currency) ?? mapChildOption(record.currencyId, getCurrencyLabel(record.currency, record.currencyId))
+
+        setEditorValues({
+          buyerId: record.buyerId ?? "",
           productType: record.productType ?? "",
           styleNo: record.styleNo ?? "",
           styleName: record.styleName ?? "",
           itemType: record.itemType ?? "",
           productDepartment: record.productDepartment ?? "",
-          cmSewing: String(record.cmSewing),
-          currencyId: String(record.currency?.id) ?? "",
-          smvSewing: String(record.smvSewing),
-          smvSewingSideSeam: String(record.smvSewingSideSeam),
-          smvCutting: String(record.smvCutting),
-          smvCuttingSideSeam: String(record.smvCuttingSideSeam),
-          smvFinishing: String(record.smvFinishing),
-          imageId: String(record.imageId) ?? "",
+          cmSewing: record.cmSewing != null ? String(record.cmSewing) : "0",
+          currencyId: record.currencyId != null ? String(record.currencyId) : "",
+          smvSewing: record.smvSewing != null ? String(record.smvSewing) : "0",
+          smvSewingSideSeam: record.smvSewingSideSeam != null ? String(record.smvSewingSideSeam) : "0",
+          smvCutting: record.smvCutting != null ? String(record.smvCutting) : "0",
+          smvCuttingSideSeam: record.smvCuttingSideSeam != null ? String(record.smvCuttingSideSeam) : "0",
+          smvFinishing: record.smvFinishing != null ? String(record.smvFinishing) : "0",
+          imageId: record.imageId != null ? String(record.imageId) : "",
           remarks: record.remarks ?? "",
-          isActive: record.isActive!,
+          isActive: record.isActive !== false,
           itemUom: record.itemUom ?? "",
           productFamily: record.productFamily ?? "",
           colors: record.styleToColorMaps?.map((map) => ({
-            id: String(map.id),
-            value: String(map.colorId!),
-            label: map.color!.colorName || ''
+            id: String(map.id ?? crypto.randomUUID()),
+            value: String(map.colorId),
+            label: map.color?.colorDisplayName?.trim() || map.color?.colorName?.trim() || String(map.colorId),
           })) ?? [],
           sizes: record.styleToSizeMaps?.map((map) => ({
-            id: String(map.id),
-            value: String(map.sizeId!),
-            label: map.size!.sizeName || ''
+            id: String(map.id ?? crypto.randomUUID()),
+            value: String(map.sizeId),
+            label: map.size?.sizeName?.trim() || String(map.sizeId),
           })) ?? [],
           embellishments: record.styleToEmbellishmentMaps?.map((map) => ({
-            id: String(map.id),
-            value: String(map.embellishmentId!),
-            label: map.embellishment!.name || ''
+            id: String(map.id ?? crypto.randomUUID()),
+            value: String(map.embellishmentId),
+            label: map.embellishment?.name?.trim() || String(map.embellishmentId),
           })) ?? [],
         })
-        // if (record.country?.id != null) {
-        //   setEditorCountry({
-        //     ...record.country,
-        //     id: record.country.id,
-        //     label: record.country.name ?? "",
-        //     value: String(record.country.id),
-        //   } as CountryOption)
-        // } else {
-        //   setEditorCountry(null)
-        // }
+        setSelectedBuyer(nextBuyer)
+        setSelectedCurrency(nextCurrency)
       } catch (caughtError) {
         const message =
           caughtError instanceof Error
@@ -682,7 +749,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
             : "Unable to load the style record right now."
 
         if (!handleAuthFailure(message)) {
-          setEditorError(message)
+          setEditorErrors([{ section: "basic-info", message }])
           toast.error(message)
         }
       } finally {
@@ -692,7 +759,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
     [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId],
   )
 
-  const loadStyleCountries = useCallback(
+  const loadBuyerOptions = useCallback(
     async ({ query, page, limit }: AppComboboxLoadParams) => {
       const token = window.localStorage.getItem("access_token")
 
@@ -701,7 +768,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         throw new Error("Your session expired. Please sign in again.")
       }
 
-      const response = await fetchCountries({
+      const response = await fetchBuyers({
         apiUrl,
         accessToken: token,
         page,
@@ -712,11 +779,138 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
 
       return {
         items: response.items
-          .filter((country) => country.deleted_at == null && country.isActive !== false)
-          .map<CountryOption>((country) => ({
-            ...country,
-            label: country.name ?? "",
-            value: String(country.id),
+          .filter((buyer) => buyer.deleted_at == null && buyer.isActive !== false)
+          .map<BuyerOption>((buyer) => ({
+            ...buyer,
+            label: buyer.displayName?.trim() || buyer.name?.trim() || `Buyer #${buyer.id}`,
+            value: String(buyer.id),
+          })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadCurrencyOptions = useCallback(
+    async ({ query, page, limit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      const response = await fetchCurrencies({
+        apiUrl,
+        accessToken: token,
+        page,
+        limit,
+        filters: { currencyName: query },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items
+          .map<CurrencyOption>((currency) => ({
+            ...currency,
+            label: currency.currencyName?.trim() || currency.currencyCode?.trim() || `Currency #${currency.id}`,
+            value: String(currency.id),
+          })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadColorOptions = useCallback(
+    async ({ query, page, limit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      const response = await fetchColors({
+        apiUrl,
+        accessToken: token,
+        page,
+        limit,
+        filters: { colorName: query, colorDisplayName: query },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items
+          .filter((color) => color.deleted_at == null && color.isActive !== false)
+          .map<ColorOption>((color) => ({
+            ...color,
+            label: color.colorDisplayName?.trim() || color.colorName?.trim() || `Color #${color.id}`,
+            value: String(color.id),
+          })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadSizeOptions = useCallback(
+    async ({ query, page, limit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      const response = await fetchSizes({
+        apiUrl,
+        accessToken: token,
+        page,
+        limit,
+        filters: { sizeName: query },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items
+          .filter((size) => size.deleted_at == null && size.isActive !== false)
+          .map<SizeOption>((size) => ({
+            ...size,
+            label: size.sizeName?.trim() || `Size #${size.id}`,
+            value: String(size.id),
+          })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadEmbellishmentOptions = useCallback(
+    async ({ query, page, limit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      const response = await fetchEmbellishments({
+        apiUrl,
+        accessToken: token,
+        page,
+        limit,
+        filters: { name: query },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items
+          .filter((embellishment) => embellishment.deleted_at == null && embellishment.isActive !== "N")
+          .map<EmbellishmentOption>((embellishment) => ({
+            ...embellishment,
+            label: embellishment.name?.trim() || `Embellishment #${embellishment.id}`,
+            value: String(embellishment.id),
           })),
         hasNextPage: response.meta.hasNextPage,
       }
@@ -934,106 +1128,37 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
 
     setEditorMode("create")
     setEditingId(null)
-    setEditorError("")
-    setEditorInitialValues(DEFAULT_FORM_VALUES)
-    setEditorCountry(null)
+    setEditorErrors([])
+    setEditorValues(DEFAULT_FORM_VALUES)
+    setSelectedBuyer(null)
+    setSelectedCurrency(null)
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
   }
 
   async function downloadTemplate() {
-    if (!accessRules?.canCreate || downloadingTemplate) {
-      if (!accessRules?.canCreate) {
-        toast.error("You do not have permission to download the style template.")
-      }
+    if (!accessRules?.canCreate) {
+      toast.error("You do not have permission to use style import/export actions.")
       return
     }
 
-    setDownloadingTemplate(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const blob = await downloadStyleUploadTemplate({
-        apiUrl,
-        accessToken: token,
-        organizationId: selectedOrganizationId || undefined,
-      })
-
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = "style-upload-template.csv"
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to download the style template right now."
-
-      if (!handleAuthFailure(message)) {
-        toast.error(message)
-      }
-    } finally {
-      setDownloadingTemplate(false)
-    }
+    toast.info("Style import/export templates are not available yet.")
   }
 
   async function uploadTemplate(file: File | null | undefined) {
-    if (!file || uploadingTemplate) {
+    if (!file) {
       return
     }
 
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to upload styles.")
+      toast.error("You do not have permission to use style import/export actions.")
       return
     }
 
-    setUploadingTemplate(true)
-
-    try {
-      const token = window.localStorage.getItem("access_token")
-
-      if (!token) {
-        handleAuthFailure("Your session expired. Please sign in again.")
-        return
-      }
-
-      const result = await uploadStyleTemplate({
-        apiUrl,
-        accessToken: token,
-        file,
-        organizationId: selectedOrganizationId || undefined,
-      })
-
-      toast.success(
-        `Style upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`,
-      )
-      triggerRefresh()
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to upload the style template right now."
-
-      if (!handleAuthFailure(message)) {
-        toast.error(message)
-      }
-    } finally {
-      setUploadingTemplate(false)
-
-      if (uploadInputRef.current) {
-        uploadInputRef.current.value = ""
-      }
+    toast.info("Style import/export templates are not available yet.")
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = ""
     }
   }
 
@@ -1061,8 +1186,16 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
       return
     }
 
+    const validationErrors = normalizeStyleFormErrors(values)
+
+    if (validationErrors.length > 0) {
+      setEditorErrors(validationErrors)
+      toast.error("Please complete the required style fields.")
+      return
+    }
+
     setEditorSubmitting(true)
-    setEditorError("")
+    setEditorErrors([])
 
     try {
       const token = window.localStorage.getItem("access_token")
@@ -1092,7 +1225,9 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       setEditorOpen(false)
-      setEditorInitialValues(DEFAULT_FORM_VALUES)
+      setEditorValues(DEFAULT_FORM_VALUES)
+      setSelectedBuyer(null)
+      setSelectedCurrency(null)
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
@@ -1102,7 +1237,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
           : "Unable to save the style right now."
 
       if (!handleAuthFailure(message)) {
-        setEditorError(message)
+        setEditorErrors([{ section: "basic-info", message }])
         toast.error(message)
       }
     } finally {
@@ -1229,9 +1364,7 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
     deletedStyles.length === 0 &&
     !error &&
     !deletedError &&
-    !accessError &&
-    !countryLoading &&
-    !countryError
+    !accessError
   ) {
     return <WorkspaceSkeleton />
   }
@@ -1430,8 +1563,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
             loadingStyles={loadingStyles}
             draftFilters={draftFilters}
             activeFilters={activeFilters}
-            countryOptions={countryOptions}
-            loadCountryOptions={loadStyleCountries}
+            buyerOptions={buyerOptions}
+            loadBuyerOptions={loadBuyerOptions}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}
@@ -1445,8 +1578,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
             canCreateStyle={Boolean(accessRules?.canCreate)}
             canUpdateStyle={Boolean(accessRules?.canUpdate)}
             canDeleteStyle={Boolean(accessRules?.canDelete)}
-            downloadingTemplate={downloadingTemplate}
-            uploadingTemplate={uploadingTemplate}
+            downloadingTemplate={false}
+            uploadingTemplate={false}
           />
 
           <input
@@ -1467,8 +1600,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
               deletedError={deletedError}
               deletedDraftFilters={deletedDraftFilters}
               deletedActiveFilters={deletedActiveFilters}
-              countryOptions={countryOptions}
-              loadCountryOptions={loadStyleCountries}
+              buyerOptions={buyerOptions}
+              loadBuyerOptions={loadBuyerOptions}
               onDeletedDraftFiltersChange={setDeletedDraftFilters}
               onDeletedActiveFiltersChange={setDeletedActiveFilters}
               onDeletedPageChange={setDeletedPage}
@@ -1482,28 +1615,37 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
       </ScrollArea>
 
       <StyleFormDialog
-        key={`${editorOpen ? "open" : "closed"}-${editorMode}-${editorCountry?.value ?? "none"}`}
+        key={`${editorOpen ? "open" : "closed"}-${editorMode}-${editingId ?? "new"}`}
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
         submitting={editorSubmitting}
-        error={editorError}
-        initialCountry={editorCountry}
-        loadCountryOptions={loadStyleCountries}
-        initialValues={editorInitialValues}
+        values={editorValues}
+        errors={editorErrors}
+        selectedBuyer={selectedBuyer}
+        selectedCurrency={selectedCurrency}
+        loadBuyerOptions={loadBuyerOptions}
+        loadCurrencyOptions={loadCurrencyOptions}
+        loadColorOptions={loadColorOptions}
+        loadSizeOptions={loadSizeOptions}
+        loadEmbellishmentOptions={loadEmbellishmentOptions}
+        onBuyerOptionChange={setSelectedBuyer}
+        onCurrencyOptionChange={setSelectedCurrency}
+        onValuesChange={setEditorValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
 
           if (!open) {
-            setEditorInitialValues(DEFAULT_FORM_VALUES)
-            setEditorCountry(null)
-            setEditorError("")
+            setEditorValues(DEFAULT_FORM_VALUES)
+            setSelectedBuyer(null)
+            setSelectedCurrency(null)
+            setEditorErrors([])
             setEditorLoading(false)
             setEditorSubmitting(false)
             setEditingId(null)
           }
         }}
-        onSubmit={submitEditor}
+        onSubmit={() => void submitEditor(editorValues)}
       />
 
       <DeleteConfirmDialog

@@ -78,13 +78,13 @@ const STYLE_DIALOG_SECTIONS: Array<{
   label: string
   icon: typeof Info
 }> = [
-  { id: "basic-info", label: "Basic Info", icon: Info },
-  { id: "production-smv", label: "Production / SMV", icon: Settings },
-  { id: "colors", label: "Colors", icon: Palette },
-  { id: "sizes", label: "Sizes", icon: Ruler },
-  { id: "embellishments", label: "Embellishments", icon: Sparkles },
-  { id: "remarks-status", label: "Remarks / Status", icon: MessageSquare },
-]
+    { id: "basic-info", label: "Basic Info", icon: Info },
+    { id: "production-smv", label: "Production / SMV", icon: Settings },
+    { id: "colors", label: "Colors", icon: Palette },
+    { id: "sizes", label: "Sizes", icon: Ruler },
+    { id: "embellishments", label: "Embellishments", icon: Sparkles },
+    { id: "remarks-status", label: "Remarks / Status", icon: MessageSquare },
+  ]
 
 function FieldLabel({ children, required = false }: { children: ReactNode; required?: boolean }) {
   return (
@@ -699,10 +699,20 @@ export function StyleFormDialog({
 
           <div className="border-t border-slate-200/70 bg-white/80 px-3 py-3 dark:border-white/10 dark:bg-[#0a0d19]/95 sm:px-4">
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="min-h-10 w-full rounded-xl sm:min-h-0 sm:w-auto sm:rounded-md">
+              {/* <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="min-h-10 w-full rounded-xl sm:min-h-0 sm:w-auto sm:rounded-md">
+                Cancel
+              </Button> */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="rounded-xl"
+              >
                 Cancel
               </Button>
-              <Button type="button" disabled={loading || submitting} onClick={onSubmit} className="min-h-10 w-full rounded-xl sm:min-h-0 sm:w-auto sm:rounded-md">
+
+              <Button type="submit" disabled={loading || submitting} className="rounded-xl">
+                {/* <Button type="button" disabled={loading || submitting} onClick={onSubmit} className="min-h-10 w-full rounded-xl sm:min-h-0 sm:w-auto sm:rounded-md"> */}
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {mode === "create" ? "Save Style" : "Save Changes"}
               </Button>

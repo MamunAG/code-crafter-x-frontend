@@ -307,9 +307,9 @@ export function DeletedStylesSection({
               initialLimit={10}
               searchLimit={10}
               inputProps={{ id: "deletedStyleBuyer" }}
-              placeholder="All countries"
-              loadingMessage="Loading countries..."
-              emptyMessage="No countries match your search."
+              placeholder="All buyers"
+              loadingMessage="Loading buyers..."
+              emptyMessage="No buyers match your search."
               showClear={Boolean(deletedDraftFilters.buyerId)}
               inputClassName="h-7 rounded-md px-2 text-xs"
               contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
