@@ -16,7 +16,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AppCombobox, type AppComboboxOption } from "@/components/app-combobox"
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxLoadResult,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,9 +41,8 @@ type BuyerFormDialogProps = {
   loading: boolean
   submitting: boolean
   error: string
-  countryOptions: CountryRecord[]
-  countryLoading: boolean
-  countryError: string
+  initialCountry: CountryOption | null
+  loadCountryOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<CountryOption>>
   initialValues: BuyerFormValues
   onOpenChange: (open: boolean) => void
   onSubmit: (values: BuyerFormValues) => void | Promise<void>
@@ -152,15 +156,15 @@ export function BuyerFormDialog({
   loading,
   submitting,
   error,
-  countryOptions,
-  countryLoading,
-  countryError,
+  initialCountry,
+  loadCountryOptions,
   initialValues,
   onOpenChange,
   onSubmit,
 }: BuyerFormDialogProps) {
   const isMobile = useIsMobile()
   const [countryComboboxOpen, setCountryComboboxOpen] = useState(false)
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(initialCountry)
   const title = mode === "create" ? "Create buyer" : "Edit buyer"
   const description =
     mode === "create"
@@ -181,18 +185,6 @@ export function BuyerFormDialog({
     reValidateMode: "onChange",
     shouldFocusError: true,
   })
-  const selectableCountries = useMemo<CountryOption[]>(
-    () =>
-      countryOptions
-        .filter((country) => country.id != null)
-        .map((country) => ({
-          ...country,
-          label: country.name ?? "",
-          value: String(country.id),
-        })),
-    [countryOptions],
-  )
-
   useEffect(() => {
     if (!open) {
       reset(initialValues)
@@ -247,12 +239,6 @@ export function BuyerFormDialog({
             {!loading && error ? (
               <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                 {error}
-              </div>
-            ) : null}
-
-            {!loading && countryError ? (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                {countryError}
               </div>
             ) : null}
 
@@ -388,53 +374,46 @@ export function BuyerFormDialog({
                   <Controller
                     name="countryId"
                     control={control}
-                    render={({ field }) => {
-                      const selectedCountry =
-                        selectableCountries.find((country) => country.value === field.value) ?? null
-
-                      return (
-                        <div id="buyer-field-countryId" className="space-y-2">
-                          <label htmlFor="buyer-country-combobox" className="text-sm font-medium">
-                            Country <span className="text-destructive">*</span>
-                          </label>
-                          <AppCombobox
-                            open={countryComboboxOpen}
-                            onOpenChange={setCountryComboboxOpen}
-                            items={selectableCountries}
-                            value={selectedCountry}
-                            onValueChange={(country) => {
-                              field.onChange(country?.value ?? "")
-                              setCountryComboboxOpen(false)
-                            }}
-                            inputProps={{
-                              id: "buyer-country-combobox",
-                              "aria-invalid": Boolean(errors.countryId),
-                            }}
-                            placeholder={
-                              selectableCountries.length > 0 ? "Search country" : "No countries available"
-                            }
-                            loading={countryLoading}
-                            loadingMessage="Loading countries..."
-                            emptyMessage={countryError || "No countries match your search."}
-                            disabled={countryLoading || selectableCountries.length === 0}
-                            showClear={Boolean(field.value)}
-                            contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]"
-                            header={
-                              <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
-                                <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                                  Country
-                                </p>
-                                <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
-                                  Search and select the buyer country.
-                                </p>
-                              </div>
-                            }
-                            renderItem={(country) => country.label}
-                          />
-                          <FieldErrorMessage message={getErrorMessage(errors.countryId?.message)} />
-                        </div>
-                      )
-                    }}
+                    render={({ field }) => (
+                      <div id="buyer-field-countryId" className="space-y-2">
+                        <label htmlFor="buyer-country-combobox" className="text-sm font-medium">
+                          Country <span className="text-destructive">*</span>
+                        </label>
+                        <AppCombobox
+                          open={countryComboboxOpen}
+                          onOpenChange={setCountryComboboxOpen}
+                          value={selectedCountry}
+                          onValueChange={(country) => {
+                            setSelectedCountry(country)
+                            field.onChange(country?.value ?? "")
+                            setCountryComboboxOpen(false)
+                          }}
+                          loadItems={loadCountryOptions}
+                          initialLimit={10}
+                          searchLimit={10}
+                          inputProps={{
+                            id: "buyer-country-combobox",
+                            "aria-invalid": Boolean(errors.countryId),
+                          }}
+                          placeholder="Search country"
+                          loadingMessage="Loading countries..."
+                          emptyMessage="No countries match your search."
+                          showClear={Boolean(field.value)}
+                          contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.38)]"
+                          header={
+                            <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+                              <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                                Country
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                                Search and select the buyer country.
+                              </p>
+                            </div>
+                          }
+                        />
+                        <FieldErrorMessage message={getErrorMessage(errors.countryId?.message)} />
+                      </div>
+                    )}
                   />
 
                   <Controller
@@ -528,7 +507,7 @@ export function BuyerFormDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading || submitting || countryLoading} className="rounded-xl">
+              <Button type="submit" disabled={loading || submitting} className="rounded-xl">
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {mode === "create" ? "Save buyer" : "Save changes"}
               </Button>

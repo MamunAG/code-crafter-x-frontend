@@ -15,6 +15,7 @@ import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
+import { type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
 import { fetchCountries } from "@/features/app-config/countries/country.service"
 import type { CountryRecord } from "@/features/app-config/countries/country.types"
 
@@ -42,6 +43,8 @@ type BuyerAccessRules = {
   canUpdate: boolean
   canDelete: boolean
 }
+
+type CountryOption = CountryRecord & AppComboboxOption
 
 const BUYER_MENU_NAME = "Buyer Setup"
 const EMPTY_ACCESS_RULES: BuyerAccessRules = {
@@ -262,6 +265,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
   const [countryOptions, setCountryOptions] = useState<CountryRecord[]>([])
+  const [editorCountry, setEditorCountry] = useState<CountryOption | null>(null)
 
   const [draftFilters, setDraftFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<BuyerFilterValues>(DEFAULT_FILTERS)
@@ -518,6 +522,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
       setEditorSubmitting(false)
       setEditorLoading(true)
       setEditorInitialValues(DEFAULT_FORM_VALUES)
+      setEditorCountry(null)
       setEditorOpen(true)
 
       try {
@@ -545,6 +550,16 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
           remarks: record.remarks ?? "",
           isActive: record.isActive !== false,
         })
+        if (record.country?.id != null) {
+          setEditorCountry({
+            ...record.country,
+            id: record.country.id,
+            label: record.country.name ?? "",
+            value: String(record.country.id),
+          } as CountryOption)
+        } else {
+          setEditorCountry(null)
+        }
       } catch (caughtError) {
         const message =
           caughtError instanceof Error
@@ -560,6 +575,38 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
       }
     },
     [accessRules?.canUpdate, apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadBuyerCountries = useCallback(
+    async ({ query, page, limit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      const response = await fetchCountries({
+        apiUrl,
+        accessToken: token,
+        page,
+        limit,
+        filters: { name: query },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items
+          .filter((country) => country.deleted_at == null && country.isActive !== false)
+          .map<CountryOption>((country) => ({
+            ...country,
+            label: country.name ?? "",
+            value: String(country.id),
+          })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
   )
 
   const openPendingActionDialog = useCallback(
@@ -775,6 +822,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditingId(null)
     setEditorError("")
     setEditorInitialValues(DEFAULT_FORM_VALUES)
+    setEditorCountry(null)
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
@@ -1068,6 +1116,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
     !error &&
     !deletedError &&
     !accessError &&
+    !countryLoading &&
     !countryError
   ) {
     return <WorkspaceSkeleton />
@@ -1317,20 +1366,21 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
       </ScrollArea>
 
       <BuyerFormDialog
+        key={`${editorOpen ? "open" : "closed"}-${editorMode}-${editorCountry?.value ?? "none"}`}
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
         submitting={editorSubmitting}
         error={editorError}
-        countryOptions={countryOptions}
-        countryLoading={countryLoading}
-        countryError={countryError}
+        initialCountry={editorCountry}
+        loadCountryOptions={loadBuyerCountries}
         initialValues={editorInitialValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
 
           if (!open) {
             setEditorInitialValues(DEFAULT_FORM_VALUES)
+            setEditorCountry(null)
             setEditorError("")
             setEditorLoading(false)
             setEditorSubmitting(false)
