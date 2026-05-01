@@ -1354,6 +1354,7 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
               deletedDraftFilters={deletedDraftFilters}
               deletedActiveFilters={deletedActiveFilters}
               countryOptions={countryOptions}
+              loadCountryOptions={loadBuyerCountries}
               onDeletedDraftFiltersChange={setDeletedDraftFilters}
               onDeletedActiveFiltersChange={setDeletedActiveFilters}
               onDeletedPageChange={setDeletedPage}

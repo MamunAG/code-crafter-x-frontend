@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 
 import {
   ChevronLeft,
@@ -18,6 +18,12 @@ import {
 } from "@tanstack/react-table"
 
 import { AppDataTable } from "@/components/app-data-table"
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxLoadResult,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,10 +46,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import type { BuyerFilterValues, BuyerRecord, CountrySummary, PaginationMeta } from "../buyer.types"
 
-const ALL_COUNTRY_VALUE = "__all_deleted_countries__"
 const ALL_STATUS_VALUE = "__all_deleted_statuses__"
 
 type DeletedBuyerActionMode = "restore" | "permanent"
+type CountryFilterOption = CountrySummary & AppComboboxOption
 
 type DeletedBuyersCardProps = {
   deletedBuyers: BuyerRecord[]
@@ -55,6 +61,7 @@ type DeletedBuyersCardProps = {
   deletedDraftFilters: BuyerFilterValues
   deletedActiveFilters: BuyerFilterValues
   countryOptions: CountrySummary[]
+  loadCountryOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<CountryFilterOption>>
   onDeletedDraftFiltersChange: (nextValues: BuyerFilterValues) => void
   onDeletedActiveFiltersChange: (nextValues: BuyerFilterValues) => void
   onDeletedPageChange: (nextPage: number) => void
@@ -101,6 +108,7 @@ export function DeletedBuyersCard({
   deletedDraftFilters,
   deletedActiveFilters,
   countryOptions,
+  loadCountryOptions,
   onDeletedDraftFiltersChange,
   onDeletedActiveFiltersChange,
   onDeletedPageChange,
@@ -109,10 +117,26 @@ export function DeletedBuyersCard({
   canRestoreBuyer,
   canPermanentlyDeleteBuyer,
 }: DeletedBuyersCardProps) {
+  const [selectedFilterCountry, setSelectedFilterCountry] = useState<CountryFilterOption | null>(null)
   const selectableCountries = useMemo(
-    () => countryOptions.filter((country) => country.id != null),
+    () =>
+      countryOptions
+        .filter((country) => country.id != null)
+        .map<CountryFilterOption>((country) => ({
+          ...country,
+          label: country.name ?? "",
+          value: String(country.id),
+        })),
     [countryOptions],
   )
+  const derivedFilterCountry = useMemo(
+    () => selectableCountries.find((country) => country.value === deletedDraftFilters.countryId) ?? null,
+    [deletedDraftFilters.countryId, selectableCountries],
+  )
+  const filterCountryValue =
+    deletedDraftFilters.countryId && selectedFilterCountry?.value === deletedDraftFilters.countryId
+      ? selectedFilterCountry
+      : derivedFilterCountry
 
   const deletedPageSummary = useMemo(() => {
     if (!deletedMeta || deletedMeta.total === 0) {
@@ -233,58 +257,65 @@ export function DeletedBuyersCard({
 
   return (
     <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-      <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <CardHeader className="border-b border-slate-200/70 py-0 dark:border-white/10">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-lg">Deleted buyers</CardTitle>
-            <CardDescription>Restore old soft deleted buyers or remove them permanently.</CardDescription>
+            <CardTitle className="text-base">Filters</CardTitle>
+            <CardDescription className="text-xs">Search deleted buyers by name, display name, email, country, or status.</CardDescription>
           </div>
-          <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
-            {deletedMeta?.total ?? deletedBuyers.length} deleted
+          <Badge variant="outline" className="w-fit rounded-full px-2.5 py-0.5 text-[11px]">
+            {deletedFilterCount} active filter{deletedFilterCount === 1 ? "" : "s"}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="border-b border-slate-200/70 p-4 dark:border-white/10">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="space-y-1">
+      <CardContent className="p-3 sm:p-0 sm:px-2">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            onDeletedActiveFiltersChange(deletedDraftFilters)
+            onDeletedPageChange(1)
+          }}
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
+        >
+            <div className="min-w-0 space-y-1">
               <label htmlFor="deletedBuyerName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Buyer name</label>
-              <Input id="deletedBuyerName" value={deletedDraftFilters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, name: event.target.value })} placeholder="Input buyer name" />
+              <Input id="deletedBuyerName" value={deletedDraftFilters.name} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, name: event.target.value })} placeholder="Input buyer name" />
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="deletedBuyerDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-              <Input id="deletedBuyerDisplayName" value={deletedDraftFilters.displayName} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, displayName: event.target.value })} placeholder="Input display name" />
+              <Input id="deletedBuyerDisplayName" value={deletedDraftFilters.displayName} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, displayName: event.target.value })} placeholder="Input display name" />
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="deletedBuyerEmail" className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</label>
-              <Input id="deletedBuyerEmail" value={deletedDraftFilters.email} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, email: event.target.value })} placeholder="Input email" />
+              <Input id="deletedBuyerEmail" value={deletedDraftFilters.email} className="h-9 rounded-md px-2 text-xs" onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, email: event.target.value })} placeholder="Input email" />
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="deletedBuyerCountry" className="text-xs font-medium text-slate-700 dark:text-slate-300">Country</label>
-              <Select
-                value={deletedDraftFilters.countryId || ALL_COUNTRY_VALUE}
-                onValueChange={(value) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, countryId: value === ALL_COUNTRY_VALUE ? "" : value })}
-              >
-                <SelectTrigger id="deletedBuyerCountry" className="h-7 w-full rounded-md px-2 text-xs">
-                  <SelectValue placeholder="All countries" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_COUNTRY_VALUE}>All countries</SelectItem>
-                  {selectableCountries.map((country) => (
-                    <SelectItem key={country.id ?? country.name ?? "country"} value={String(country.id)}>
-                      {country.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AppCombobox
+                value={filterCountryValue}
+                onValueChange={(country) => {
+                  setSelectedFilterCountry(country)
+                  onDeletedDraftFiltersChange({ ...deletedDraftFilters, countryId: country?.value ?? "" })
+                }}
+                loadItems={loadCountryOptions}
+                initialLimit={10}
+                searchLimit={10}
+                inputProps={{ id: "deletedBuyerCountry" }}
+                placeholder="All countries"
+                loadingMessage="Loading countries..."
+                emptyMessage="No countries match your search."
+                showClear={Boolean(deletedDraftFilters.countryId)}
+                inputClassName="h-9 rounded-md px-2 text-xs"
+                contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+              />
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="deletedBuyerStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
               <Select
                 value={deletedDraftFilters.isActive || ALL_STATUS_VALUE}
                 onValueChange={(value) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
               >
-                <SelectTrigger id="deletedBuyerStatus" className="h-7 w-full rounded-md px-2 text-xs">
+                <SelectTrigger id="deletedBuyerStatus" className="h-9 w-full rounded-md px-2 text-xs">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -294,17 +325,8 @@ export function DeletedBuyersCard({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              className="w-full rounded-xl sm:w-auto"
-              onClick={() => {
-                onDeletedActiveFiltersChange(deletedDraftFilters)
-                onDeletedPageChange(1)
-              }}
-            >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6">
+            <Button type="submit" className="w-full rounded-xl sm:w-auto">
               <Search className="size-3.5" />
               Search
             </Button>
@@ -314,6 +336,7 @@ export function DeletedBuyersCard({
               className="w-full rounded-xl sm:w-auto"
               onClick={() => {
                 const cleared = { name: "", displayName: "", contact: "", email: "", countryId: "", address: "", isActive: "", remarks: "" }
+                setSelectedFilterCountry(null)
                 onDeletedDraftFiltersChange(cleared)
                 onDeletedActiveFiltersChange(cleared)
                 onDeletedPageChange(1)
@@ -322,14 +345,21 @@ export function DeletedBuyersCard({
               Reset
             </Button>
           </div>
+        </form>
+      </CardContent>
 
-          <div className="mt-2 flex items-center justify-between">
-            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
-              {deletedFilterCount} active filter{deletedFilterCount === 1 ? "" : "s"}
-            </Badge>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{deletedPageSummary}</p>
+      <CardHeader className="border-b border-slate-200/70 dark:border-white/10">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-lg">Deleted buyers</CardTitle>
+            <CardDescription>{deletedPageSummary}</CardDescription>
           </div>
+          <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
+            {deletedMeta?.total ?? deletedBuyers.length} deleted
+          </Badge>
         </div>
+      </CardHeader>
+      <CardContent className="p-0">
 
         {deletedError ? (
           <div className="p-4">
