@@ -153,7 +153,7 @@ export function ActiveStylesSection({
   uploadingTemplate,
 }: StyleTableSectionProps) {
   const [selectedFilterBuyer, setSelectedFilterBuyer] = useState<BuyerFilterOption | null>(null)
-  const selectableCountries = useMemo(
+  const selectableBuyers = useMemo(
     () =>
       buyerOptions
         .filter((buyer) => buyer.id != null)
@@ -165,8 +165,8 @@ export function ActiveStylesSection({
     [buyerOptions],
   )
   const derivedFilterBuyer = useMemo(
-    () => selectableCountries.find((buyer) => buyer.value === draftFilters.buyerId) ?? null,
-    [draftFilters.buyerId, selectableCountries],
+    () => selectableBuyers.find((buyer) => buyer.value === draftFilters.buyerId) ?? null,
+    [draftFilters.buyerId, selectableBuyers],
   )
   const filterBuyerValue =
     draftFilters.buyerId && selectedFilterBuyer?.value === draftFilters.buyerId
@@ -177,20 +177,22 @@ export function ActiveStylesSection({
     () =>
       [
         draftFilters.buyerId,
+        draftFilters.styleNo,
+        draftFilters.itemType,
         draftFilters.currencyId,
         draftFilters.isActive,
         draftFilters.productType,
-        draftFilters.styleNo,
       ].filter((value) => value.trim()).length,
     [draftFilters],
   )
 
   const filtersActive = Boolean(
     activeFilters.buyerId ||
+    activeFilters.styleNo ||
+    activeFilters.itemType ||
     activeFilters.currencyId ||
     activeFilters.isActive ||
-    activeFilters.productType ||
-    activeFilters.styleNo
+    activeFilters.productType
   )
 
   const pageSummary = useMemo(() => {
@@ -202,7 +204,6 @@ export function ActiveStylesSection({
 
   const columns = useMemo<ColumnDef<StyleRecord>[]>(
     () => [
-      // STYLE INFO
       {
         id: "style",
         header: "Style",
@@ -223,8 +224,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // BUYER
       {
         id: "buyer",
         header: "Buyer",
@@ -237,8 +236,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // ITEM TYPE
       {
         id: "itemType",
         header: "Item Type",
@@ -246,8 +243,6 @@ export function ActiveStylesSection({
           <span className="text-xs">{row.original.itemType ?? "-"}</span>
         ),
       },
-
-      // DEPARTMENT
       {
         id: "department",
         header: "Department",
@@ -255,8 +250,6 @@ export function ActiveStylesSection({
           <span className="text-xs">{row.original.productDepartment ?? "-"}</span>
         ),
       },
-
-      // UOM
       {
         id: "uom",
         header: "UOM",
@@ -264,8 +257,6 @@ export function ActiveStylesSection({
           <span className="text-xs">{row.original.itemUom ?? "-"}</span>
         ),
       },
-
-      // COST (CM)
       {
         id: "cm",
         header: "CM Sewing",
@@ -275,8 +266,6 @@ export function ActiveStylesSection({
           </span>
         ),
       },
-
-      // CURRENCY
       {
         id: "currency",
         header: "Currency",
@@ -289,8 +278,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // STATUS
       {
         id: "status",
         header: "Status",
@@ -311,8 +298,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // CREATED
       {
         id: "created",
         header: "Created",
@@ -330,8 +315,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // UPDATED
       {
         id: "updated",
         header: "Updated",
@@ -357,8 +340,6 @@ export function ActiveStylesSection({
           )
         },
       },
-
-      // ACTIONS
       {
         id: "actions",
         header: () => <span className="pr-4">Actions</span>,
@@ -437,7 +418,6 @@ export function ActiveStylesSection({
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="outline" className="rounded-full" disabled={!canCreateStyle}>
                   <MoreHorizontal className="size-2.5" />
-                  {/* Bulk actions */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
@@ -461,24 +441,8 @@ export function ActiveStylesSection({
             onActiveFiltersChange(draftFilters)
             onPageChange(1)
           }}
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
         >
-          {/* <div className="min-w-0 space-y-1">
-            <label htmlFor="filterStyleName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Style name</label>
-            <Input id="filterStyleName" value={draftFilters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, name: event.target.value })} placeholder="Input style name" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="filterStyleDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-            <Input id="filterStyleDisplayName" value={draftFilters.displayName} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, displayName: event.target.value })} placeholder="Input display name" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="filterStyleContact" className="text-xs font-medium text-slate-700 dark:text-slate-300">Contact</label>
-            <Input id="filterStyleContact" value={draftFilters.contact} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, contact: event.target.value })} placeholder="Input contact" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="filterStyleEmail" className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input id="filterStyleEmail" value={draftFilters.email} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onDraftFiltersChange({ ...draftFilters, email: event.target.value })} placeholder="Input email" />
-          </div> */}
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterStyleBuyer" className="text-xs font-medium text-slate-700 dark:text-slate-300">Buyer</label>
             <AppCombobox
@@ -499,7 +463,27 @@ export function ActiveStylesSection({
               contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
-          {/* <div className="min-w-0 space-y-1">
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterStyleNo" className="text-xs font-medium text-slate-700 dark:text-slate-300">Style No</label>
+            <Input
+              id="filterStyleNo"
+              value={draftFilters.styleNo}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDraftFiltersChange({ ...draftFilters, styleNo: event.target.value })}
+              placeholder="Input style no"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterStyleItemType" className="text-xs font-medium text-slate-700 dark:text-slate-300">Item Type</label>
+            <Input
+              id="filterStyleItemType"
+              value={draftFilters.itemType}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDraftFiltersChange({ ...draftFilters, itemType: event.target.value })}
+              placeholder="Input item type"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
             <label htmlFor="filterStyleStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
             <AppSelect
               triggerId="filterStyleStatus"
@@ -512,8 +496,8 @@ export function ActiveStylesSection({
                 { value: "false", label: "Inactive" },
               ]}
             />
-          </div> */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6">
             <Button type="submit" className="w-full rounded-xl sm:w-auto">
               <Search className="size-3.5" />
               Search
@@ -586,8 +570,6 @@ export function ActiveStylesSection({
                     </div>
 
                     <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      {/* <p>Contact: {style.contact}</p>
-                      <p>Email: {style.email}</p> */}
                       <p>Created: {formatDate(style.created_at)}</p>
                     </div>
                   </article>

@@ -119,7 +119,7 @@ export function DeletedStylesSection({
   canPermanentlyDeleteStyle,
 }: DeletedStylesCardProps) {
   const [selectedFilterBuyer, setSelectedFilterBuyer] = useState<BuyerFilterOption | null>(null)
-  const selectableCountries = useMemo(
+  const selectableBuyers = useMemo(
     () =>
       buyerOptions
         .filter((buyer) => buyer.id != null)
@@ -131,8 +131,8 @@ export function DeletedStylesSection({
     [buyerOptions],
   )
   const derivedFilterBuyer = useMemo(
-    () => selectableCountries.find((buyer) => buyer.value === deletedDraftFilters.buyerId) ?? null,
-    [deletedDraftFilters.buyerId, selectableCountries],
+    () => selectableBuyers.find((buyer) => buyer.value === deletedDraftFilters.buyerId) ?? null,
+    [deletedDraftFilters.buyerId, selectableBuyers],
   )
   const filterBuyerValue =
     deletedDraftFilters.buyerId && selectedFilterBuyer?.value === deletedDraftFilters.buyerId
@@ -153,9 +153,10 @@ export function DeletedStylesSection({
     () =>
       [
         deletedDraftFilters.buyerId,
+        deletedDraftFilters.styleNo,
+        deletedDraftFilters.itemType,
         deletedDraftFilters.currencyId,
         deletedDraftFilters.productType,
-        deletedDraftFilters.styleNo,
         deletedDraftFilters.isActive,
       ].filter((value) => value.trim()).length,
     [deletedDraftFilters],
@@ -163,9 +164,10 @@ export function DeletedStylesSection({
 
   const deletedFiltersActive = Boolean(
     deletedActiveFilters.buyerId ||
+    deletedActiveFilters.styleNo ||
+    deletedActiveFilters.itemType ||
     deletedActiveFilters.currencyId ||
     deletedActiveFilters.productType ||
-    deletedActiveFilters.styleNo ||
     deletedActiveFilters.isActive,
   )
 
@@ -181,11 +183,6 @@ export function DeletedStylesSection({
           </div>
         ),
       },
-      // {
-      //   id: "email",
-      //   header: "Email",
-      //   cell: ({ row }) => <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{row.original.email}</span>,
-      // },
       {
         id: "buyer",
         header: "Buyer",
@@ -226,11 +223,11 @@ export function DeletedStylesSection({
           return (
             <div className="pr-4 text-right">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
-                    <MoreHorizontal className="size-3.5" />
-                    <span className="sr-only">Open deleted item actions</span>
-                  </Button>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+                <MoreHorizontal className="size-3.5" />
+                <span className="sr-only">Open deleted item actions</span>
+              </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   {canRestoreStyle ? <DropdownMenuItem onSelect={() => onOpenAction(style, "restore")}>Restore style</DropdownMenuItem> : null}
@@ -316,6 +313,26 @@ export function DeletedStylesSection({
             />
           </div>
           <div className="min-w-0 space-y-1">
+            <label htmlFor="deletedStyleNo" className="text-xs font-medium text-slate-700 dark:text-slate-300">Style No</label>
+            <Input
+              id="deletedStyleNo"
+              value={deletedDraftFilters.styleNo}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, styleNo: event.target.value })}
+              placeholder="Input style no"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="deletedStyleItemType" className="text-xs font-medium text-slate-700 dark:text-slate-300">Item Type</label>
+            <Input
+              id="deletedStyleItemType"
+              value={deletedDraftFilters.itemType}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDeletedDraftFiltersChange({ ...deletedDraftFilters, itemType: event.target.value })}
+              placeholder="Input item type"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
             <label htmlFor="deletedStyleStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
             <AppSelect
               triggerId="deletedStyleStatus"
@@ -329,7 +346,7 @@ export function DeletedStylesSection({
               ]}
             />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6">
             <Button type="submit" className="w-full rounded-xl sm:w-auto">
               <Search className="size-3.5" />
               Search
@@ -339,7 +356,15 @@ export function DeletedStylesSection({
               variant="outline"
               className="w-full rounded-xl sm:w-auto"
               onClick={() => {
-                const cleared = { productType: "", buyerId: "", styleNo: "", styleName: "", currencyId: "", isActive: "" }
+                const cleared = {
+                  productType: "",
+                  buyerId: "",
+                  styleNo: "",
+                  styleName: "",
+                  itemType: "",
+                  currencyId: "",
+                  isActive: "",
+                }
                 setSelectedFilterBuyer(null)
                 onDeletedDraftFiltersChange(cleared)
                 onDeletedActiveFiltersChange(cleared)
@@ -353,7 +378,6 @@ export function DeletedStylesSection({
       </CardContent>
 
       <CardContent className="border-t border-slate-200/70 p-0 dark:border-white/10">
-
         {deletedError ? (
           <div className="p-4">
             <EmptyState title="Unable to load deleted styles" description={deletedError} />
@@ -408,15 +432,14 @@ export function DeletedStylesSection({
                         <Badge variant="outline" className="rounded-full px-3 py-1">{getBuyerLabel(style.buyer, style.buyerId)}</Badge>
                       </div>
 
-                      {/* <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                        <p>Email: {style.email}</p>
+                      <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                         <p>Deleted: {formatDate(style.deleted_at)}</p>
                         <p>
                           {getUserLabel(style.deleted_by_user, style.deleted_by_id)
                             ? `Deleted by ${getUserLabel(style.deleted_by_user, style.deleted_by_id)}`
                             : "Deleted item"}
                         </p>
-                      </div> */}
+                      </div>
                     </article>
                   ))}
                 </div>

@@ -39,11 +39,13 @@ import { ActiveStylesSection } from "./component/active-styles-section"
 import { DeletedStylesSection } from "./component/deleted-styles-section"
 import {
   createStyle,
+  downloadStyleUploadTemplate,
   fetchStyle,
   fetchStyles,
   permanentlyDeleteStyle,
   restoreStyle,
   softDeleteStyle,
+  uploadStyleTemplate,
   updateStyle,
 } from "./style.service"
 
@@ -75,6 +77,7 @@ const DEFAULT_FILTERS: StyleFilterValues = {
   buyerId: "",
   styleNo: "",
   styleName: "",
+  itemType: "",
   currencyId: "",
   isActive: "",
 }
@@ -456,6 +459,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null)
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<StyleRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
@@ -668,7 +673,14 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [accessRules?.canView, apiUrl, handleAuthFailure, loadingAccessRules, selectedOrganizationId])
+  }, [
+    accessRules?.canView,
+    apiUrl,
+    handleAuthFailure,
+    loadingAccessRules,
+    refreshVersion,
+    selectedOrganizationId,
+  ])
 
   const openEditDialog = useCallback(
     async (styleId: string) => {
@@ -1138,27 +1150,98 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   }
 
   async function downloadTemplate() {
-    if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to use style import/export actions.")
+    if (!accessRules?.canCreate || downloadingTemplate) {
+      if (!accessRules?.canCreate) {
+        toast.error("You do not have permission to download the style template.")
+      }
+
       return
     }
 
-    toast.info("Style import/export templates are not available yet.")
+    setDownloadingTemplate(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const blob = await downloadStyleUploadTemplate({
+        apiUrl,
+        accessToken: token,
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "style-upload-template.csv"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to download the style template right now."
+
+      if (!handleAuthFailure(message)) {
+        toast.error(message)
+      }
+    } finally {
+      setDownloadingTemplate(false)
+    }
   }
 
   async function uploadTemplate(file: File | null | undefined) {
-    if (!file) {
+    if (!file || uploadingTemplate) {
       return
     }
 
     if (!accessRules?.canCreate) {
-      toast.error("You do not have permission to use style import/export actions.")
+      toast.error("You do not have permission to upload styles.")
       return
     }
 
-    toast.info("Style import/export templates are not available yet.")
-    if (uploadInputRef.current) {
-      uploadInputRef.current.value = ""
+    setUploadingTemplate(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const result = await uploadStyleTemplate({
+        apiUrl,
+        accessToken: token,
+        file,
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      toast.success(
+        `Style upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`,
+      )
+      triggerRefresh()
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to upload the style template right now."
+
+      if (!handleAuthFailure(message)) {
+        toast.error(message)
+      }
+    } finally {
+      setUploadingTemplate(false)
+
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = ""
+      }
     }
   }
 
@@ -1578,8 +1661,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
             canCreateStyle={Boolean(accessRules?.canCreate)}
             canUpdateStyle={Boolean(accessRules?.canUpdate)}
             canDeleteStyle={Boolean(accessRules?.canDelete)}
-            downloadingTemplate={false}
-            uploadingTemplate={false}
+            downloadingTemplate={downloadingTemplate}
+            uploadingTemplate={uploadingTemplate}
           />
 
           <input

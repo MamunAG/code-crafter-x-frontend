@@ -116,6 +116,7 @@ export type StyleFilterValues = {
   buyerId: string
   styleNo: string
   styleName: string
+  itemType: string
   currencyId: string
   isActive: string
 }

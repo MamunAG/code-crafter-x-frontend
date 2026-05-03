@@ -64,6 +64,7 @@ function appendFilterParams(url: URL, filters: Partial<StyleFilterValues>) {
   const buyerId = filters.buyerId?.trim() ?? ""
   const styleNo = filters.styleNo?.trim() ?? ""
   const styleName = filters.styleName?.trim() ?? ""
+  const itemType = filters.itemType?.trim() ?? ""
   const currencyId = filters.currencyId?.trim() ?? ""
   const isActive = filters.isActive?.trim() ?? ""
 
@@ -71,6 +72,7 @@ function appendFilterParams(url: URL, filters: Partial<StyleFilterValues>) {
   if (buyerId) url.searchParams.set("buyerId", buyerId)
   if (styleNo) url.searchParams.set("styleNo", styleNo)
   if (styleName) url.searchParams.set("styleName", styleName)
+  if (itemType) url.searchParams.set("itemType", itemType)
   if (currencyId) url.searchParams.set("currencyId", currencyId)
   if (isActive) url.searchParams.set("isActive", isActive)
 }
@@ -212,6 +214,64 @@ export async function createStyle({
   }
 
   return payloadData.data
+}
+
+export async function downloadStyleUploadTemplate({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/style/template/upload"), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+  })
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error("You do not have permission to download the style template.")
+  }
+
+  if (!response.ok) {
+    throw new Error("Unable to download the style upload template right now.")
+  }
+
+  return response.blob()
+}
+
+export async function uploadStyleTemplate({
+  apiUrl,
+  accessToken,
+  file,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+  organizationId?: string
+}): Promise<{ inserted: number; skipped: number }> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/style/upload"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    body: formData,
+  })
+
+  const payload = await readJsonResponse<{ inserted: number; skipped: number }>(response)
+
+  if (!payload.data) {
+    throw new Error("The style upload completed without a summary.")
+  }
+
+  return payload.data
 }
 
 export async function updateStyle({
