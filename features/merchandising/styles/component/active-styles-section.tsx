@@ -101,6 +101,16 @@ function styleStatusTone(style?: StyleRecord | null) {
   return style.isActive === false ? "outline" : "secondary"
 }
 
+function getStyleImageUrl(style: StyleRecord) {
+  return (
+    style.image?.thumbnail_url?.trim() ||
+    style.image?.public_url?.trim() ||
+    style.image?.file_url?.trim() ||
+    style.image?.file_path?.trim() ||
+    ""
+  )
+}
+
 function EmptyState({
   title,
   description,
@@ -209,12 +219,23 @@ export function ActiveStylesSection({
         header: "Style",
         cell: ({ row }) => {
           const s = row.original
+          const imageUrl = getStyleImageUrl(s)
           return (
             <div className="pl-4">
               <div className="flex items-center gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-white dark:text-slate-900">
-                  {(s.styleNo?.trim() || "?").charAt(0).toUpperCase()}
-                </span>
+                <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={s.styleNo || "Style image"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                      {(s.styleNo?.trim() || "?").charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold">{s.styleNo}</p>
                   <p className="truncate text-[11px] text-slate-500">{s.styleName ?? "-"}</p>
@@ -526,6 +547,7 @@ export function ActiveStylesSection({
           ) : styles.length > 0 ? (
             <div className="space-y-3 p-4">
               {styles.map((style) => {
+                const imageUrl = getStyleImageUrl(style)
                 const tone = styleStatusTone(style)
                 const label = style.deleted_at ? "Deleted" : style.isActive === false ? "Inactive" : "Active"
 
@@ -537,9 +559,19 @@ export function ActiveStylesSection({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white dark:bg-white dark:text-slate-900">
-                            {(style.styleNo?.trim() || "?").charAt(0).toUpperCase()}
-                          </span>
+                          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={style.styleNo || "Style image"}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                {(style.styleNo?.trim() || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{style.styleNo}</p>
                             <p className="truncate text-xs text-slate-500 dark:text-slate-400">{style.styleName}</p>

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
@@ -433,7 +434,13 @@ export function StyleFormDialog({
       }}
     >
       <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-slate-200/70 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#080a14] sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:max-w-7xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
-        <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] sm:max-h-[calc(100vh-2rem)] sm:min-h-[78vh]">
+        <form
+          className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] sm:max-h-[calc(100vh-2rem)] sm:min-h-[78vh]"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onSubmit()
+          }}
+        >
           <div className="grid min-h-0 lg:grid-cols-[230px_minmax(0,1fr)]">
             <aside className="hidden border-r border-slate-200/70 bg-white/55 p-3 dark:border-white/10 dark:bg-[#0a0d19]/90 lg:block">
               <nav className="space-y-2">
@@ -532,148 +539,122 @@ export function StyleFormDialog({
                       <CardHeader className="px-4 pb-2 pt-3">
                         <CardTitle className="text-sm">Basic Info</CardTitle>
                       </CardHeader>
-                      <CardContent className="grid min-w-0 gap-4 px-3 pb-3 sm:px-4 md:grid-cols-2 xl:grid-cols-4">
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel required>Style No</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.styleNo} onChange={(event) => update("styleNo", event.target.value)} placeholder="Input style no" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Style Name</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.styleName} onChange={(event) => update("styleName", event.target.value)} placeholder="Input style name" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel required>Buyer</FieldLabel>
-                          <AppCombobox
-                            open={buyerOpen}
-                            onOpenChange={setBuyerOpen}
-                            value={selectedBuyer}
-                            onValueChange={(option) => {
-                              onBuyerOptionChange(option)
-                              update("buyerId", option?.value ?? "")
-                              setBuyerOpen(false)
-                            }}
-                            loadItems={loadBuyerOptions}
-                            initialLimit={10}
-                            searchLimit={10}
-                            placeholder="Search buyer"
-                            showClear={Boolean(values.buyerId)}
-                            inputClassName={STYLE_DIALOG_INPUT_CLASS}
-                            contentClassName="rounded-lg"
-                          />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel required>Currency</FieldLabel>
-                          <AppCombobox
-                            open={currencyOpen}
-                            onOpenChange={setCurrencyOpen}
-                            value={selectedCurrency}
-                            onValueChange={(option) => {
-                              onCurrencyOptionChange(option)
-                              update("currencyId", option?.value ?? "")
-                              setCurrencyOpen(false)
-                            }}
-                            loadItems={loadCurrencyOptions}
-                            initialLimit={10}
-                            searchLimit={10}
-                            placeholder="Search currency"
-                            showClear={Boolean(values.currencyId)}
-                            inputClassName={STYLE_DIALOG_INPUT_CLASS}
-                            contentClassName="rounded-lg"
-                          />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Product Type</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productType} onChange={(event) => update("productType", event.target.value)} placeholder="Input product type" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Item Type</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.itemType} onChange={(event) => update("itemType", event.target.value)} placeholder="Input item type" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Product Department</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productDepartment} onChange={(event) => update("productDepartment", event.target.value)} placeholder="Input department" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Product Family</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productFamily} onChange={(event) => update("productFamily", event.target.value)} placeholder="Input product family" />
-                        </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Item UOM</FieldLabel>
-                          <AppSelect
-                            value={values.itemUom || "none"}
-                            onValueChange={(value) => update("itemUom", value === "none" ? "" : value)}
-                            options={ITEM_UOM_OPTIONS}
-                            triggerClassName={STYLE_DIALOG_INPUT_CLASS}
-                          />
-                        </div>
-                      </CardContent>
-                      <CardContent className="border-t border-slate-200/70 px-3 py-4 sm:px-4 dark:border-white/10">
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                          <div className="space-y-3">
+                      <CardContent className="px-3 pb-3 sm:px-4">
+                        <div className="grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(280px,360px)] xl:items-start">
+                          <div className="grid gap-4 md:grid-cols-2 xl:col-span-3 xl:grid-cols-3">
                             <div className={STYLE_DIALOG_FIELD_CLASS}>
-                              <FieldLabel>Image ID</FieldLabel>
-                              <div className="flex flex-col gap-2 sm:flex-row">
-                                <Input
-                                  className={STYLE_DIALOG_INPUT_CLASS}
-                                  value={values.imageId}
-                                  onChange={(event) => update("imageId", event.target.value)}
-                                  placeholder="Uploaded file ID"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="rounded-xl sm:w-auto"
-                                  onClick={() => imageInputRef.current?.click()}
-                                  disabled={imageUploading || loading || submitting}
-                                >
-                                  {imageUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-                                  Upload image
-                                </Button>
-                              </div>
-                              <input
-                                ref={imageInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(event) => {
-                                  void onImageUpload(event.currentTarget.files?.[0])
-                                  event.currentTarget.value = ""
+                              <FieldLabel required>Style No</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.styleNo} onChange={(event) => update("styleNo", event.target.value)} placeholder="Input style no" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Style Name</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.styleName} onChange={(event) => update("styleName", event.target.value)} placeholder="Input style name" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel required>Buyer</FieldLabel>
+                              <AppCombobox
+                                open={buyerOpen}
+                                onOpenChange={setBuyerOpen}
+                                value={selectedBuyer}
+                                onValueChange={(option) => {
+                                  onBuyerOptionChange(option)
+                                  update("buyerId", option?.value ?? "")
+                                  setBuyerOpen(false)
                                 }}
+                                loadItems={loadBuyerOptions}
+                                initialLimit={10}
+                                searchLimit={10}
+                                placeholder="Search buyer"
+                                showClear={Boolean(values.buyerId)}
+                                inputClassName={STYLE_DIALOG_INPUT_CLASS}
+                                contentClassName="rounded-lg"
                               />
                             </div>
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
-                              <p className="font-medium text-slate-800 dark:text-slate-100">Image guidance</p>
-                              <p className="mt-1 leading-6">
-                                Uploading an image stores the backend file id here automatically. Save the style to attach it to the record.
-                              </p>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel required>Currency</FieldLabel>
+                              <AppCombobox
+                                open={currencyOpen}
+                                onOpenChange={setCurrencyOpen}
+                                value={selectedCurrency}
+                                onValueChange={(option) => {
+                                  onCurrencyOptionChange(option)
+                                  update("currencyId", option?.value ?? "")
+                                  setCurrencyOpen(false)
+                                }}
+                                loadItems={loadCurrencyOptions}
+                                initialLimit={10}
+                                searchLimit={10}
+                                placeholder="Search currency"
+                                showClear={Boolean(values.currencyId)}
+                                inputClassName={STYLE_DIALOG_INPUT_CLASS}
+                                contentClassName="rounded-lg"
+                              />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Product Type</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productType} onChange={(event) => update("productType", event.target.value)} placeholder="Input product type" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Item Type</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.itemType} onChange={(event) => update("itemType", event.target.value)} placeholder="Input item type" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Product Department</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productDepartment} onChange={(event) => update("productDepartment", event.target.value)} placeholder="Input department" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Product Family</FieldLabel>
+                              <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.productFamily} onChange={(event) => update("productFamily", event.target.value)} placeholder="Input product family" />
+                            </div>
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Item UOM</FieldLabel>
+                              <AppSelect
+                                value={values.itemUom || "none"}
+                                onValueChange={(value) => update("itemUom", value === "none" ? "" : value)}
+                                options={ITEM_UOM_OPTIONS}
+                                triggerClassName={STYLE_DIALOG_INPUT_CLASS}
+                              />
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                                Uploaded preview
-                              </p>
-                              <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px]">
-                                File ID {values.imageId || "-"}
-                              </Badge>
-                            </div>
-
-                            {imagePreviewUrl ? (
-                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-950">
-                                <div className="flex items-center justify-center bg-slate-50 px-4 py-4 dark:bg-white/[0.03]">
+                          <div className="space-y-3 xl:col-start-4 xl:row-start-1 xl:row-span-3 xl:self-stretch">
+                            <div className="flex h-full min-h-24 flex-col gap-1 border rounded-md justify-between p-2">
+                              {imagePreviewUrl ? (
+                                <div className="flex flex-1 justify-center items-center">
                                   <img
                                     src={imagePreviewUrl}
                                     alt="Uploaded style preview"
-                                    className="max-h-64 w-full rounded-xl object-contain"
+                                    className="h-24 w-auto max-w-48 rounded object-contain min-h-full"
                                   />
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="flex min-h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
-                                No image uploaded yet. Use the button to add a preview.
-                              </div>
-                            )}
+                              ) : (
+                                <div className="flex flex-1 h-28 w-full items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+                                  No image uploaded yet.
+                                </div>
+                              )}
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full rounded-xl"
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={imageUploading || loading || submitting}
+                              >
+                                {imageUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                                Upload image
+                              </Button>
+                            </div>
+
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => {
+                                void onImageUpload(event.currentTarget.files?.[0])
+                                event.currentTarget.value = ""
+                              }}
+                            />
                           </div>
                         </div>
                       </CardContent>
@@ -792,7 +773,7 @@ export function StyleFormDialog({
               </Button>
             </DialogFooter>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   )
