@@ -64,6 +64,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           //   ],
           // },
           {
+            label: "Factory Setup",
+            href: "/app-config/core/factory",
+            description: "Create and manage application module entries.",
+          },
+          {
             label: "Module",
             href: "/app-config/core/module-entry",
             description: "Create and manage application module entries.",
