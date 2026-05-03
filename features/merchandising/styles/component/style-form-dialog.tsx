@@ -11,6 +11,7 @@ import {
   Settings,
   Sparkles,
   Trash2,
+  Upload,
 } from "lucide-react"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
@@ -52,6 +53,8 @@ type StyleFormDialogProps = {
   errors: StyleFormError[]
   selectedBuyer: SelectOption | null
   selectedCurrency: SelectOption | null
+  imagePreviewUrl: string
+  imageUploading: boolean
   loadBuyerOptions: (params: AppComboboxLoadParams) => Promise<{ items: SelectOption[]; hasNextPage: boolean }>
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<{ items: SelectOption[]; hasNextPage: boolean }>
   loadColorOptions: (params: AppComboboxLoadParams) => Promise<{ items: SelectOption[]; hasNextPage: boolean }>
@@ -59,6 +62,7 @@ type StyleFormDialogProps = {
   loadEmbellishmentOptions: (params: AppComboboxLoadParams) => Promise<{ items: SelectOption[]; hasNextPage: boolean }>
   onBuyerOptionChange: (option: SelectOption | null) => void
   onCurrencyOptionChange: (option: SelectOption | null) => void
+  onImageUpload: (file: File | null | undefined) => void
   onValuesChange: (values: StyleFormValues) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
@@ -334,6 +338,8 @@ export function StyleFormDialog({
   errors,
   selectedBuyer,
   selectedCurrency,
+  imagePreviewUrl,
+  imageUploading,
   loadBuyerOptions,
   loadCurrencyOptions,
   loadColorOptions,
@@ -341,6 +347,7 @@ export function StyleFormDialog({
   loadEmbellishmentOptions,
   onBuyerOptionChange,
   onCurrencyOptionChange,
+  onImageUpload,
   onValuesChange,
   onOpenChange,
   onSubmit,
@@ -349,6 +356,7 @@ export function StyleFormDialog({
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<StyleDialogSectionId>("basic-info")
   const scrollViewportRef = useRef<HTMLDivElement | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
   const sectionRefs = useRef<Record<StyleDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     "production-smv": null,
@@ -600,7 +608,53 @@ export function StyleFormDialog({
                         </div>
                         <div className={STYLE_DIALOG_FIELD_CLASS}>
                           <FieldLabel>Image ID</FieldLabel>
-                          <Input className={STYLE_DIALOG_INPUT_CLASS} value={values.imageId} onChange={(event) => update("imageId", event.target.value)} placeholder="Optional file ID" />
+                          <div className="space-y-3">
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              <Input
+                                className={STYLE_DIALOG_INPUT_CLASS}
+                                value={values.imageId}
+                                onChange={(event) => update("imageId", event.target.value)}
+                                placeholder="Uploaded file ID"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="rounded-xl sm:w-auto"
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={imageUploading || loading || submitting}
+                              >
+                                {imageUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                                Upload image
+                              </Button>
+                            </div>
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => {
+                                void onImageUpload(event.currentTarget.files?.[0])
+                                event.currentTarget.value = ""
+                              }}
+                            />
+                            {imagePreviewUrl ? (
+                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-white/10 dark:bg-white/[0.03]">
+                                <div className="flex items-center justify-between gap-3 px-1 pb-2">
+                                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Uploaded image preview</p>
+                                  <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px]">
+                                    File ID {values.imageId || "-"}
+                                  </Badge>
+                                </div>
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
+                                  <img
+                                    src={imagePreviewUrl}
+                                    alt="Uploaded style preview"
+                                    className="max-h-56 w-full object-contain"
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

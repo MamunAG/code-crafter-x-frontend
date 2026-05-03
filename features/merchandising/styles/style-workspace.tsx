@@ -45,6 +45,7 @@ import {
   permanentlyDeleteStyle,
   restoreStyle,
   softDeleteStyle,
+  uploadStyleImageFile,
   uploadStyleTemplate,
   updateStyle,
 } from "./style.service"
@@ -458,7 +459,9 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorValues, setEditorValues] = useState<StyleFormValues>(DEFAULT_FORM_VALUES)
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null)
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
@@ -697,6 +700,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
       setEditorValues(DEFAULT_FORM_VALUES)
       setSelectedBuyer(null)
       setSelectedCurrency(null)
+      setImagePreviewUrl("")
+      setImageUploading(false)
       setEditorOpen(true)
 
       try {
@@ -754,6 +759,12 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         })
         setSelectedBuyer(nextBuyer)
         setSelectedCurrency(nextCurrency)
+        setImagePreviewUrl(
+          record.image?.public_url?.trim() ||
+            record.image?.file_url?.trim() ||
+            record.image?.file_path?.trim() ||
+            "",
+        )
       } catch (caughtError) {
         const message =
           caughtError instanceof Error
@@ -1144,10 +1155,75 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorValues(DEFAULT_FORM_VALUES)
     setSelectedBuyer(null)
     setSelectedCurrency(null)
+    setImagePreviewUrl("")
+    setImageUploading(false)
     setEditorLoading(false)
     setEditorSubmitting(false)
     setEditorOpen(true)
   }
+
+  const uploadStyleImage = useCallback(
+    async (file: File | null | undefined) => {
+      if (!file) {
+        return
+      }
+
+      if (!accessRules?.canCreate && !(editorMode === "edit" && accessRules?.canUpdate)) {
+        toast.error("You do not have permission to upload style images.")
+        return
+      }
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please choose an image file.")
+        return
+      }
+
+      setImageUploading(true)
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+
+        const fileRecord = await uploadStyleImageFile({
+          apiUrl,
+          accessToken: token,
+          file,
+        })
+
+        const uploadedPreviewUrl =
+          fileRecord.public_url?.trim() ||
+          fileRecord.file_url?.trim() ||
+          fileRecord.thumbnail_url?.trim() ||
+          ""
+
+        setEditorValues((current) => ({
+          ...current,
+          imageId: String(fileRecord.file_id),
+        }))
+        setImagePreviewUrl(uploadedPreviewUrl)
+
+        toast.success(
+          `Image uploaded successfully. File ID ${fileRecord.file_id} will be saved with the style.`,
+        )
+      } catch (caughtError) {
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to upload the style image right now."
+
+        if (!handleAuthFailure(message)) {
+          toast.error(message)
+        }
+      } finally {
+        setImageUploading(false)
+      }
+    },
+    [accessRules?.canCreate, accessRules?.canUpdate, apiUrl, editorMode, handleAuthFailure],
+  )
 
   async function downloadTemplate() {
     if (!accessRules?.canCreate || downloadingTemplate) {
@@ -1311,6 +1387,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
       setEditorValues(DEFAULT_FORM_VALUES)
       setSelectedBuyer(null)
       setSelectedCurrency(null)
+      setImagePreviewUrl("")
+      setImageUploading(false)
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
@@ -1707,6 +1785,8 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         errors={editorErrors}
         selectedBuyer={selectedBuyer}
         selectedCurrency={selectedCurrency}
+        imagePreviewUrl={imagePreviewUrl}
+        imageUploading={imageUploading}
         loadBuyerOptions={loadBuyerOptions}
         loadCurrencyOptions={loadCurrencyOptions}
         loadColorOptions={loadColorOptions}
@@ -1714,17 +1794,20 @@ export function StyleWorkspace({ apiUrl }: { apiUrl: string }) {
         loadEmbellishmentOptions={loadEmbellishmentOptions}
         onBuyerOptionChange={setSelectedBuyer}
         onCurrencyOptionChange={setSelectedCurrency}
+        onImageUpload={uploadStyleImage}
         onValuesChange={setEditorValues}
         onOpenChange={(open) => {
           setEditorOpen(open)
 
           if (!open) {
-            setEditorValues(DEFAULT_FORM_VALUES)
-            setSelectedBuyer(null)
-            setSelectedCurrency(null)
-            setEditorErrors([])
-            setEditorLoading(false)
-            setEditorSubmitting(false)
+      setEditorValues(DEFAULT_FORM_VALUES)
+      setSelectedBuyer(null)
+      setSelectedCurrency(null)
+      setImagePreviewUrl("")
+      setImageUploading(false)
+      setEditorErrors([])
+      setEditorLoading(false)
+      setEditorSubmitting(false)
             setEditingId(null)
           }
         }}

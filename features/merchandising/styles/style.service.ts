@@ -6,6 +6,25 @@ import type {
   StyleRecord,
 } from "./style.types"
 
+type BackendFileRecord = {
+  success?: boolean
+  file_id: number
+  file_url: string
+  thumbnail_url?: string
+  original_name: string
+  file_name: string
+  file_size: number
+  mime_type: string
+  file_type: string
+  file_category: string
+  message?: string
+  public_url?: string
+  uploaded_by?: string
+  uploaded_at?: string
+  updated_at?: string
+  deleted_at?: string | null
+}
+
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
 }
@@ -214,6 +233,58 @@ export async function createStyle({
   }
 
   return payloadData.data
+}
+
+export async function uploadStyleImageFile({
+  apiUrl,
+  accessToken,
+  file,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+}): Promise<BackendFileRecord> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(`${apiUrl}/api/v1/files/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    body: formData,
+  })
+
+  let payload: { success?: boolean; message?: string; data?: BackendFileRecord } | null = null
+
+  try {
+    payload = (await response.json()) as { success?: boolean; message?: string; data?: BackendFileRecord }
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 413) {
+    throw new Error("The selected image is too large. Please choose a smaller image.")
+  }
+
+  if (
+    payload?.message?.toLowerCase().includes("file too large") ||
+    payload?.message?.toLowerCase().includes("payload too large") ||
+    payload?.message?.includes("LIMIT_FILE_SIZE")
+  ) {
+    throw new Error("The selected image is too large. Please choose a smaller image.")
+  }
+
+  if (!response.ok || !payload?.success || !payload.data) {
+    throw new Error(payload?.message || "Unable to save the uploaded image right now.")
+  }
+
+  return payload.data
 }
 
 export async function downloadStyleUploadTemplate({

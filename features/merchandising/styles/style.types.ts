@@ -39,6 +39,18 @@ export type CurrencySummary = {
   symbol?: string | null
 }
 
+export type FileSummary = {
+  id?: number | null
+  file_id?: number | null
+  file_name?: string | null
+  original_name?: string | null
+  file_path?: string | null
+  file_url?: string | null
+  public_url?: string | null
+  thumbnail_url?: string | null
+  mime_type?: string | null
+}
+
 export type ColorSummary = {
   id?: number | null
   colorName?: string | null
@@ -87,12 +99,13 @@ export type StyleRecord = {
   cmSewing?: number | null
   currencyId: number
   currency?: CurrencySummary | null
+  imageId?: number | null
+  image?: FileSummary | null
   smvSewing?: number | null
   smvSewingSideSeam?: number | null
   smvCutting?: number | null
   smvCuttingSideSeam?: number | null
   smvFinishing?: number | null
-  imageId?: number | null
   remarks?: string | null
   isActive?: boolean
   itemUom?: "Pcs" | "Set" | string | null
