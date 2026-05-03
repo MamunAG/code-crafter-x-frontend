@@ -69,6 +69,12 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             description: "Create and manage application module entries.",
           },
           {
+            label: "Designation Setup",
+            href: "/app-config/core/designation",
+            description: "Create and manage organization designations.",
+            permissionMenuName: "Designation Setup",
+          },
+          {
             label: "Module",
             href: "/app-config/core/module-entry",
             description: "Create and manage application module entries.",
