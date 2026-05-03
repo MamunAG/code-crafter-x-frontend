@@ -80,6 +80,16 @@ function getStatusTone(factory: FactoryRecord) {
   return factory.isActive === false ? "outline" as const : "secondary" as const
 }
 
+function getFactoryImageUrl(factory: FactoryRecord) {
+  return (
+    factory.image?.thumbnail_url?.trim() ||
+    factory.image?.public_url?.trim() ||
+    factory.image?.file_url?.trim() ||
+    factory.image?.file_path?.trim() ||
+    ""
+  )
+}
+
 function EmptyState({
   title,
   description,
@@ -155,19 +165,34 @@ export function ActiveFactorySection({
     {
       id: "factory",
       header: "Factory",
-      cell: ({ row }) => (
-        <div className="pl-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-white dark:text-slate-900">
-              {(row.original.name?.trim() || "?").charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{row.original.name}</p>
-              <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{row.original.displayName}</p>
+      cell: ({ row }) => {
+        const factory = row.original
+        const imageUrl = getFactoryImageUrl(factory)
+
+        return (
+          <div className="pl-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={factory.name || "Factory image"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                    {(factory.name?.trim() || "?").charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{factory.name}</p>
+                <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{factory.displayName}</p>
+              </div>
             </div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       id: "code",
@@ -395,17 +420,30 @@ export function ActiveFactorySection({
             </div>
           ) : data.length > 0 ? (
             <div className="space-y-3 p-4">
-              {data.map((factory) => (
-                <article
-                  key={factory.id}
-                  className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white dark:bg-white dark:text-slate-900">
-                          {(factory.name?.trim() || "?").charAt(0).toUpperCase()}
-                        </span>
+              {data.map((factory) => {
+                const imageUrl = getFactoryImageUrl(factory)
+
+                return (
+                  <article
+                    key={factory.id}
+                    className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={factory.name || "Factory image"}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                {(factory.name?.trim() || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{factory.name}</p>
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">{factory.displayName}</p>
@@ -427,21 +465,22 @@ export function ActiveFactorySection({
                           Delete factory
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                      </DropdownMenu>
+                    </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant={getStatusTone(factory)} className="rounded-full px-3 py-1">{getStatusLabel(factory)}</Badge>
-                    <Badge variant="outline" className="rounded-full px-3 py-1">{factory.code || "No code"}</Badge>
-                  </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant={getStatusTone(factory)} className="rounded-full px-3 py-1">{getStatusLabel(factory)}</Badge>
+                      <Badge variant="outline" className="rounded-full px-3 py-1">{factory.code || "No code"}</Badge>
+                    </div>
 
-                  <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                    <p>Contact: {factory.contact || "-"}</p>
-                    <p>Email: {factory.email || "-"}</p>
-                    <p>Created: {formatDate(factory.created_at)}</p>
-                  </div>
-                </article>
-              ))}
+                    <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <p>Contact: {factory.contact || "-"}</p>
+                      <p>Email: {factory.email || "-"}</p>
+                      <p>Created: {formatDate(factory.created_at)}</p>
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           ) : (
             <div className="p-4">
