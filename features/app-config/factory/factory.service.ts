@@ -6,6 +6,25 @@ import type {
     PaginatedResponse,
 } from "./factory.types"
 
+type BackendFileRecord = {
+    success?: boolean
+    file_id: number
+    file_url: string
+    thumbnail_url?: string
+    original_name: string
+    file_name: string
+    file_size: number
+    mime_type: string
+    file_type: string
+    file_category: string
+    message?: string
+    public_url?: string
+    uploaded_by?: string
+    uploaded_at?: string
+    updated_at?: string
+    deleted_at?: string | null
+}
+
 function buildApiUrl(apiUrl: string, path: string) {
     return new URL(path, apiUrl)
 }
@@ -69,6 +88,11 @@ function optionalString(value: string) {
     return trimmedValue || undefined
 }
 
+function optionalNumber(value: string) {
+    const trimmedValue = value.trim()
+    return trimmedValue ? Number(trimmedValue) : undefined
+}
+
 function buildFactoryPayload(payload: FactoryFormValues) {
     return {
         name: payload.name.trim(),
@@ -76,6 +100,7 @@ function buildFactoryPayload(payload: FactoryFormValues) {
         code: optionalString(payload.code),
         contact: optionalString(payload.contact),
         email: optionalString(payload.email),
+        imageId: optionalNumber(payload.imageId),
         address: optionalString(payload.address),
         remarks: optionalString(payload.remarks),
         isActive: payload.isActive,
@@ -173,6 +198,33 @@ export async function createFactory({
     }
 
     return payloadData.data
+}
+
+export async function uploadFactoryImageFile({
+    apiUrl,
+    accessToken,
+    file,
+}: {
+    apiUrl: string
+    accessToken: string
+    file: File
+}): Promise<BackendFileRecord> {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const response = await fetch(buildApiUrl(apiUrl, "/api/v1/files/upload"), {
+        method: "POST",
+        headers: buildRequestHeaders({ accessToken }),
+        body: formData,
+    })
+
+    const payload = await readJsonResponse<BackendFileRecord>(response)
+
+    if (!payload.data) {
+        throw new Error("The uploaded image was saved, but no file record was returned.")
+    }
+
+    return payload.data
 }
 
 export async function updateFactory({

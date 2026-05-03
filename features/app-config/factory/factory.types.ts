@@ -21,6 +21,18 @@ export type UserSummary = {
     display_name?: string | null
 }
 
+export type FileSummary = {
+    id?: number | null
+    file_id?: number | null
+    file_name?: string | null
+    original_name?: string | null
+    file_path?: string | null
+    file_url?: string | null
+    public_url?: string | null
+    thumbnail_url?: string | null
+    mime_type?: string | null
+}
+
 export type PaginatedResponse<T> = {
     items: T[]
     meta: PaginationMeta
@@ -34,6 +46,8 @@ export type FactoryRecord = {
     contact?: string | null
     email?: string | null
     organizationId?: string | null
+    imageId?: number | null
+    image?: FileSummary | null
     address?: string | null
     remarks?: string | null
     isActive?: boolean
@@ -65,6 +79,7 @@ export type FactoryFormValues = {
     code: string
     contact: string
     email: string
+    imageId: string
     address: string
     remarks: string
     isActive: boolean

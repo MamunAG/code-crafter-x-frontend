@@ -24,6 +24,7 @@ import {
     restoreFactory,
     softDeleteFactory,
     updateFactory,
+    uploadFactoryImageFile,
     uploadFactoryTemplate,
 } from "./factory.service"
 import type { FactoryFilterValues, FactoryFormValues, FactoryRecord, PaginationMeta } from "./factory.types"
@@ -47,6 +48,7 @@ const DEFAULT_FORM_VALUES: FactoryFormValues = {
     code: "",
     contact: "",
     email: "",
+    imageId: "",
     address: "",
     remarks: "",
     isActive: true,
@@ -54,6 +56,20 @@ const DEFAULT_FORM_VALUES: FactoryFormValues = {
 
 function getFactoryLabel(factory: FactoryRecord) {
     return factory.displayName?.trim() || factory.name
+}
+
+function getFactoryImagePreviewUrl(factory: FactoryRecord | null) {
+    if (!factory) {
+        return ""
+    }
+
+    return (
+        factory.image?.public_url?.trim() ||
+        factory.image?.file_url?.trim() ||
+        factory.image?.thumbnail_url?.trim() ||
+        factory.image?.file_path?.trim() ||
+        ""
+    )
 }
 
 function normalizeAuthFailure(message: string) {
@@ -217,6 +233,7 @@ function WorkspaceSkeleton() {
 export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
     const router = useRouter()
     const uploadInputRef = useRef<HTMLInputElement | null>(null)
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
 
     const [loadingFactories, setLoadingFactories] = useState(true)
     const [loadingDeletedFactories, setLoadingDeletedFactories] = useState(true)
@@ -247,6 +264,8 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
     const [editorError, setEditorError] = useState("")
     const [editorInitialValues, setEditorInitialValues] = useState<FactoryFormValues>(DEFAULT_FORM_VALUES)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [imagePreviewUrl, setImagePreviewUrl] = useState("")
+    const [imageUploading, setImageUploading] = useState(false)
     const [uploadingTemplate, setUploadingTemplate] = useState(false)
     const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
@@ -373,6 +392,7 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
         setEditorError("")
         setEditingId(null)
         setEditorInitialValues(DEFAULT_FORM_VALUES)
+        setImagePreviewUrl("")
         setEditorOpen(true)
     }
 
@@ -382,6 +402,7 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
         setEditorOpen(true)
         setEditorLoading(true)
         setEditorError("")
+        setImagePreviewUrl("")
 
         try {
             const token = window.localStorage.getItem("access_token")
@@ -402,11 +423,13 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
                 displayName: rec.displayName ?? "",
                 code: rec.code ?? "",
                 contact: rec.contact ?? "",
+                imageId: rec.imageId != null ? String(rec.imageId) : "",
                 email: rec.email ?? "",
                 address: rec.address ?? "",
                 remarks: rec.remarks ?? "",
                 isActive: rec.isActive !== false,
             })
+            setImagePreviewUrl(getFactoryImagePreviewUrl(rec))
         } catch (caughtError) {
             const message =
                 caughtError instanceof Error
@@ -465,6 +488,7 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
 
             setEditorOpen(false)
             setEditorInitialValues(DEFAULT_FORM_VALUES)
+            setImagePreviewUrl("")
             setEditingId(null)
             triggerRefresh()
         } catch (caughtError) {
@@ -481,6 +505,62 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
             setEditorSubmitting(false)
         }
     }, [apiUrl, editingId, editorMode, handleAuthFailure, selectedOrganizationId, triggerRefresh])
+
+    const uploadFactoryImage = useCallback(
+        async (file: File | null | undefined) => {
+            if (!file) {
+                return
+            }
+
+            if (!file.type.startsWith("image/")) {
+                toast.error("Please choose an image file.")
+                return
+            }
+
+            setImageUploading(true)
+
+            try {
+                const token = window.localStorage.getItem("access_token")
+
+                if (!token) {
+                    handleAuthFailure("Your session expired. Please sign in again.")
+                    return
+                }
+
+                const fileRecord = await uploadFactoryImageFile({
+                    apiUrl,
+                    accessToken: token,
+                    file,
+                })
+
+                const uploadedPreviewUrl =
+                    fileRecord.public_url?.trim() ||
+                    fileRecord.file_url?.trim() ||
+                    fileRecord.thumbnail_url?.trim() ||
+                    ""
+
+                setEditorInitialValues((current) => ({
+                    ...current,
+                    imageId: String(fileRecord.file_id),
+                }))
+                setImagePreviewUrl(uploadedPreviewUrl)
+
+                toast.success(`Factory image uploaded successfully. File ID ${fileRecord.file_id} will be saved with the factory.`)
+            } catch (caughtError) {
+                const message =
+                    caughtError instanceof Error
+                        ? caughtError.message
+                        : "Unable to upload the factory image right now."
+
+                if (!handleAuthFailure(message)) {
+                    toast.error(message)
+                }
+            } finally {
+                setImageUploading(false)
+            }
+        },
+        [apiUrl, handleAuthFailure],
+    )
 
     const downloadTemplateFile = useCallback(async () => {
         setDownloadingTemplate(true)
@@ -849,17 +929,21 @@ export function FactoryWorkspace({ apiUrl }: { apiUrl: string }) {
                 error={editorError}
                 mode={editorMode}
                 initialValues={editorInitialValues}
+                imagePreviewUrl={imagePreviewUrl}
+                imageUploading={imageUploading}
                 onOpenChange={(open) => {
                     setEditorOpen(open)
 
                     if (!open) {
                         setEditorInitialValues(DEFAULT_FORM_VALUES)
+                        setImagePreviewUrl("")
                         setEditorError("")
                         setEditorLoading(false)
                         setEditorSubmitting(false)
                         setEditingId(null)
                     }
                 }}
+                onImageUpload={uploadFactoryImage}
                 onSubmit={submitEditor}
             />
 
