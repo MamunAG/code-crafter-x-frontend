@@ -606,54 +606,74 @@ export function StyleFormDialog({
                             triggerClassName={STYLE_DIALOG_INPUT_CLASS}
                           />
                         </div>
-                        <div className={STYLE_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Image ID</FieldLabel>
+                      </CardContent>
+                      <CardContent className="border-t border-slate-200/70 px-3 py-4 sm:px-4 dark:border-white/10">
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                           <div className="space-y-3">
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                              <Input
-                                className={STYLE_DIALOG_INPUT_CLASS}
-                                value={values.imageId}
-                                onChange={(event) => update("imageId", event.target.value)}
-                                placeholder="Uploaded file ID"
+                            <div className={STYLE_DIALOG_FIELD_CLASS}>
+                              <FieldLabel>Image ID</FieldLabel>
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <Input
+                                  className={STYLE_DIALOG_INPUT_CLASS}
+                                  value={values.imageId}
+                                  onChange={(event) => update("imageId", event.target.value)}
+                                  placeholder="Uploaded file ID"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="rounded-xl sm:w-auto"
+                                  onClick={() => imageInputRef.current?.click()}
+                                  disabled={imageUploading || loading || submitting}
+                                >
+                                  {imageUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                                  Upload image
+                                </Button>
+                              </div>
+                              <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(event) => {
+                                  void onImageUpload(event.currentTarget.files?.[0])
+                                  event.currentTarget.value = ""
+                                }}
                               />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="rounded-xl sm:w-auto"
-                                onClick={() => imageInputRef.current?.click()}
-                                disabled={imageUploading || loading || submitting}
-                              >
-                                {imageUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-                                Upload image
-                              </Button>
                             </div>
-                            <input
-                              ref={imageInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => {
-                                void onImageUpload(event.currentTarget.files?.[0])
-                                event.currentTarget.value = ""
-                              }}
-                            />
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                              <p className="font-medium text-slate-800 dark:text-slate-100">Image guidance</p>
+                              <p className="mt-1 leading-6">
+                                Uploading an image stores the backend file id here automatically. Save the style to attach it to the record.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                Uploaded preview
+                              </p>
+                              <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px]">
+                                File ID {values.imageId || "-"}
+                              </Badge>
+                            </div>
+
                             {imagePreviewUrl ? (
-                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-white/10 dark:bg-white/[0.03]">
-                                <div className="flex items-center justify-between gap-3 px-1 pb-2">
-                                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Uploaded image preview</p>
-                                  <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px]">
-                                    File ID {values.imageId || "-"}
-                                  </Badge>
-                                </div>
-                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
+                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-950">
+                                <div className="flex items-center justify-center bg-slate-50 px-4 py-4 dark:bg-white/[0.03]">
                                   <img
                                     src={imagePreviewUrl}
                                     alt="Uploaded style preview"
-                                    className="max-h-56 w-full object-contain"
+                                    className="max-h-64 w-full rounded-xl object-contain"
                                   />
                                 </div>
                               </div>
-                            ) : null}
+                            ) : (
+                              <div className="flex min-h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                                No image uploaded yet. Use the button to add a preview.
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardContent>
