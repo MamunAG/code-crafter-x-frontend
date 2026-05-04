@@ -166,6 +166,12 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
               },
             ],
           },
+          {
+            label: "Employee",
+            href: "/hr-payroll/employee",
+            description: "Manage employee master data and workforce records.",
+            permissionMenuName: "Employee Setup",
+          },
         ],
       },
     ],
