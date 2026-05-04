@@ -266,6 +266,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Orders",
             href: "/merchandising/production",
             children: [
+              {
+                label: "Purchase Order",
+                href: "/merchandising/production/orders/purchase-order",
+                permissionMenuName: "Purchase Order",
+              },
               { label: "Work orders", href: "/merchandising/production/orders/work-orders" },
               { label: "Status", href: "/merchandising/production/orders/status" },
             ],
