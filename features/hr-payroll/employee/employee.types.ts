@@ -111,3 +111,18 @@ export type EmployeeFormValues = {
   remarks: string
   isActive: boolean
 }
+
+export type EmployeeUploadReport = {
+  inserted: number
+  skipped: number
+  skippedReasons?: {
+    duplicateEmployees?: string[]
+    missingRequiredRows?: number
+    invalidJoiningDateRows?: number
+  }
+  missing?: {
+    factories?: string[]
+    departments?: string[]
+    designations?: string[]
+  }
+}

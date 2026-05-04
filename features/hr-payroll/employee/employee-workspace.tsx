@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Edit3, Loader2, Plus, RefreshCcw, Trash2, Undo2, Users } from "lucide-react"
+import { Check, Edit3, Loader2, Plus, RefreshCcw, Trash2, Undo2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import type {
@@ -14,13 +14,21 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
-import { fetchFactories } from "@/features/app-config/factory/factory.service"
-import { fetchDepartments } from "@/features/app-config/departments/department.service"
-import { fetchDesignations } from "@/features/app-config/designations/designation.service"
+import { createFactory, fetchFactories } from "@/features/app-config/factory/factory.service"
+import { createDepartment, fetchDepartments } from "@/features/app-config/departments/department.service"
+import { createDesignation, fetchDesignations } from "@/features/app-config/designations/designation.service"
 import type { FactoryRecord } from "@/features/app-config/factory/factory.types"
 import type { DepartmentRecord } from "@/features/app-config/departments/department.types"
 import type { DesignationRecord } from "@/features/app-config/designations/designation.types"
@@ -33,6 +41,7 @@ import { EmployeeFormDialog } from "./component/employee-form-dialog"
 import {
   createEmployee,
   downloadEmployeeUploadTemplate,
+  EmployeeUploadReportError,
   fetchEmployee,
   fetchEmployees,
   permanentlyDeleteEmployee,
@@ -45,6 +54,7 @@ import {
 import type {
   EmployeeFilterValues,
   EmployeeFormValues,
+  EmployeeUploadReport,
   EmployeeRecord,
   PaginationMeta,
 } from "./employee.types"
@@ -61,6 +71,14 @@ type EmployeeAccessRules = {
 type LookupOption = {
   value: string
   label: string
+}
+
+type MissingSetupKind = "factory" | "department" | "designation"
+
+type MissingSetupItem = {
+  kind: MissingSetupKind
+  label: string
+  value: string
 }
 
 type FactoryOption = AppComboboxOption
@@ -166,6 +184,10 @@ function genderLabel(gender?: string | null) {
   return gender || "Not set"
 }
 
+function getMissingSetupKey(item: MissingSetupItem) {
+  return `${item.kind}:${item.value.trim().toLowerCase()}`
+}
+
 function lookupLabel(value: string, options: LookupOption[]) {
   return options.find((option) => option.value === value)?.label || "Not set"
 }
@@ -176,6 +198,30 @@ function formatDate(value?: string | null) {
   }
 
   return value
+}
+
+function buildEmployeeUploadSkippedMessage(report: EmployeeUploadReport) {
+  const duplicateEmployees = report.skippedReasons?.duplicateEmployees ?? []
+  const missingRequiredRows = report.skippedReasons?.missingRequiredRows ?? 0
+  const invalidJoiningDateRows = report.skippedReasons?.invalidJoiningDateRows ?? 0
+
+  if (duplicateEmployees.length) {
+    const sample = duplicateEmployees.slice(0, 3).join(", ")
+    const extraCount = duplicateEmployees.length - 3
+    const extraText = extraCount > 0 ? ` and ${extraCount} more` : ""
+
+    return `No employees were inserted because the employee code already exists for the selected factory: ${sample}${extraText}.`
+  }
+
+  if (missingRequiredRows > 0) {
+    return `No employees were inserted because ${missingRequiredRows} row${missingRequiredRows === 1 ? "" : "s"} missed required data. Please provide factory, employee code, and employee name.`
+  }
+
+  if (invalidJoiningDateRows > 0) {
+    return `No employees were inserted because ${invalidJoiningDateRows} row${invalidJoiningDateRows === 1 ? "" : "s"} had an invalid joining date. Please use a valid date format and upload again.`
+  }
+
+  return `No employees were inserted. ${report.skipped} row${report.skipped === 1 ? "" : "s"} skipped. Please verify the factory, department, designation, employee code, and required fields, then upload again.`
 }
 
 function EmptyState({
@@ -312,6 +358,186 @@ function RecentlyDeletedDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+function MissingUploadSetupSection({
+  title,
+  items,
+  savingKeys,
+  savedKeys,
+  errors,
+  onSave,
+}: {
+  title: string
+  items: MissingSetupItem[]
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onSave: (item: MissingSetupItem) => void
+}) {
+  if (!items.length) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">{title}</p>
+        <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
+          {items.length} missing
+        </Badge>
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => {
+          const key = getMissingSetupKey(item)
+          const saving = savingKeys.has(key)
+          const saved = savedKeys.has(key)
+          const error = errors[key]
+
+          return (
+            <div
+              key={key}
+              className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-950/40"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium text-slate-950 dark:text-slate-50">
+                      {item.value}
+                    </p>
+                    <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px]">
+                      {item.label}
+                    </Badge>
+                  </div>
+                  {error ? (
+                    <p className="mt-1 text-xs leading-5 text-destructive">{error}</p>
+                  ) : null}
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={saved ? "outline" : "default"}
+                  className="h-8 rounded-xl"
+                  disabled={saving || saved}
+                  onClick={() => onSave(item)}
+                >
+                  {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {saved ? <Check className="size-3.5" /> : null}
+                  {saved ? "Saved" : "Save"}
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function UploadReportDialog({
+  open,
+  report,
+  savingKeys,
+  savedKeys,
+  errors,
+  onOpenChange,
+  onSaveMissingSetup,
+}: {
+  open: boolean
+  report: EmployeeUploadReport | null
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onOpenChange: (open: boolean) => void
+  onSaveMissingSetup: (item: MissingSetupItem) => void
+}) {
+  const factoryItems = (report?.missing?.factories ?? []).map((value) => ({
+    kind: "factory" as const,
+    label: "Factory",
+    value,
+  }))
+  const departmentItems = (report?.missing?.departments ?? []).map((value) => ({
+    kind: "department" as const,
+    label: "Department",
+    value,
+  }))
+  const designationItems = (report?.missing?.designations ?? []).map((value) => ({
+    kind: "designation" as const,
+    label: "Designation",
+    value,
+  }))
+  const allItems = [...factoryItems, ...departmentItems, ...designationItems]
+  const missingTotal = allItems.length
+  const allItemsSaved = allItems.length > 0 && allItems.every((item) => savedKeys.has(getMissingSetupKey(item)))
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Employee upload report</DialogTitle>
+          <DialogDescription>
+            The upload was stopped because required setup data is missing. Add the missing records,
+            then upload the template again.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Inserted</p>
+              <p className="mt-1 text-xl font-semibold">{report?.inserted ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Skipped</p>
+              <p className="mt-1 text-xl font-semibold">{report?.skipped ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Missing setup</p>
+              <p className="mt-1 text-xl font-semibold">{missingTotal}</p>
+            </div>
+          </div>
+
+          <MissingUploadSetupSection
+            title="Factories to add first"
+            items={factoryItems}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+          <MissingUploadSetupSection
+            title="Departments to add first"
+            items={departmentItems}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+          <MissingUploadSetupSection
+            title="Designations to add first"
+            items={designationItems}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+
+          {allItemsSaved ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+              All missing setup records have been saved. Please upload the employee template again.
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" className="rounded-xl" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -699,6 +925,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
     typeof window === "undefined" ? "" : readSelectedOrganizationId(),
   )
   const [refreshVersion, setRefreshVersion] = useState(0)
+  const [lookupRefreshVersion, setLookupRefreshVersion] = useState(0)
 
   const [loadingEmployees, setLoadingEmployees] = useState(true)
   const [loadingDeletedEmployees, setLoadingDeletedEmployees] = useState(true)
@@ -724,6 +951,11 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
   const [imageUploading, setImageUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [uploadReport, setUploadReport] = useState<EmployeeUploadReport | null>(null)
+  const [uploadReportOpen, setUploadReportOpen] = useState(false)
+  const [savingMissingSetupKeys, setSavingMissingSetupKeys] = useState<Set<string>>(() => new Set())
+  const [savedMissingSetupKeys, setSavedMissingSetupKeys] = useState<Set<string>>(() => new Set())
+  const [missingSetupErrors, setMissingSetupErrors] = useState<Record<string, string>>({})
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<EmployeeEditorMode>("create")
@@ -784,6 +1016,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
   }, [])
 
   const triggerRefresh = useCallback(() => setRefreshVersion((current) => current + 1), [])
+  const triggerLookupRefresh = useCallback(() => setLookupRefreshVersion((current) => current + 1), [])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1004,7 +1237,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [accessRules?.canView, apiUrl, handleAuthFailure, selectedOrganizationId])
+  }, [accessRules?.canView, apiUrl, handleAuthFailure, lookupRefreshVersion, selectedOrganizationId])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1125,6 +1358,107 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorOpen(true)
   }
 
+  const resetMissingSetupSaveState = useCallback(() => {
+    setSavingMissingSetupKeys(new Set())
+    setSavedMissingSetupKeys(new Set())
+    setMissingSetupErrors({})
+  }, [])
+
+  const saveMissingSetupItem = useCallback(
+    async (item: MissingSetupItem) => {
+      const key = getMissingSetupKey(item)
+
+      if (savingMissingSetupKeys.has(key) || savedMissingSetupKeys.has(key)) {
+        return
+      }
+
+      const token = window.localStorage.getItem("access_token")
+
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      setSavingMissingSetupKeys((current) => new Set(current).add(key))
+      setMissingSetupErrors((current) => {
+        const next = { ...current }
+        delete next[key]
+        return next
+      })
+
+      try {
+        if (item.kind === "factory") {
+          await createFactory({
+            apiUrl,
+            accessToken: token,
+            organizationId: selectedOrganizationId,
+            payload: {
+              name: item.value,
+              displayName: item.value,
+              code: "",
+              contact: "",
+              email: "",
+              imageId: "",
+              address: "",
+              remarks: "",
+              isActive: true,
+            },
+          })
+        } else if (item.kind === "department") {
+          await createDepartment({
+            apiUrl,
+            accessToken: token,
+            organizationId: selectedOrganizationId,
+            payload: {
+              departmentName: item.value,
+              description: "",
+              isActive: true,
+            },
+          })
+        } else {
+          await createDesignation({
+            apiUrl,
+            accessToken: token,
+            organizationId: selectedOrganizationId,
+            payload: {
+              designationName: item.value,
+              description: "",
+              isActive: true,
+            },
+          })
+        }
+
+        setSavedMissingSetupKeys((current) => new Set(current).add(key))
+        toast.success(`${item.label} "${item.value}" saved successfully.`)
+        triggerLookupRefresh()
+      } catch (caughtError) {
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : `Unable to save ${item.label.toLowerCase()} "${item.value}" right now.`
+
+        if (!handleAuthFailure(message)) {
+          setMissingSetupErrors((current) => ({ ...current, [key]: message }))
+          toast.error(message)
+        }
+      } finally {
+        setSavingMissingSetupKeys((current) => {
+          const next = new Set(current)
+          next.delete(key)
+          return next
+        })
+      }
+    },
+    [
+      apiUrl,
+      handleAuthFailure,
+      savedMissingSetupKeys,
+      savingMissingSetupKeys,
+      selectedOrganizationId,
+      triggerLookupRefresh,
+    ],
+  )
+
   async function downloadTemplate() {
     if (!accessRules?.canCreate || downloadingTemplate) {
       if (!accessRules?.canCreate) {
@@ -1158,6 +1492,14 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (caughtError) {
+      if (caughtError instanceof EmployeeUploadReportError) {
+        resetMissingSetupSaveState()
+        setUploadReport(caughtError.report)
+        setUploadReportOpen(true)
+        toast.warning("Employee upload needs setup data before it can continue.")
+        return
+      }
+
       const message =
         caughtError instanceof Error
           ? caughtError.message
@@ -1198,11 +1540,27 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         organizationId: selectedOrganizationId,
       })
 
-      toast.success(
-        `Employee upload completed. ${result.inserted} inserted, ${result.skipped} skipped.`,
-      )
+      if (result.inserted > 0) {
+        toast.success(
+          `Employee upload completed. ${result.inserted} inserted, ${result.skipped} skipped.`,
+        )
+      } else {
+        toast.warning(buildEmployeeUploadSkippedMessage(result))
+      }
       triggerRefresh()
     } catch (caughtError) {
+      if (caughtError instanceof EmployeeUploadReportError) {
+        resetMissingSetupSaveState()
+        setUploadReport(caughtError.report)
+        setUploadReportOpen(true)
+
+        if (!handleAuthFailure(caughtError.message)) {
+          toast.error(caughtError.message)
+        }
+
+        return
+      }
+
       const message =
         caughtError instanceof Error
           ? caughtError.message
@@ -1954,6 +2312,23 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         imageUploading={imageUploading}
         onImageUpload={uploadEmployeeImage}
         onSubmit={submitEditor}
+      />
+
+      <UploadReportDialog
+        open={uploadReportOpen}
+        report={uploadReport}
+        savingKeys={savingMissingSetupKeys}
+        savedKeys={savedMissingSetupKeys}
+        errors={missingSetupErrors}
+        onSaveMissingSetup={saveMissingSetupItem}
+        onOpenChange={(open) => {
+          setUploadReportOpen(open)
+
+          if (!open) {
+            setUploadReport(null)
+            resetMissingSetupSaveState()
+          }
+        }}
       />
 
       <DeleteConfirmDialog
