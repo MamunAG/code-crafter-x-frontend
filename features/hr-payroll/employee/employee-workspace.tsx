@@ -210,7 +210,7 @@ function buildEmployeeUploadSkippedMessage(report: EmployeeUploadReport) {
     const extraCount = duplicateEmployees.length - 3
     const extraText = extraCount > 0 ? ` and ${extraCount} more` : ""
 
-    return `No employees were inserted because the employee code already exists for the selected factory: ${sample}${extraText}.`
+    return `No new employees were inserted.`
   }
 
   if (missingRequiredRows > 0) {
@@ -1624,25 +1624,25 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         setEditorFactory(
           record.factory
             ? {
-                label: record.factory.displayName?.trim() || record.factory.name?.trim() || "Selected factory",
-                value: record.factory.id,
-              }
+              label: record.factory.displayName?.trim() || record.factory.name?.trim() || "Selected factory",
+              value: record.factory.id,
+            }
             : factoryOptions.find((factory) => factory.value === record.factoryId) ?? null,
         )
         setEditorDesignation(
           record.designation
             ? {
-                label: record.designation.designationName?.trim() || "Selected designation",
-                value: record.designation.id,
-              }
+              label: record.designation.designationName?.trim() || "Selected designation",
+              value: record.designation.id,
+            }
             : designationOptions.find((designation) => designation.value === record.designationId) ?? null,
         )
         setEditorDepartment(
           record.department
             ? {
-                label: record.department.departmentName?.trim() || "Selected department",
-                value: record.department.id,
-              }
+              label: record.department.departmentName?.trim() || "Selected department",
+              value: record.department.id,
+            }
             : departmentOptions.find((department) => department.value === record.departmentId) ?? null,
         )
         setEditorGender(record.gender ? toGenderOption(record.gender) : null)
@@ -2134,23 +2134,23 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
                     Create, review, and maintain employee records for the selected organization.
                   </p>
 
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Badge variant="secondary" className="rounded-full px-3 py-1">
-              Total {activeTotal}
-            </Badge>
-            <Badge variant="outline" className="rounded-full px-3 py-1">
-              Active {activeCount}
-            </Badge>
-            <Badge variant="outline" className="rounded-full px-3 py-1">
-              Deleted {deletedTotal}
-            </Badge>
-            {recentlyDeletedEmployee ? (
-              <Badge variant="destructive" className="rounded-full px-3 py-1">
-                Recently deleted
-              </Badge>
-            ) : null}
-          </div>
-        </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Badge variant="secondary" className="rounded-full px-3 py-1">
+                      Total {activeTotal}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Active {activeCount}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Deleted {deletedTotal}
+                    </Badge>
+                    {recentlyDeletedEmployee ? (
+                      <Badge variant="destructive" className="rounded-full px-3 py-1">
+                        Recently deleted
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
