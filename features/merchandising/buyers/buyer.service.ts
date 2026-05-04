@@ -3,6 +3,7 @@ import type {
   BuyerFilterValues,
   BuyerFormValues,
   BuyerRecord,
+  BuyerUploadReport,
   PaginatedResponse,
 } from "./buyer.types"
 
@@ -33,6 +34,94 @@ function buildRequestHeaders({
   }
 
   return headers
+}
+
+export class BuyerUploadReportError extends Error {
+  report: BuyerUploadReport
+
+  constructor(message: string, report: BuyerUploadReport) {
+    super(message)
+    this.name = "BuyerUploadReportError"
+    this.report = report
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value != null
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+}
+
+function isBuyerUploadReport(value: unknown): value is BuyerUploadReport {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const missing = value.missing
+
+  return (
+    typeof value.inserted === "number" &&
+    typeof value.skipped === "number" &&
+    (!isRecord(missing) || !missing.countries || isStringArray(missing.countries))
+  )
+}
+
+function extractBuyerUploadReport(payload: unknown, depth = 0): BuyerUploadReport | null {
+  if (depth > 3) {
+    return null
+  }
+
+  if (isBuyerUploadReport(payload)) {
+    return payload
+  }
+
+  if (!isRecord(payload)) {
+    return null
+  }
+
+  return (
+    extractBuyerUploadReport(payload.uploadReport, depth + 1) ||
+    extractBuyerUploadReport(payload.data, depth + 1) ||
+    extractBuyerUploadReport(payload.response, depth + 1) ||
+    extractBuyerUploadReport(payload.message, depth + 1)
+  )
+}
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload
+  }
+
+  if (Array.isArray(payload)) {
+    const messages = payload.filter(
+      (item): item is string => typeof item === "string" && item.trim().length > 0,
+    )
+    return messages.length ? messages.join(" ") : fallback
+  }
+
+  if (!isRecord(payload)) {
+    return fallback
+  }
+
+  if (typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message
+  }
+
+  if (Array.isArray(payload.message) || isRecord(payload.message)) {
+    return extractErrorMessage(payload.message, fallback)
+  }
+
+  if (isRecord(payload.response)) {
+    return extractErrorMessage(payload.response, fallback)
+  }
+
+  if (typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error
+  }
+
+  return fallback
 }
 
 async function readJsonResponse<T>(response: Response) {
@@ -235,7 +324,7 @@ export async function uploadBuyerTemplate({
   accessToken: string
   file: File
   organizationId?: string
-}): Promise<{ inserted: number; skipped: number }> {
+}): Promise<BuyerUploadReport> {
   const formData = new FormData()
   formData.append("file", file)
 
@@ -245,13 +334,44 @@ export async function uploadBuyerTemplate({
     body: formData,
   })
 
-  const payload = await readJsonResponse<{ inserted: number; skipped: number }>(response)
+  let payload: unknown = null
 
-  if (!payload.data) {
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error(extractErrorMessage(payload, "You do not have permission to upload buyers."))
+  }
+
+  if (!response.ok) {
+    const uploadReport = extractBuyerUploadReport(payload)
+    const message = extractErrorMessage(payload, "Buyer upload could not be completed.")
+
+    if (uploadReport) {
+      throw new BuyerUploadReportError(message, uploadReport)
+    }
+
+    throw new Error(message)
+  }
+
+  if (!isRecord(payload) || payload.success !== true) {
+    throw new Error(extractErrorMessage(payload, "Unable to upload the buyer template right now."))
+  }
+
+  const uploadReport = extractBuyerUploadReport(payload.data)
+
+  if (!uploadReport) {
     throw new Error("The buyer upload completed without a summary.")
   }
 
-  return payload.data
+  return uploadReport
 }
 
 export async function updateBuyer({

@@ -74,3 +74,11 @@ export type BuyerFormValues = {
   remarks: string
   isActive: boolean
 }
+
+export type BuyerUploadReport = {
+  inserted: number
+  skipped: number
+  missing?: {
+    countries?: string[]
+  }
+}

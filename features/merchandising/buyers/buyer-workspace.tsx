@@ -2,13 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, RefreshCcw, Trash2, Undo2, Users } from "lucide-react"
+import { Check, Loader2, Plus, RefreshCcw, Trash2, Undo2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
@@ -16,13 +24,14 @@ import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
 import { type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
-import { fetchCountries } from "@/features/app-config/countries/country.service"
+import { createCountry, fetchCountries } from "@/features/app-config/countries/country.service"
 import type { CountryRecord } from "@/features/app-config/countries/country.types"
 
 import { BuyerFormDialog } from "./component/buyer-form-dialog"
 import { ActiveBuyersSection } from "./component/active-buyers-section"
 import { DeletedBuyersSection } from "./component/deleted-buyers-section"
 import {
+  BuyerUploadReportError,
   createBuyer,
   downloadBuyerUploadTemplate,
   fetchBuyer,
@@ -33,7 +42,7 @@ import {
   updateBuyer,
   uploadBuyerTemplate,
 } from "./buyer.service"
-import type { BuyerFilterValues, BuyerFormValues, BuyerRecord, PaginationMeta } from "./buyer.types"
+import type { BuyerFilterValues, BuyerFormValues, BuyerRecord, BuyerUploadReport, PaginationMeta } from "./buyer.types"
 
 type BuyerEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -45,6 +54,12 @@ type BuyerAccessRules = {
 }
 
 type CountryOption = CountryRecord & AppComboboxOption
+
+type MissingBuyerSetupItem = {
+  kind: "country"
+  label: string
+  value: string
+}
 
 const BUYER_MENU_NAME = "Buyer Setup"
 const EMPTY_ACCESS_RULES: BuyerAccessRules = {
@@ -85,6 +100,10 @@ function normalizeAuthFailure(message: string) {
     message.toLowerCase().includes("session expired") ||
     message.toLowerCase().includes("unauthorized")
   )
+}
+
+function getMissingBuyerSetupKey(item: MissingBuyerSetupItem) {
+  return `${item.kind}:${item.value.trim().toLowerCase()}`
 }
 
 function EmptyState({
@@ -306,6 +325,152 @@ function RecentlyDeletedDialog({
   )
 }
 
+function MissingBuyerSetupSection({
+  items,
+  savingKeys,
+  savedKeys,
+  errors,
+  onSave,
+}: {
+  items: MissingBuyerSetupItem[]
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onSave: (item: MissingBuyerSetupItem) => void
+}) {
+  if (!items.length) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Countries to add first</p>
+        <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
+          {items.length} missing
+        </Badge>
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => {
+          const key = getMissingBuyerSetupKey(item)
+          const saving = savingKeys.has(key)
+          const saved = savedKeys.has(key)
+          const error = errors[key]
+
+          return (
+            <div
+              key={key}
+              className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-950/40"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium text-slate-950 dark:text-slate-50">{item.value}</p>
+                    <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px]">
+                      {item.label}
+                    </Badge>
+                  </div>
+                  {error ? <p className="mt-1 text-xs leading-5 text-destructive">{error}</p> : null}
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={saved ? "outline" : "default"}
+                  className="h-8 rounded-xl"
+                  disabled={saving || saved}
+                  onClick={() => onSave(item)}
+                >
+                  {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {saved ? <Check className="size-3.5" /> : null}
+                  {saved ? "Saved" : "Save"}
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function BuyerUploadReportDialog({
+  open,
+  report,
+  savingKeys,
+  savedKeys,
+  errors,
+  onOpenChange,
+  onSaveMissingSetup,
+}: {
+  open: boolean
+  report: BuyerUploadReport | null
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onOpenChange: (open: boolean) => void
+  onSaveMissingSetup: (item: MissingBuyerSetupItem) => void
+}) {
+  const countryItems = (report?.missing?.countries ?? []).map((value) => ({
+    kind: "country" as const,
+    label: "Country",
+    value,
+  }))
+  const allItemsSaved =
+    countryItems.length > 0 && countryItems.every((item) => savedKeys.has(getMissingBuyerSetupKey(item)))
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Buyer upload report</DialogTitle>
+          <DialogDescription>
+            The upload was stopped because required setup data is missing. Add the missing records,
+            then upload the template again.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Inserted</p>
+              <p className="mt-1 text-xl font-semibold">{report?.inserted ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Skipped</p>
+              <p className="mt-1 text-xl font-semibold">{report?.skipped ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Missing setup</p>
+              <p className="mt-1 text-xl font-semibold">{countryItems.length}</p>
+            </div>
+          </div>
+
+          <MissingBuyerSetupSection
+            items={countryItems}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+
+          {allItemsSaved ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+              All missing setup records have been saved. Please upload the buyer template again.
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" className="rounded-xl" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
@@ -348,6 +513,11 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+  const [uploadReport, setUploadReport] = useState<BuyerUploadReport | null>(null)
+  const [uploadReportOpen, setUploadReportOpen] = useState(false)
+  const [savingMissingSetupKeys, setSavingMissingSetupKeys] = useState<Set<string>>(() => new Set())
+  const [savedMissingSetupKeys, setSavedMissingSetupKeys] = useState<Set<string>>(() => new Set())
+  const [missingSetupErrors, setMissingSetupErrors] = useState<Record<string, string>>({})
 
   const [deleteTarget, setDeleteTarget] = useState<BuyerRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
@@ -872,6 +1042,66 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
     setRefreshVersion((current) => current + 1)
   }
 
+  function resetMissingSetupSaveState() {
+    setSavingMissingSetupKeys(new Set())
+    setSavedMissingSetupKeys(new Set())
+    setMissingSetupErrors({})
+  }
+
+  async function saveMissingSetupItem(item: MissingBuyerSetupItem) {
+    const key = getMissingBuyerSetupKey(item)
+
+    if (savingMissingSetupKeys.has(key) || savedMissingSetupKeys.has(key)) {
+      return
+    }
+
+    const token = window.localStorage.getItem("access_token")
+
+    if (!token) {
+      handleAuthFailure("Your session expired. Please sign in again.")
+      return
+    }
+
+    setSavingMissingSetupKeys((current) => new Set(current).add(key))
+    setMissingSetupErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+
+    try {
+      await createCountry({
+        apiUrl,
+        accessToken: token,
+        organizationId: selectedOrganizationId || undefined,
+        payload: {
+          name: item.value,
+          isActive: true,
+        },
+      })
+
+      setSavedMissingSetupKeys((current) => new Set(current).add(key))
+      toast.success(`${item.label} "${item.value}" saved successfully.`)
+      triggerRefresh()
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : `Unable to save ${item.label.toLowerCase()} "${item.value}" right now.`
+
+      if (!handleAuthFailure(message)) {
+        setMissingSetupErrors((current) => ({ ...current, [key]: message }))
+        toast.error(message)
+      }
+    } finally {
+      setSavingMissingSetupKeys((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
   function resetActiveFilters() {
     setDraftFilters(DEFAULT_FILTERS)
     setActiveFilters(DEFAULT_FILTERS)
@@ -972,6 +1202,18 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
       )
       triggerRefresh()
     } catch (caughtError) {
+      if (caughtError instanceof BuyerUploadReportError) {
+        resetMissingSetupSaveState()
+        setUploadReport(caughtError.report)
+        setUploadReportOpen(true)
+
+        if (!handleAuthFailure(caughtError.message)) {
+          toast.error(caughtError.message)
+        }
+
+        return
+      }
+
       const message =
         caughtError instanceof Error
           ? caughtError.message
@@ -1456,6 +1698,23 @@ export function BuyerWorkspace({ apiUrl }: { apiUrl: string }) {
           }
         }}
         onSubmit={submitEditor}
+      />
+
+      <BuyerUploadReportDialog
+        open={uploadReportOpen}
+        report={uploadReport}
+        savingKeys={savingMissingSetupKeys}
+        savedKeys={savedMissingSetupKeys}
+        errors={missingSetupErrors}
+        onSaveMissingSetup={saveMissingSetupItem}
+        onOpenChange={(open) => {
+          setUploadReportOpen(open)
+
+          if (!open) {
+            setUploadReport(null)
+            resetMissingSetupSaveState()
+          }
+        }}
       />
 
       <DeleteConfirmDialog
