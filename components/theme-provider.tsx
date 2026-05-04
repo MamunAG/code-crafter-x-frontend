@@ -3,6 +3,8 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
+import { MENU_SEARCH_OPEN_EVENT, isTypingTarget } from "@/lib/app-hotkeys"
+
 function ThemeProvider({
   children,
   ...props
@@ -16,21 +18,9 @@ function ThemeProvider({
       {...props}
     >
       <ThemeHotkey />
+      <MenuSearchHotkey />
       {children}
     </NextThemesProvider>
-  )
-}
-
-function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
   )
 }
 
@@ -66,6 +56,44 @@ function ThemeHotkey() {
       window.removeEventListener("keydown", onKeyDown)
     }
   }, [resolvedTheme, setTheme])
+
+  return null
+}
+
+function MenuSearchHotkey() {
+  React.useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.repeat) {
+        return
+      }
+
+      if (!event.ctrlKey || event.metaKey || event.altKey) {
+        return
+      }
+
+      if (isTypingTarget(event.target)) {
+        return
+      }
+
+      const key = typeof event.key === "string" ? event.key.toLowerCase() : ""
+      const isSearchShortcut =
+        (key === "s" && !event.shiftKey) ||
+        (key === "f" && event.shiftKey)
+
+      if (!isSearchShortcut) {
+        return
+      }
+
+      event.preventDefault()
+      window.dispatchEvent(new Event(MENU_SEARCH_OPEN_EVENT))
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [])
 
   return null
 }

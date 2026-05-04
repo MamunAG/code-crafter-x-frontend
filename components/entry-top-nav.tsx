@@ -3,8 +3,10 @@ import { cookies } from "next/headers"
 import { House } from "lucide-react"
 
 import { AuthAvatarMenu } from "@/components/auth-avatar-menu"
+import { MenuSearchDialog } from "@/components/menu-search-dialog"
 import { ModuleNavMenu } from "@/components/module-nav-menu"
 import { NotificationBell } from "@/components/notification-bell"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   AUTH_COOKIE_NAME,
   AUTH_USER_AVATAR_COOKIE_NAME,
@@ -87,38 +89,44 @@ export async function EntryTopNav({ current }: EntryTopNavProps) {
             <div className="hidden lg:block">
               <ModuleNavMenu current={current} />
             </div>
+            <MenuSearchDialog />
+            <ThemeToggle />
             <NotificationBell />
             <AuthAvatarMenu userLabel={userLabel} imageUrl={userImageUrl} />
           </div>
         ) : (
-          <nav className="flex flex-wrap items-center gap-1">
-            {NAV_ITEMS.map((item) => {
-              const isActive = item.key === current
+          <div className="flex items-center gap-2">
+            <nav className="flex flex-wrap items-center gap-1">
+              {NAV_ITEMS.map((item) => {
+                const isActive = item.key === current
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label={item.label}
-                  className={cn(
-                    "inline-flex items-center justify-center rounded-full px-2.5 py-1.5 text-xs font-medium transition sm:px-3",
-                    isActive
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
-                  )}
-                >
-                  {item.key === "home" ? (
-                    <>
-                      <House className="h-3.5 w-3.5 sm:hidden" />
-                      <span className="hidden sm:inline">{item.label}</span>
-                    </>
-                  ) : (
-                    item.label
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-label={item.label}
+                    className={cn(
+                      "inline-flex items-center justify-center rounded-full px-2.5 py-1.5 text-xs font-medium transition sm:px-3",
+                      isActive
+                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
+                    )}
+                  >
+                    {item.key === "home" ? (
+                      <>
+                        <House className="h-3.5 w-3.5 sm:hidden" />
+                        <span className="hidden sm:inline">{item.label}</span>
+                      </>
+                    ) : (
+                      item.label
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+            <MenuSearchDialog />
+            <ThemeToggle />
+          </div>
         )}
       </div>
     </header>
