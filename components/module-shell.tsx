@@ -4,7 +4,7 @@ import { EntryTopNav } from "@/components/entry-top-nav"
 import { cn } from "@/lib/utils"
 
 type ModuleShellProps = {
-  current: "app-config" | "merchandising" | "iam"
+  current: "app-config" | "hr-payroll" | "merchandising" | "iam"
   children: ReactNode
   mainClassName: string
 }

@@ -12,38 +12,38 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
-import { ActiveDesignationSection } from "./component/active-designation-section"
-import { DeletedDesignationSection } from "./component/deleted-designation-section"
-import { DesignationFormDialog } from "./component/designation-form-dialog"
+import { ActiveDepartmentSection } from "./component/active-department-section"
+import { DeletedDepartmentSection } from "./component/deleted-department-section"
+import { DepartmentFormDialog } from "./component/department-form-dialog"
 import {
-  createDesignation,
-  downloadDesignationUploadTemplate,
-  fetchDesignation,
-  fetchDesignations,
-  permanentlyDeleteDesignation,
-  restoreDesignation,
-  softDeleteDesignation,
-  uploadDesignationTemplate,
-  updateDesignation,
-} from "./designation.service"
-import type { DesignationFilterValues, DesignationFormValues, DesignationRecord, PaginationMeta } from "./designation.types"
+  createDepartment,
+  downloadDepartmentUploadTemplate,
+  fetchDepartment,
+  fetchDepartments,
+  permanentlyDeleteDepartment,
+  restoreDepartment,
+  softDeleteDepartment,
+  uploadDepartmentTemplate,
+  updateDepartment,
+} from "./department.service"
+import type { DepartmentFilterValues, DepartmentFormValues, DepartmentRecord, PaginationMeta } from "./department.types"
 
-type DesignationEditorMode = "create" | "edit"
+type DepartmentEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
 
-const DEFAULT_FILTERS: DesignationFilterValues = {
-  designationName: "",
+const DEFAULT_FILTERS: DepartmentFilterValues = {
+  departmentName: "",
   isActive: "",
 }
 
-const DEFAULT_FORM_VALUES: DesignationFormValues = {
-  designationName: "",
+const DEFAULT_FORM_VALUES: DepartmentFormValues = {
+  departmentName: "",
   description: "",
   isActive: true,
 }
 
-function getDesignationLabel(designation: DesignationRecord) {
-  return designation.designationName
+function getDepartmentLabel(department: DepartmentRecord) {
+  return department.departmentName
 }
 
 function normalizeAuthFailure(message: string) {
@@ -67,13 +67,13 @@ function EmptyState({ title, description, actionLabel, onAction }: { title: stri
 
 function DeleteConfirmDialog({
   open,
-  designation,
+  department,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
-  designation: DesignationRecord | null
+  department: DepartmentRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
@@ -82,9 +82,9 @@ function DeleteConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete designation</AlertDialogTitle>
+          <AlertDialogTitle>Delete department</AlertDialogTitle>
           <AlertDialogDescription>
-            This will soft delete <span className="font-medium text-slate-900 dark:text-slate-100">{designation ? getDesignationLabel(designation) : "this designation"}</span>.
+            This will soft delete <span className="font-medium text-slate-900 dark:text-slate-100">{department ? getDepartmentLabel(department) : "this department"}</span>.
             You can restore it from the recently deleted card before removing it permanently.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -103,23 +103,23 @@ function DeleteConfirmDialog({
 function RecentlyDeletedDialog({
   open,
   action,
-  designation,
+  department,
   working,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean
   action: PendingDeleteMode
-  designation: DesignationRecord | null
+  department: DepartmentRecord | null
   working: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }) {
-  const title = action === "restore" ? "Restore designation" : "Delete designation permanently"
+  const title = action === "restore" ? "Restore department" : "Delete department permanently"
   const description =
     action === "restore"
-      ? "Bring this designation back into the active configuration list."
-      : "This will permanently remove the designation record and cannot be undone."
+      ? "Bring this department back into the active configuration list."
+      : "This will permanently remove the department record and cannot be undone."
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -127,7 +127,7 @@ function RecentlyDeletedDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            {description} <span className="font-medium text-slate-900 dark:text-slate-100">{designation ? getDesignationLabel(designation) : "this designation"}</span>.
+            {description} <span className="font-medium text-slate-900 dark:text-slate-100">{department ? getDepartmentLabel(department) : "this department"}</span>.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -142,43 +142,43 @@ function RecentlyDeletedDialog({
   )
 }
 
-export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
+export function DepartmentWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
-  const [loadingDesignations, setLoadingDesignations] = useState(true)
-  const [loadingDeletedDesignations, setLoadingDeletedDesignations] = useState(true)
+  const [loadingDepartments, setLoadingDepartments] = useState(true)
+  const [loadingDeletedDepartments, setLoadingDeletedDepartments] = useState(true)
   const [error, setError] = useState("")
   const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(() => (typeof window === "undefined" ? "" : readSelectedOrganizationId()))
 
-  const [designations, setDesignations] = useState<DesignationRecord[]>([])
+  const [departments, setDepartments] = useState<DepartmentRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
 
-  const [deletedDesignations, setDeletedDesignations] = useState<DesignationRecord[]>([])
+  const [deletedDepartments, setDeletedDepartments] = useState<DepartmentRecord[]>([])
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
 
-  const [activeFilters, setActiveFilters] = useState<DesignationFilterValues>(DEFAULT_FILTERS)
-  const [deletedFilters, setDeletedFilters] = useState<DesignationFilterValues>(DEFAULT_FILTERS)
+  const [activeFilters, setActiveFilters] = useState<DepartmentFilterValues>(DEFAULT_FILTERS)
+  const [deletedFilters, setDeletedFilters] = useState<DepartmentFilterValues>(DEFAULT_FILTERS)
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [editorMode, setEditorMode] = useState<DesignationEditorMode>("create")
+  const [editorMode, setEditorMode] = useState<DepartmentEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorError, setEditorError] = useState("")
-  const [editorInitialValues, setEditorInitialValues] = useState<DesignationFormValues>(DEFAULT_FORM_VALUES)
+  const [editorInitialValues, setEditorInitialValues] = useState<DepartmentFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
 
-  const [deleteTarget, setDeleteTarget] = useState<DesignationRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DepartmentRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
-  const [recentlyDeletedDesignation, setRecentlyDeletedDesignation] = useState<DesignationRecord | null>(null)
-  const [pendingActionTarget, setPendingActionTarget] = useState<DesignationRecord | null>(null)
+  const [recentlyDeletedDepartment, setRecentlyDeletedDepartment] = useState<DepartmentRecord | null>(null)
+  const [pendingActionTarget, setPendingActionTarget] = useState<DepartmentRecord | null>(null)
   const [pendingActionMode, setPendingActionMode] = useState<PendingDeleteMode | null>(null)
   const [pendingActionWorking, setPendingActionWorking] = useState(false)
 
@@ -212,9 +212,9 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
 
   const triggerRefresh = useCallback(() => setRefreshVersion((current) => current + 1), [])
 
-  const loadDesignations = useCallback(async () => {
-    setLoadingDesignations(true)
-    setLoadingDeletedDesignations(true)
+  const loadDepartments = useCallback(async () => {
+    setLoadingDepartments(true)
+    setLoadingDeletedDepartments(true)
     setError("")
     setDeletedError("")
 
@@ -226,31 +226,31 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       const [activeResponse, deletedResponse] = await Promise.all([
-        fetchDesignations({ apiUrl, accessToken: token, page, limit, filters: activeFilters, organizationId: selectedOrganizationId || undefined }),
-        fetchDesignations({ apiUrl, accessToken: token, page: deletedPage, limit: deletedLimit, filters: deletedFilters, deletedOnly: true, organizationId: selectedOrganizationId || undefined }),
+        fetchDepartments({ apiUrl, accessToken: token, page, limit, filters: activeFilters, organizationId: selectedOrganizationId || undefined }),
+        fetchDepartments({ apiUrl, accessToken: token, page: deletedPage, limit: deletedLimit, filters: deletedFilters, deletedOnly: true, organizationId: selectedOrganizationId || undefined }),
       ])
 
-      setDesignations(activeResponse.items)
+      setDepartments(activeResponse.items)
       setMeta(activeResponse.meta)
-      setDeletedDesignations(deletedResponse.items)
+      setDeletedDepartments(deletedResponse.items)
       setDeletedMeta(deletedResponse.meta)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to load designation data right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load department data right now."
       if (!handleAuthFailure(message)) {
         setError(message)
         setDeletedError(message)
         toast.error(message)
       }
     } finally {
-      setLoadingDesignations(false)
-      setLoadingDeletedDesignations(false)
+      setLoadingDepartments(false)
+      setLoadingDeletedDepartments(false)
     }
   }, [activeFilters, apiUrl, deletedFilters, deletedLimit, deletedPage, handleAuthFailure, limit, page, selectedOrganizationId])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    void loadDesignations()
-  }, [loadDesignations, refreshVersion])
+    void loadDepartments()
+  }, [loadDepartments, refreshVersion])
 
   function openCreateDialog() {
     setEditorMode("create")
@@ -274,14 +274,14 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      const record = await fetchDesignation({ apiUrl, accessToken: token, id, organizationId: selectedOrganizationId || undefined })
+      const record = await fetchDepartment({ apiUrl, accessToken: token, id, organizationId: selectedOrganizationId || undefined })
       setEditorInitialValues({
-        designationName: record.designationName ?? "",
+        departmentName: record.departmentName ?? "",
         description: record.description ?? "",
         isActive: record.isActive !== false,
       })
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the selected designation."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the selected department."
       if (!handleAuthFailure(message)) {
         setEditorError(message)
         toast.error(message)
@@ -291,9 +291,9 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [apiUrl, handleAuthFailure, selectedOrganizationId])
 
-  const submitEditor = useCallback(async (values: DesignationFormValues) => {
-    if (!values.designationName.trim()) {
-      setEditorError("Designation name is required.")
+  const submitEditor = useCallback(async (values: DepartmentFormValues) => {
+    if (!values.departmentName.trim()) {
+      setEditorError("Department name is required.")
       return
     }
 
@@ -308,11 +308,11 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       if (editorMode === "create") {
-        await createDesignation({ apiUrl, accessToken: token, payload: values, organizationId: selectedOrganizationId || undefined })
-        toast.success("Designation created successfully.")
+        await createDepartment({ apiUrl, accessToken: token, payload: values, organizationId: selectedOrganizationId || undefined })
+        toast.success("Department created successfully.")
       } else if (editingId != null) {
-        await updateDesignation({ apiUrl, accessToken: token, id: editingId, payload: values, organizationId: selectedOrganizationId || undefined })
-        toast.success("Designation updated successfully.")
+        await updateDepartment({ apiUrl, accessToken: token, id: editingId, payload: values, organizationId: selectedOrganizationId || undefined })
+        toast.success("Department updated successfully.")
       }
 
       setEditorOpen(false)
@@ -320,7 +320,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       setEditingId(null)
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to save the designation right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to save the department right now."
       if (!handleAuthFailure(message)) {
         setEditorError(message)
         toast.error(message)
@@ -342,7 +342,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      const blob = await downloadDesignationUploadTemplate({
+      const blob = await downloadDepartmentUploadTemplate({
         apiUrl,
         accessToken: token,
         organizationId: selectedOrganizationId || undefined,
@@ -351,13 +351,13 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = "designation-upload-template.csv"
+      link.download = "department-upload-template.csv"
       document.body.appendChild(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the designation template right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the department template right now."
       if (!handleAuthFailure(message)) toast.error(message)
     } finally {
       setDownloadingTemplate(false)
@@ -376,17 +376,17 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      const result = await uploadDesignationTemplate({
+      const result = await uploadDepartmentTemplate({
         apiUrl,
         accessToken: token,
         file,
         organizationId: selectedOrganizationId || undefined,
       })
 
-      toast.success(`Designation upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`)
+      toast.success(`Department upload completed. ${result.inserted} inserted, ${result.skipped} already existed.`)
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the designation template right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the department template right now."
       if (!handleAuthFailure(message)) toast.error(message)
     } finally {
       setUploadingTemplate(false)
@@ -407,21 +407,21 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      await softDeleteDesignation({ apiUrl, accessToken: token, id: deleteTarget.id, organizationId: selectedOrganizationId || undefined })
-      setRecentlyDeletedDesignation(deleteTarget)
+      await softDeleteDepartment({ apiUrl, accessToken: token, id: deleteTarget.id, organizationId: selectedOrganizationId || undefined })
+      setRecentlyDeletedDepartment(deleteTarget)
       setDeleteTarget(null)
-      toast.success("Designation moved to recently deleted.")
+      toast.success("Department moved to recently deleted.")
       triggerRefresh()
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to delete the designation right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to delete the department right now."
       if (!handleAuthFailure(message)) toast.error(message)
     } finally {
       setDeleteWorking(false)
     }
   }, [apiUrl, deleteTarget, deleteWorking, handleAuthFailure, selectedOrganizationId, triggerRefresh])
 
-  function openPendingActionDialog(designation: DesignationRecord, action: PendingDeleteMode) {
-    setPendingActionTarget(designation)
+  function openPendingActionDialog(department: DepartmentRecord, action: PendingDeleteMode) {
+    setPendingActionTarget(department)
     setPendingActionMode(action)
   }
 
@@ -437,14 +437,14 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       if (pendingActionMode === "restore") {
-        await restoreDesignation({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
-        toast.success("Designation restored successfully.")
+        await restoreDepartment({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
+        toast.success("Department restored successfully.")
       } else {
-        await permanentlyDeleteDesignation({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
-        toast.success("Designation deleted permanently.")
+        await permanentlyDeleteDepartment({ apiUrl, accessToken: token, id: pendingActionTarget.id, organizationId: selectedOrganizationId || undefined })
+        toast.success("Department deleted permanently.")
       }
 
-      if (recentlyDeletedDesignation?.id === pendingActionTarget.id) setRecentlyDeletedDesignation(null)
+      if (recentlyDeletedDepartment?.id === pendingActionTarget.id) setRecentlyDeletedDepartment(null)
       setPendingActionTarget(null)
       setPendingActionMode(null)
       triggerRefresh()
@@ -454,13 +454,13 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
     } finally {
       setPendingActionWorking(false)
     }
-  }, [apiUrl, handleAuthFailure, pendingActionMode, pendingActionTarget, pendingActionWorking, recentlyDeletedDesignation, selectedOrganizationId, triggerRefresh])
+  }, [apiUrl, handleAuthFailure, pendingActionMode, pendingActionTarget, pendingActionWorking, recentlyDeletedDepartment, selectedOrganizationId, triggerRefresh])
 
-  const deletedTotal = deletedMeta?.total ?? deletedDesignations.length
-  const activeTotal = meta?.total ?? designations.length
-  const activeCount = useMemo(() => designations.filter((designation) => designation.deleted_at == null && designation.isActive !== false).length, [designations])
+  const deletedTotal = deletedMeta?.total ?? deletedDepartments.length
+  const activeTotal = meta?.total ?? departments.length
+  const activeCount = useMemo(() => departments.filter((department) => department.deleted_at == null && department.isActive !== false).length, [departments])
 
-  if (error && designations.length === 0) {
+  if (error && departments.length === 0) {
     return (
       <div className="space-y-6">
         <Card className="border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
@@ -468,14 +468,14 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Designation Setup</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage designation master data.</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">Department Setup</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage department master data.</p>
               </div>
               <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Retry</Button>
             </div>
           </CardContent>
         </Card>
-        <EmptyState title="Unable to load designations" description={error} actionLabel="Try again" onAction={triggerRefresh} />
+        <EmptyState title="Unable to load departments" description={error} actionLabel="Try again" onAction={triggerRefresh} />
       </div>
     )
   }
@@ -489,9 +489,9 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
-                  <h1 className="mt-2 text-3xl font-semibold tracking-tight">Designation Setup</h1>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight">Department Setup</h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Create, review, and maintain designation records for the selected organization.
+                    Create, review, and maintain department records for the selected organization.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Badge variant="secondary" className="rounded-full px-3 py-1">{activeTotal} total</Badge>
@@ -501,33 +501,33 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Refresh</Button>
-                  <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New designation</Button>
+                  <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New department</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {recentlyDeletedDesignation ? (
+          {recentlyDeletedDepartment ? (
             <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">Recently deleted designation</p>
-                    <p className="text-sm text-amber-900/80 dark:text-amber-100/85">{getDesignationLabel(recentlyDeletedDesignation)} was soft deleted and can still be restored.</p>
+                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">Recently deleted department</p>
+                    <p className="text-sm text-amber-900/80 dark:text-amber-100/85">{getDepartmentLabel(recentlyDeletedDepartment)} was soft deleted and can still be restored.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50" onClick={() => openPendingActionDialog(recentlyDeletedDesignation, "restore")}><Undo2 className="size-3.5" />Restore</Button>
-                    <Button type="button" variant="destructive" className="rounded-xl" onClick={() => openPendingActionDialog(recentlyDeletedDesignation, "permanent")}><Trash2 className="size-3.5" />Delete permanently</Button>
+                    <Button type="button" variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50" onClick={() => openPendingActionDialog(recentlyDeletedDepartment, "restore")}><Undo2 className="size-3.5" />Restore</Button>
+                    <Button type="button" variant="destructive" className="rounded-xl" onClick={() => openPendingActionDialog(recentlyDeletedDepartment, "permanent")}><Trash2 className="size-3.5" />Delete permanently</Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ) : null}
 
-          <ActiveDesignationSection
-            data={designations}
+          <ActiveDepartmentSection
+            data={departments}
             meta={meta}
-            loading={loadingDesignations}
+            loading={loadingDepartments}
             page={page}
             limit={limit}
             filters={activeFilters}
@@ -551,22 +551,22 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
             onChange={(event) => void uploadTemplate(event.target.files?.[0])}
           />
 
-          <DeletedDesignationSection
-            data={deletedDesignations}
+          <DeletedDepartmentSection
+            data={deletedDepartments}
             meta={deletedMeta}
-            loading={loadingDeletedDesignations}
+            loading={loadingDeletedDepartments}
             page={deletedPage}
             limit={deletedLimit}
             filters={deletedFilters}
             onFilterChange={setDeletedFilters}
             onPageChange={setDeletedPage}
             onLimitChange={setDeletedLimit}
-            onOpenAction={(designation, mode) => openPendingActionDialog(designation, mode)}
+            onOpenAction={(department, mode) => openPendingActionDialog(department, mode)}
           />
         </div>
       </ScrollArea>
 
-      <DesignationFormDialog
+      <DepartmentFormDialog
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}
@@ -588,7 +588,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
-        designation={deleteTarget}
+        department={deleteTarget}
         working={deleteWorking}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
@@ -599,7 +599,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       <RecentlyDeletedDialog
         open={Boolean(pendingActionTarget && pendingActionMode)}
         action={pendingActionMode ?? "restore"}
-        designation={pendingActionTarget}
+        department={pendingActionTarget}
         working={pendingActionWorking}
         onOpenChange={(open) => {
           if (!open) {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ModuleNavMenu } from "@/components/module-nav-menu"
 
 type ModuleRoutePageProps = {
-  current: "app-config" | "merchandising" | "iam"
+  current: "app-config" | "hr-payroll" | "merchandising" | "iam"
   title: string
   eyebrow: string
   description: string

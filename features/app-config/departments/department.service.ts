@@ -1,10 +1,10 @@
 import type {
   ApiResponse,
-  DesignationFilterValues,
-  DesignationFormValues,
-  DesignationRecord,
+  DepartmentFilterValues,
+  DepartmentFormValues,
+  DepartmentRecord,
   PaginatedResponse,
-} from "./designation.types"
+} from "./department.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -40,14 +40,14 @@ async function readJsonResponse<T>(response: Response) {
   }
 
   if (response.status === 401) throw new Error("Your session expired. Please sign in again.")
-  if (response.status === 403) throw new Error(payload?.message || "You do not have permission to complete this designation action.")
-  if (!response.ok || !payload?.success) throw new Error(payload?.message || "Unable to complete the designation request right now.")
+  if (response.status === 403) throw new Error(payload?.message || "You do not have permission to complete this department action.")
+  if (!response.ok || !payload?.success) throw new Error(payload?.message || "Unable to complete the department request right now.")
 
   return payload
 }
 
-function appendFilterParams(url: URL, filters: Partial<DesignationFilterValues>) {
-  if (filters.designationName?.trim()) url.searchParams.set("designationName", filters.designationName.trim())
+function appendFilterParams(url: URL, filters: Partial<DepartmentFilterValues>) {
+  if (filters.departmentName?.trim()) url.searchParams.set("departmentName", filters.departmentName.trim())
   if (filters.isActive?.trim()) url.searchParams.set("isActive", filters.isActive.trim())
 }
 
@@ -56,15 +56,15 @@ function optionalString(value: string) {
   return trimmedValue || undefined
 }
 
-function buildDesignationPayload(payload: DesignationFormValues) {
+function buildDepartmentPayload(payload: DepartmentFormValues) {
   return {
-    designationName: payload.designationName.trim(),
+    departmentName: payload.departmentName.trim(),
     description: optionalString(payload.description),
     isActive: payload.isActive,
   }
 }
 
-export async function fetchDesignations({
+export async function fetchDepartments({
   apiUrl,
   accessToken,
   page,
@@ -77,11 +77,11 @@ export async function fetchDesignations({
   accessToken: string
   page: number
   limit: number
-  filters: Partial<DesignationFilterValues>
+  filters: Partial<DepartmentFilterValues>
   deletedOnly?: boolean
   organizationId?: string
-}): Promise<PaginatedResponse<DesignationRecord>> {
-  const url = buildApiUrl(apiUrl, "/api/v1/hr/designation")
+}): Promise<PaginatedResponse<DepartmentRecord>> {
+  const url = buildApiUrl(apiUrl, "/api/v1/hr/department")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
   if (deletedOnly) url.searchParams.set("deletedOnly", "true")
@@ -93,12 +93,12 @@ export async function fetchDesignations({
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<PaginatedResponse<DesignationRecord>>(response)
-  if (!payload.data?.items || !payload.data?.meta) throw new Error("The designation list was returned without pagination data.")
+  const payload = await readJsonResponse<PaginatedResponse<DepartmentRecord>>(response)
+  if (!payload.data?.items || !payload.data?.meta) throw new Error("The department list was returned without pagination data.")
   return payload.data
 }
 
-export async function fetchDesignation({
+export async function fetchDepartment({
   apiUrl,
   accessToken,
   id,
@@ -108,19 +108,19 @@ export async function fetchDesignation({
   accessToken: string
   id: string
   organizationId?: string
-}): Promise<DesignationRecord> {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/designation/${id}`), {
+}): Promise<DepartmentRecord> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/department/${id}`), {
     method: "GET",
     headers: buildRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
-  const payload = await readJsonResponse<DesignationRecord>(response)
-  if (!payload.data) throw new Error("The designation record was returned without data.")
+  const payload = await readJsonResponse<DepartmentRecord>(response)
+  if (!payload.data) throw new Error("The department record was returned without data.")
   return payload.data
 }
 
-export async function createDesignation({
+export async function createDepartment({
   apiUrl,
   accessToken,
   payload,
@@ -128,21 +128,21 @@ export async function createDesignation({
 }: {
   apiUrl: string
   accessToken: string
-  payload: DesignationFormValues
+  payload: DepartmentFormValues
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/designation"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/department"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify(buildDesignationPayload(payload)),
+    body: JSON.stringify(buildDepartmentPayload(payload)),
   })
 
-  const payloadData = await readJsonResponse<DesignationRecord>(response)
-  if (!payloadData.data) throw new Error("The designation was saved, but the created record was not returned.")
+  const payloadData = await readJsonResponse<DepartmentRecord>(response)
+  if (!payloadData.data) throw new Error("The department was saved, but the created record was not returned.")
   return payloadData.data
 }
 
-export async function downloadDesignationUploadTemplate({
+export async function downloadDepartmentUploadTemplate({
   apiUrl,
   accessToken,
   organizationId,
@@ -151,19 +151,19 @@ export async function downloadDesignationUploadTemplate({
   accessToken: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/designation/template/upload"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/department/template/upload"), {
     method: "GET",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
 
   if (response.status === 401) throw new Error("Your session expired. Please sign in again.")
-  if (response.status === 403) throw new Error("You do not have permission to download the designation template.")
-  if (!response.ok) throw new Error("Unable to download the designation upload template right now.")
+  if (response.status === 403) throw new Error("You do not have permission to download the department template.")
+  if (!response.ok) throw new Error("Unable to download the department upload template right now.")
 
   return response.blob()
 }
 
-export async function uploadDesignationTemplate({
+export async function uploadDepartmentTemplate({
   apiUrl,
   accessToken,
   file,
@@ -177,18 +177,18 @@ export async function uploadDesignationTemplate({
   const formData = new FormData()
   formData.append("file", file)
 
-  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/designation/upload"), {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/department/upload"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId }),
     body: formData,
   })
 
   const payload = await readJsonResponse<{ inserted: number; skipped: number }>(response)
-  if (!payload.data) throw new Error("The designation upload completed without a summary.")
+  if (!payload.data) throw new Error("The department upload completed without a summary.")
   return payload.data
 }
 
-export async function updateDesignation({
+export async function updateDepartment({
   apiUrl,
   accessToken,
   id,
@@ -198,21 +198,21 @@ export async function updateDesignation({
   apiUrl: string
   accessToken: string
   id: string
-  payload: DesignationFormValues
+  payload: DepartmentFormValues
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/designation/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/department/${id}`), {
     method: "PATCH",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify(buildDesignationPayload(payload)),
+    body: JSON.stringify(buildDepartmentPayload(payload)),
   })
 
-  const payloadData = await readJsonResponse<DesignationRecord>(response)
-  if (!payloadData.data) throw new Error("The designation was updated, but the updated record was not returned.")
+  const payloadData = await readJsonResponse<DepartmentRecord>(response)
+  if (!payloadData.data) throw new Error("The department was updated, but the updated record was not returned.")
   return payloadData.data
 }
 
-export async function softDeleteDesignation({
+export async function softDeleteDepartment({
   apiUrl,
   accessToken,
   id,
@@ -223,14 +223,14 @@ export async function softDeleteDesignation({
   id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/designation/${id}`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/department/${id}`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
   await readJsonResponse(response)
 }
 
-export async function restoreDesignation({
+export async function restoreDepartment({
   apiUrl,
   accessToken,
   id,
@@ -241,14 +241,14 @@ export async function restoreDesignation({
   id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/designation/${id}/restore`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/department/${id}/restore`), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
   await readJsonResponse(response)
 }
 
-export async function permanentlyDeleteDesignation({
+export async function permanentlyDeleteDepartment({
   apiUrl,
   accessToken,
   id,
@@ -259,7 +259,7 @@ export async function permanentlyDeleteDesignation({
   id: string
   organizationId?: string
 }) {
-  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/designation/${id}/permanent`), {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/department/${id}/permanent`), {
     method: "DELETE",
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })

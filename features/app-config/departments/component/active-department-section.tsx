@@ -13,24 +13,24 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 
-import type { DesignationFilterValues, DesignationRecord, PaginationMeta } from "../designation.types"
+import type { DepartmentFilterValues, DepartmentRecord, PaginationMeta } from "../department.types"
 
 const ALL_STATUS_VALUE = "__all_statuses__"
 const MOBILE_SKELETONS = Array.from({ length: 5 })
 
-type ActiveDesignationSectionProps = {
-  data: DesignationRecord[]
+type ActiveDepartmentSectionProps = {
+  data: DepartmentRecord[]
   meta: PaginationMeta | null
   page: number
   limit: number
   loading: boolean
-  filters: DesignationFilterValues
-  onFilterChange: (nextValues: DesignationFilterValues) => void
+  filters: DepartmentFilterValues
+  onFilterChange: (nextValues: DepartmentFilterValues) => void
   onPageChange: (nextPage: number | ((current: number) => number)) => void
   onLimitChange: (nextPageSize: number) => void
   onCreate: () => void
-  onEdit: (designationId: string) => void
-  onDelete: (designation: DesignationRecord) => void
+  onEdit: (departmentId: string) => void
+  onDelete: (department: DepartmentRecord) => void
   onDownloadTemplate: () => void
   onUploadTemplate: () => void
   downloadingTemplate: boolean
@@ -44,14 +44,14 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(parsed)
 }
 
-function getStatusLabel(designation: DesignationRecord) {
-  if (designation.deleted_at) return "Deleted"
-  return designation.isActive === false ? "Inactive" : "Active"
+function getStatusLabel(department: DepartmentRecord) {
+  if (department.deleted_at) return "Deleted"
+  return department.isActive === false ? "Inactive" : "Active"
 }
 
-function getStatusTone(designation: DesignationRecord) {
-  if (designation.deleted_at) return "destructive" as const
-  return designation.isActive === false ? "outline" as const : "secondary" as const
+function getStatusTone(department: DepartmentRecord) {
+  if (department.deleted_at) return "destructive" as const
+  return department.isActive === false ? "outline" as const : "secondary" as const
 }
 
 function EmptyState({ title, description, actionLabel, onAction }: { title: string; description: string; actionLabel: string; onAction: () => void }) {
@@ -69,7 +69,7 @@ function EmptyState({ title, description, actionLabel, onAction }: { title: stri
   )
 }
 
-export function ActiveDesignationSection({
+export function ActiveDepartmentSection({
   data,
   meta,
   page,
@@ -86,36 +86,36 @@ export function ActiveDesignationSection({
   onUploadTemplate,
   downloadingTemplate,
   uploadingTemplate,
-}: ActiveDesignationSectionProps) {
+}: ActiveDepartmentSectionProps) {
   const filterCount = useMemo(
-    () => [filters.designationName, filters.isActive].filter((value) => value.trim()).length,
+    () => [filters.departmentName, filters.isActive].filter((value) => value.trim()).length,
     [filters],
   )
 
   const pageSummary = useMemo(() => {
-    if (!meta || meta.total === 0) return "No designations found"
+    if (!meta || meta.total === 0) return "No departments found"
     const start = (meta.page - 1) * meta.limit + 1
     const end = Math.min(meta.page * meta.limit, meta.total)
     return `Showing ${start}-${end} of ${meta.total}`
   }, [meta])
 
   const clearFilters = () => {
-    onFilterChange({ designationName: "", isActive: "" })
+    onFilterChange({ departmentName: "", isActive: "" })
     onPageChange(1)
   }
 
-  const columns = useMemo<ColumnDef<DesignationRecord>[]>(() => [
+  const columns = useMemo<ColumnDef<DepartmentRecord>[]>(() => [
     {
-      id: "designation",
-      header: "Designation",
+      id: "department",
+      header: "Department",
       cell: ({ row }) => (
         <div className="pl-4">
           <div className="flex items-center gap-3">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-white dark:text-slate-900">
-              {(row.original.designationName?.trim() || "?").charAt(0).toUpperCase()}
+              {(row.original.departmentName?.trim() || "?").charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{row.original.designationName}</p>
+              <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{row.original.departmentName}</p>
               <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{row.original.description || "No description"}</p>
             </div>
           </div>
@@ -154,10 +154,10 @@ export function ActiveDesignationSection({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => onEdit(row.original.id)}>Edit designation</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onEdit(row.original.id)}>Edit department</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => onDelete(row.original)}>
-                Delete designation
+                Delete department
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -173,7 +173,7 @@ export function ActiveDesignationSection({
       <CardHeader className="border-b border-slate-200/70 py-0 dark:border-white/10">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-base">Designations table</CardTitle>
+            <CardTitle className="text-base">Departments table</CardTitle>
             <CardDescription>{pageSummary}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export function ActiveDesignationSection({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={onUploadTemplate} disabled={uploadingTemplate}>
                   <Upload className="mr-2 size-3.5" />
-                  {uploadingTemplate ? "Uploading designations..." : "Upload designations"}
+                  {uploadingTemplate ? "Uploading departments..." : "Upload departments"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -214,19 +214,19 @@ export function ActiveDesignationSection({
           className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
         >
           <div className="min-w-0 space-y-1 xl:col-span-2">
-            <label htmlFor="filterDesignationName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Designation name</label>
+            <label htmlFor="filterDepartmentName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Department name</label>
             <Input
-              id="filterDesignationName"
-              value={filters.designationName}
+              id="filterDepartmentName"
+              value={filters.departmentName}
               className="h-7 rounded-md px-2 text-xs"
-              onChange={(event) => onFilterChange({ ...filters, designationName: event.target.value })}
-              placeholder="Input designation name"
+              onChange={(event) => onFilterChange({ ...filters, departmentName: event.target.value })}
+              placeholder="Input department name"
             />
           </div>
           <div className="min-w-0 space-y-1">
-            <label htmlFor="filterDesignationStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
+            <label htmlFor="filterDepartmentStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
             <AppSelect
-              triggerId="filterDesignationStatus"
+              triggerId="filterDepartmentStatus"
               value={filters.isActive || ALL_STATUS_VALUE}
               onValueChange={(value) => onFilterChange({ ...filters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
               placeholder="All statuses"
@@ -259,12 +259,12 @@ export function ActiveDesignationSection({
             <div className="space-y-3 p-4">{MOBILE_SKELETONS.map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)}</div>
           ) : data.length > 0 ? (
             <div className="space-y-3 p-4">
-              {data.map((designation) => (
-                <article key={designation.id} className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+              {data.map((department) => (
+                <article key={department.id} className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{designation.designationName}</p>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">{designation.description || "No description"}</p>
+                      <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{department.departmentName}</p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">{department.description || "No description"}</p>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -273,24 +273,24 @@ export function ActiveDesignationSection({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onSelect={() => onEdit(designation.id)}>Edit designation</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onEdit(department.id)}>Edit department</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(designation)}>Delete designation</DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(department)}>Delete department</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant={getStatusTone(designation)} className="rounded-full px-3 py-1">{getStatusLabel(designation)}</Badge>
+                    <Badge variant={getStatusTone(department)} className="rounded-full px-3 py-1">{getStatusLabel(department)}</Badge>
                   </div>
                   <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                    <p>Created: {formatDate(designation.created_at)}</p>
+                    <p>Created: {formatDate(department.created_at)}</p>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
             <div className="p-4">
-              <EmptyState title="No designations found" description="Try clearing or relaxing the current filters." actionLabel="Reset" onAction={clearFilters} />
+              <EmptyState title="No departments found" description="Try clearing or relaxing the current filters." actionLabel="Reset" onAction={clearFilters} />
             </div>
           )}
           <div className="flex flex-col gap-3 border-t border-slate-200/70 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
@@ -318,7 +318,7 @@ export function ActiveDesignationSection({
               onLimitChange(nextPageSize)
               onPageChange(1)
             }}
-            emptyState={<EmptyState title="No designations found" description="Try clearing or relaxing the current filters." actionLabel="Reset" onAction={clearFilters} />}
+            emptyState={<EmptyState title="No departments found" description="Try clearing or relaxing the current filters." actionLabel="Reset" onAction={clearFilters} />}
           />
         </div>
       </CardContent>

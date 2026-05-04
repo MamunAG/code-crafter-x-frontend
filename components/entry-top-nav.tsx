@@ -19,6 +19,7 @@ type EntryTopNavProps = {
   current:
   | "home"
   | "app-config"
+  | "hr-payroll"
   | "merchandising"
   | "iam"
   | "account"

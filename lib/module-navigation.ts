@@ -16,7 +16,7 @@ export type ModuleGroup = {
 }
 
 export type ModuleNavigationItem = {
-  key: "app-config" | "merchandising" | "iam"
+  key: "app-config" | "hr-payroll" | "merchandising" | "iam"
   label: string
   href: string
   description: string
@@ -67,12 +67,6 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Factory Setup",
             href: "/app-config/core/factory",
             description: "Create and manage application module entries.",
-          },
-          {
-            label: "Designation Setup",
-            href: "/app-config/core/designation",
-            description: "Create and manage organization designations.",
-            permissionMenuName: "Designation Setup",
           },
           {
             label: "Module",
@@ -144,6 +138,36 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
       //     },
       //   ],
       // },
+    ],
+  },
+  {
+    key: "hr-payroll",
+    label: "Hr-Payroll",
+    href: "/hr-payroll",
+    description: "Employee records, organizational setup, and payroll operations.",
+    groups: [
+      {
+        label: "Masters",
+        description: "Foundation records for HR and payroll workflows.",
+        items: [
+          {
+            label: "Core",
+            href: "/hr-payroll/core",
+            children: [
+              {
+                label: "Designation Setup",
+                href: "/hr-payroll/core/designation",
+                permissionMenuName: "Designation Setup",
+              },
+              {
+                label: "Department Setup",
+                href: "/hr-payroll/core/department",
+                permissionMenuName: "Department Setup",
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
   {
