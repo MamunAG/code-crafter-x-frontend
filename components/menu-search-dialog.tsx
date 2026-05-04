@@ -226,15 +226,31 @@ export function MenuSearchDialog() {
         description="Search menu names and navigate directly to a page."
       >
         <Command className="flex size-full flex-col overflow-hidden rounded-none border-0 bg-transparent p-0">
-          <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-4 dark:border-white/10 dark:bg-white/5">
-            <div className="flex items-start justify-between gap-4">
+          <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-950 dark:text-white">
                   Search menus
                 </p>
-                <p className="mt-1 max-w-[28rem] text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Jump to a section, submenu, or nested page in a couple of keystrokes.
+                <p className="mt-1 max-w-[28rem] whitespace-nowrap text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Jump to any page or submenu.
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                  <span className="text-slate-400 dark:text-slate-500">Shortcuts:</span>
+                  <Badge
+                    variant="outline"
+                    className="h-4 border-slate-200 bg-white px-1.5 text-[9px] text-slate-600 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    Ctrl+S
+                  </Badge>
+                  <span className="text-slate-400 dark:text-slate-500">or</span>
+                  <Badge
+                    variant="outline"
+                    className="h-4 border-slate-200 bg-white px-1.5 text-[9px] text-slate-600 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    Ctrl+Shift+F
+                  </Badge>
+                </div>
               </div>
               <div className="hidden shrink-0 items-center gap-2 sm:flex">
                 <Badge variant="outline" className="border-slate-200 bg-white text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-slate-400">
