@@ -68,7 +68,7 @@ function buildJobPayload(values: JobFormValues) {
   return {
     factoryId: values.factoryId.trim(),
     buyerId: values.buyerId.trim(),
-    merchandiserId: optionalNumber(values.merchandiserId),
+    merchandiserId: optionalString(values.merchandiserId),
     ordertype: optionalString(values.ordertype),
     totalPoQty: normalizeNumber(values.totalPoQty),
     poReceiveDate: optionalString(values.poReceiveDate),

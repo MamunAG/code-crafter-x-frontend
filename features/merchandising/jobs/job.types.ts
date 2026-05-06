@@ -26,6 +26,12 @@ export type UserSummary = {
   display_name?: string | null
 }
 
+export type EmployeeSummary = {
+  id?: string | null
+  employeeName?: string | null
+  employeeCode?: string | null
+}
+
 export type FactorySummary = {
   id?: string | null
   name?: string | null
@@ -86,7 +92,8 @@ export type JobRecord = {
   factory?: FactorySummary | null
   buyerId: string
   buyer?: BuyerSummary | null
-  merchandiserId?: number | null
+  merchandiserId?: string | null
+  merchandiser?: EmployeeSummary | null
   ordertype?: OrderType | null
   totalPoQty?: number | null
   poReceiveDate?: string | null

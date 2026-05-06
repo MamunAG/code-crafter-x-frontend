@@ -16,6 +16,7 @@ import { fetchFactories } from "@/features/app-config/factory/factory.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
 import { fetchColors } from "@/features/merchandising/colors/color.service"
+import { fetchEmployee, fetchEmployees } from "@/features/hr-payroll/employee/employee.service"
 import { fetchSizes } from "@/features/merchandising/sizes/size.service"
 import { fetchStyles } from "@/features/merchandising/styles/style.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
@@ -220,6 +221,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorValues, setEditorValues] = useState<JobFormValues>(DEFAULT_FORM_VALUES)
   const [selectedFactory, setSelectedFactory] = useState<AppComboboxOption | null>(null)
   const [selectedBuyer, setSelectedBuyer] = useState<AppComboboxOption | null>(null)
+  const [selectedMerchandiser, setSelectedMerchandiser] = useState<AppComboboxOption | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<JobRecord | null>(null)
   const [deleteWorking, setDeleteWorking] = useState(false)
@@ -362,55 +364,93 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [accessRules?.canView, apiUrl, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
 
-  async function loadFactoryOptions({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) {
-    const token = window.localStorage.getItem("access_token")
-    if (!token) throw new Error("Your session expired. Please sign in again.")
-    const response = await fetchFactories({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { name: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
-    return {
-      items: response.items.map((factory) => ({ value: factory.id, label: factory.displayName?.trim() || factory.name })),
-      hasNextPage: response.meta.hasNextPage,
-    }
-  }
+  const loadFactoryOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchFactories({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { name: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
+      return {
+        items: response.items.map((factory) => ({ value: factory.id, label: factory.displayName?.trim() || factory.name })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
 
-  async function loadBuyerOptions({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) {
-    const token = window.localStorage.getItem("access_token")
-    if (!token) throw new Error("Your session expired. Please sign in again.")
-    const response = await fetchBuyers({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { name: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
-    return {
-      items: response.items.map((buyer) => ({ value: buyer.id, label: buyer.displayName?.trim() || buyer.name })),
-      hasNextPage: response.meta.hasNextPage,
-    }
-  }
+  const loadBuyerOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchBuyers({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { name: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
+      return {
+        items: response.items.map((buyer) => ({ value: buyer.id, label: buyer.displayName?.trim() || buyer.name })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
 
-  async function loadStyleOptions({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) {
-    const token = window.localStorage.getItem("access_token")
-    if (!token) throw new Error("Your session expired. Please sign in again.")
-    const response = await fetchStyles({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { styleNo: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
-    return {
-      items: response.items.map((style) => ({ value: style.id, label: style.styleNo?.trim() || style.styleName?.trim() || style.id })),
-      hasNextPage: response.meta.hasNextPage,
-    }
-  }
+  const loadEmployeeOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchEmployees({
+        apiUrl,
+        accessToken: token,
+        page: pageNumber,
+        limit: pageLimit,
+        filters: { employeeName: query, isActive: "true" },
+        organizationId: selectedOrganizationId || undefined,
+      })
+      return {
+        items: response.items.map((employee) => ({
+          value: employee.id,
+          label: [employee.employeeCode?.trim(), employee.employeeName?.trim()].filter(Boolean).join(" - ") || employee.id,
+        })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
 
-  async function loadSizeOptions({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) {
-    const token = window.localStorage.getItem("access_token")
-    if (!token) throw new Error("Your session expired. Please sign in again.")
-    const response = await fetchSizes({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { sizeName: query }, organizationId: selectedOrganizationId || undefined })
-    return {
-      items: response.items.filter((size) => size.deleted_at == null && size.isActive !== false).map((size) => ({ value: String(size.id), label: size.sizeName })),
-      hasNextPage: response.meta.hasNextPage,
-    }
-  }
+  const loadStyleOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchStyles({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { styleNo: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
+      return {
+        items: response.items.map((style) => ({ value: style.id, label: style.styleNo?.trim() || style.styleName?.trim() || style.id })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
 
-  async function loadColorOptions({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) {
-    const token = window.localStorage.getItem("access_token")
-    if (!token) throw new Error("Your session expired. Please sign in again.")
-    const response = await fetchColors({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { colorName: query }, organizationId: selectedOrganizationId || undefined })
-    return {
-      items: response.items.filter((color) => color.deleted_at == null && color.isActive !== false).map((color) => ({ value: String(color.id), label: color.colorDisplayName?.trim() || color.colorName })),
-      hasNextPage: response.meta.hasNextPage,
-    }
-  }
+  const loadSizeOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchSizes({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { sizeName: query }, organizationId: selectedOrganizationId || undefined })
+      return {
+        items: response.items.filter((size) => size.deleted_at == null && size.isActive !== false).map((size) => ({ value: String(size.id), label: size.sizeName })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
+
+  const loadColorOptions = useCallback(
+    async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const response = await fetchColors({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { colorName: query }, organizationId: selectedOrganizationId || undefined })
+      return {
+        items: response.items.filter((color) => color.deleted_at == null && color.isActive !== false).map((color) => ({ value: String(color.id), label: color.colorDisplayName?.trim() || color.colorName })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
 
   function openCreateDialog() {
     if (!accessRules?.canCreate) {
@@ -422,6 +462,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorValues(DEFAULT_FORM_VALUES)
     setSelectedFactory(null)
     setSelectedBuyer(null)
+    setSelectedMerchandiser(null)
     setEditorErrors([])
     setEditorLoading(false)
     setEditorOpen(true)
@@ -437,6 +478,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorLoading(true)
     setEditorOpen(true)
     setEditorErrors([])
+    setSelectedMerchandiser(null)
     try {
       const token = window.localStorage.getItem("access_token")
       if (!token) {
@@ -444,6 +486,26 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
       const record = await fetchJob({ apiUrl, accessToken: token, id, organizationId: selectedOrganizationId || undefined })
+      let nextMerchandiser: AppComboboxOption | null = null
+      if (record.merchandiserId) {
+        try {
+          const employee = await fetchEmployee({
+            apiUrl,
+            accessToken: token,
+            id: record.merchandiserId,
+            organizationId: selectedOrganizationId || undefined,
+          })
+          nextMerchandiser = {
+            value: employee.id,
+            label: [employee.employeeCode?.trim(), employee.employeeName?.trim()].filter(Boolean).join(" - ") || employee.id,
+          }
+        } catch {
+          nextMerchandiser = {
+            value: record.merchandiserId,
+            label: record.merchandiser?.employeeName?.trim() || record.merchandiser?.employeeCode?.trim() || record.merchandiserId,
+          }
+        }
+      }
       setEditorValues({
         factoryId: record.factoryId ?? "",
         buyerId: record.buyerId ?? "",
@@ -456,6 +518,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
       })
       setSelectedFactory({ value: record.factoryId, label: record.factory?.displayName?.trim() || record.factory?.name?.trim() || record.factoryId })
       setSelectedBuyer({ value: record.buyerId, label: record.buyer?.displayName?.trim() || record.buyer?.name?.trim() || record.buyerId })
+      setSelectedMerchandiser(nextMerchandiser)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to load purchase order right now."
       if (!handleAuthFailure(message)) toast.error(message)
@@ -670,13 +733,16 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         errors={editorErrors}
         selectedFactory={selectedFactory}
         selectedBuyer={selectedBuyer}
+        selectedMerchandiser={selectedMerchandiser}
         loadFactoryOptions={loadFactoryOptions}
         loadBuyerOptions={loadBuyerOptions}
+        loadEmployeeOptions={loadEmployeeOptions}
         loadStyleOptions={loadStyleOptions}
         loadSizeOptions={loadSizeOptions}
         loadColorOptions={loadColorOptions}
         onFactoryOptionChange={setSelectedFactory}
         onBuyerOptionChange={setSelectedBuyer}
+        onMerchandiserOptionChange={setSelectedMerchandiser}
         onValuesChange={(values) => {
           const totalPoQty = values.jobDetails.reduce((total, detail) => total + (Number(detail.quantity) || 0), 0)
           setEditorValues({ ...values, totalPoQty: String(totalPoQty) })
@@ -687,6 +753,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             setEditorValues(DEFAULT_FORM_VALUES)
             setSelectedFactory(null)
             setSelectedBuyer(null)
+            setSelectedMerchandiser(null)
             setEditorErrors([])
             setEditorLoading(false)
             setEditorSubmitting(false)
