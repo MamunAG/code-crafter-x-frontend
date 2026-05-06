@@ -52,6 +52,9 @@ const ORDER_TYPE_OPTIONS = [
 const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
 const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-md text-xs"
+const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
+
+type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
 
 const JOB_DIALOG_SECTIONS: Array<{ id: JobDialogSectionId; label: string; icon: typeof Info }> = [
   { id: "basic-info", label: "Basic Info", icon: Info },
@@ -167,6 +170,13 @@ export function JobFormDialog({
     )
   }
 
+  function updateDetailFromRow(index: number, patch: Partial<JobDetailFormValues>) {
+    update(
+      "jobDetails",
+      values.jobDetails.map((detail, detailIndex) => (detailIndex >= index ? { ...detail, ...patch } : detail)),
+    )
+  }
+
   function addDetail() {
     update("jobDetails", [...values.jobDetails, newDetailRow()])
   }
@@ -210,7 +220,11 @@ export function JobFormDialog({
     setDraggingDetailId("")
   }
 
-  function focusNextQuantityInput(currentIndex: number) {
+  function getDetailFocusAttribute(column: DetailFocusColumn) {
+    return `data-job-detail-${column}`
+  }
+
+  function focusNextDetailField(currentIndex: number, column: DetailFocusColumn) {
     const nextDetail = values.jobDetails[currentIndex + 1]
 
     if (!nextDetail) {
@@ -218,19 +232,22 @@ export function JobFormDialog({
     }
 
     window.requestAnimationFrame(() => {
-      const nextInput = document.querySelector<HTMLInputElement>(`[data-job-detail-quantity="${nextDetail.id}"]`)
+      const attribute = getDetailFocusAttribute(column)
+      const nextInput = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`[${attribute}="${nextDetail.id}"]`)).find(
+        (input) => input.offsetParent !== null,
+      )
       nextInput?.focus()
       nextInput?.select()
     })
   }
 
-  function handleQuantityKeyDown(event: React.KeyboardEvent<HTMLInputElement>, currentIndex: number) {
+  function handleDetailFieldKeyDown(event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, currentIndex: number, column: DetailFocusColumn) {
     if (event.key !== "Enter") {
       return
     }
 
     event.preventDefault()
-    focusNextQuantityInput(currentIndex)
+    focusNextDetailField(currentIndex, column)
   }
 
   function scrollToSection(sectionId: JobDialogSectionId) {
@@ -483,15 +500,46 @@ export function JobFormDialog({
                                       className={JOB_DIALOG_INPUT_CLASS}
                                       value={detail.quantity}
                                       onChange={(event) => updateDetail(detail.id, { quantity: event.target.value })}
-                                      onKeyDown={(event) => handleQuantityKeyDown(event, index)}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "quantity")}
                                       inputMode="decimal"
                                       placeholder="Quantity"
                                       data-job-detail-quantity={detail.id}
                                     />
-                                    <Input className={JOB_DIALOG_INPUT_CLASS} value={detail.fob} onChange={(event) => updateDetail(detail.id, { fob: event.target.value })} inputMode="decimal" placeholder="FOB" />
-                                    <Input className={JOB_DIALOG_INPUT_CLASS} value={detail.cm} onChange={(event) => updateDetail(detail.id, { cm: event.target.value })} inputMode="decimal" placeholder="CM" />
-                                    <Input className={JOB_DIALOG_INPUT_CLASS} type="date" value={detail.deliveryDate} onChange={(event) => updateDetail(detail.id, { deliveryDate: event.target.value })} />
-                                    <Textarea className="w-full min-w-0 rounded-md text-sm md:col-span-2 xl:col-span-4" value={detail.remarks} onChange={(event) => updateDetail(detail.id, { remarks: event.target.value })} placeholder="Remarks" rows={2} />
+                                    <Input
+                                      className={JOB_DIALOG_INPUT_CLASS}
+                                      value={detail.fob}
+                                      onChange={(event) => updateDetailFromRow(index, { fob: event.target.value })}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "fob")}
+                                      inputMode="decimal"
+                                      placeholder="FOB"
+                                      data-job-detail-fob={detail.id}
+                                    />
+                                    <Input
+                                      className={JOB_DIALOG_INPUT_CLASS}
+                                      value={detail.cm}
+                                      onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cm")}
+                                      inputMode="decimal"
+                                      placeholder="CM"
+                                      data-job-detail-cm={detail.id}
+                                    />
+                                    <Input
+                                      className={JOB_DIALOG_INPUT_CLASS}
+                                      type="date"
+                                      value={detail.deliveryDate}
+                                      onChange={(event) => updateDetailFromRow(index, { deliveryDate: event.target.value })}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
+                                      data-job-detail-deliveryDate={detail.id}
+                                    />
+                                    <Textarea
+                                      className="w-full min-w-0 rounded-md text-sm md:col-span-2 xl:col-span-4"
+                                      value={detail.remarks}
+                                      onChange={(event) => updateDetail(detail.id, { remarks: event.target.value })}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "remarks")}
+                                      placeholder="Remarks"
+                                      rows={2}
+                                      data-job-detail-remarks={detail.id}
+                                    />
                                   </div>
                                 </div>
                               ))}
@@ -600,7 +648,7 @@ export function JobFormDialog({
                                         <Input
                                           value={detail.quantity}
                                           onChange={(event) => updateDetail(detail.id, { quantity: event.target.value })}
-                                          onKeyDown={(event) => handleQuantityKeyDown(event, index)}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "quantity")}
                                           inputMode="decimal"
                                           placeholder="Quantity"
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
@@ -610,27 +658,33 @@ export function JobFormDialog({
                                       <td className="px-2 py-2 align-top">
                                         <Input
                                           value={detail.fob}
-                                          onChange={(event) => updateDetail(detail.id, { fob: event.target.value })}
+                                          onChange={(event) => updateDetailFromRow(index, { fob: event.target.value })}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "fob")}
                                           inputMode="decimal"
                                           placeholder="FOB"
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                          data-job-detail-fob={detail.id}
                                         />
                                       </td>
                                       <td className="px-2 py-2 align-top">
                                         <Input
                                           value={detail.cm}
-                                          onChange={(event) => updateDetail(detail.id, { cm: event.target.value })}
+                                          onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cm")}
                                           inputMode="decimal"
                                           placeholder="CM"
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                          data-job-detail-cm={detail.id}
                                         />
                                       </td>
                                       <td className="px-2 py-2 align-top">
                                         <Input
                                           type="date"
                                           value={detail.deliveryDate}
-                                          onChange={(event) => updateDetail(detail.id, { deliveryDate: event.target.value })}
+                                          onChange={(event) => updateDetailFromRow(index, { deliveryDate: event.target.value })}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                          data-job-detail-deliveryDate={detail.id}
                                         />
                                       </td>
                                       <td className="px-2 py-2 align-top">
@@ -638,8 +692,10 @@ export function JobFormDialog({
                                           type="text"
                                           value={detail.remarks}
                                           onChange={(event) => updateDetail(detail.id, { remarks: event.target.value })}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "remarks")}
                                           placeholder="Remarks"
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                          data-job-detail-remarks={detail.id}
                                         />
                                       </td>
                                       <td className="px-2 py-2 align-top text-right">
