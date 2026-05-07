@@ -13,12 +13,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchFactories } from "@/features/app-config/factory/factory.service"
+import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
-import { fetchColors } from "@/features/merchandising/colors/color.service"
+import { createColor, fetchColors } from "@/features/merchandising/colors/color.service"
 import { fetchEmployee, fetchEmployees } from "@/features/hr-payroll/employee/employee.service"
-import { fetchSizes } from "@/features/merchandising/sizes/size.service"
-import { fetchStyles } from "@/features/merchandising/styles/style.service"
+import { createSize, fetchSizes } from "@/features/merchandising/sizes/size.service"
+import { createStyle, fetchStyles } from "@/features/merchandising/styles/style.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
@@ -608,6 +609,124 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
+  async function createAiAssistMasterData({
+    row,
+    missing,
+    matches,
+  }: {
+    row: JobAiAssistRow
+    missing: { styleNo?: string; size?: string; color?: string }
+    matches: { styleOption: AppComboboxOption | null; sizeOption: AppComboboxOption | null; colorOption: AppComboboxOption | null }
+  }): Promise<Partial<{ styleOption: AppComboboxOption | null; sizeOption: AppComboboxOption | null; colorOption: AppComboboxOption | null }>> {
+    const token = window.localStorage.getItem("access_token")
+    if (!token) {
+      handleAuthFailure("Your session expired. Please sign in again.")
+      return {}
+    }
+
+    const organizationId = selectedOrganizationId || undefined
+    let colorOption = matches.colorOption
+    let sizeOption = matches.sizeOption
+
+    try {
+      if (missing.color?.trim()) {
+        const color = await createColor({
+          apiUrl,
+          accessToken: token,
+          organizationId,
+          payload: {
+            colorName: missing.color.trim(),
+            colorDisplayName: missing.color.trim(),
+            colorDescription: "Created from Job Entry AI Assist.",
+            colorHexCode: "",
+            isActive: true,
+          },
+        })
+        colorOption = {
+          value: String(color.id),
+          label: color.colorDisplayName?.trim() || color.colorName,
+        }
+      }
+
+      if (missing.size?.trim()) {
+        const size = await createSize({
+          apiUrl,
+          accessToken: token,
+          organizationId,
+          payload: {
+            sizeName: missing.size.trim(),
+            isActive: true,
+          },
+        })
+        sizeOption = {
+          value: String(size.id),
+          label: size.sizeName,
+        }
+      }
+
+      let styleOption = matches.styleOption
+      if (missing.styleNo?.trim()) {
+        if (!editorValues.buyerId.trim()) {
+          throw new Error("Please select a buyer before adding a new style from AI Assist.")
+        }
+
+        const currencies = await fetchCurrencies({
+          apiUrl,
+          accessToken: token,
+          page: 1,
+          limit: 100,
+          filters: {},
+          organizationId,
+        })
+        const currency = currencies.items.find((item) => item.isActive !== false && item.isDefault) ?? currencies.items.find((item) => item.isActive !== false) ?? currencies.items[0]
+
+        if (!currency?.id) {
+          throw new Error("Please create an active currency before adding a new style from AI Assist.")
+        }
+
+        const style = await createStyle({
+          apiUrl,
+          accessToken: token,
+          organizationId,
+          payload: {
+            productType: "",
+            buyerId: editorValues.buyerId.trim(),
+            styleNo: missing.styleNo.trim(),
+            styleName: "",
+            itemType: "",
+            productDepartment: "",
+            cmSewing: "0",
+            currencyId: String(currency.id),
+            smvSewing: "0",
+            smvSewingSideSeam: "0",
+            smvCutting: "0",
+            smvCuttingSideSeam: "0",
+            smvFinishing: "0",
+            imageId: "",
+            remarks: "Created from Job Entry AI Assist.",
+            isActive: true,
+            itemUom: "Pcs",
+            productFamily: "",
+            colors: colorOption ? [{ id: crypto.randomUUID(), value: colorOption.value, label: colorOption.label }] : [],
+            sizes: sizeOption ? [{ id: crypto.randomUUID(), value: sizeOption.value, label: sizeOption.label }] : [],
+            embellishments: [],
+          },
+        })
+        styleOption = {
+          value: style.id,
+          label: formatStyleLabel(style.styleNo, style.styleName) || style.id,
+        }
+      }
+
+      toast.success("Missing setup data added successfully.")
+      return { styleOption, sizeOption, colorOption }
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to add missing setup data right now."
+      if (!handleAuthFailure(message)) toast.error(message)
+      throw caughtError
+    }
+  }
+
   function requestSoftDelete(job: JobRecord) {
     if (!accessRules?.canDelete) {
       toast.error("You do not have permission to delete purchase orders.")
@@ -790,6 +909,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           setEditorValues({ ...values, totalPoQty: String(totalPoQty) })
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
+        onAiAssistMasterDataCreate={createAiAssistMasterData}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {

@@ -159,6 +159,8 @@ export type JobAiAssistRow = {
   color: string
   size: string
   quantity: number
+  deliveryDate: string | null
+  fob: number | null
 }
 
 export type JobAiAssistResult = {

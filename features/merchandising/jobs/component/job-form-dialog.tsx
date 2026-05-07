@@ -5,12 +5,14 @@ import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Tr
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
 import { AppSelect } from "@/components/app-select"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,6 +21,25 @@ import { cn } from "@/lib/utils"
 import type { JobAiAssistRow, JobDetailFormValues, JobDialogSectionId, JobFormError, JobFormValues } from "../job.types"
 
 type SelectOption = AppComboboxOption
+
+type AiAssistMasterDataMatches = {
+  styleOption: SelectOption | null
+  sizeOption: SelectOption | null
+  colorOption: SelectOption | null
+}
+
+type AiAssistMissingMasterData = {
+  styleNo?: string
+  size?: string
+  color?: string
+}
+
+type AiAssistPendingAdd = {
+  row: JobAiAssistRow
+  index: number
+  matches: AiAssistMasterDataMatches
+  missing: AiAssistMissingMasterData
+}
 
 type JobFormDialogProps = {
   open: boolean
@@ -41,6 +62,11 @@ type JobFormDialogProps = {
   onMerchandiserOptionChange: (option: SelectOption | null) => void
   onValuesChange: (values: JobFormValues) => void
   onAiAssistFileAnalyze: (file: File) => Promise<JobAiAssistRow[]>
+  onAiAssistMasterDataCreate: (params: {
+    row: JobAiAssistRow
+    missing: AiAssistMissingMasterData
+    matches: AiAssistMasterDataMatches
+  }) => Promise<Partial<AiAssistMasterDataMatches>>
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
 }
@@ -147,6 +173,78 @@ function formatSummaryValue(value: number) {
   return value.toFixed(2).replace(/\.?0+$/, "")
 }
 
+function normalizeLookupText(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? ""
+}
+
+function findBestAiAssistOption(options: SelectOption[], value: string, allowStylePrefix = false) {
+  const normalizedValue = normalizeLookupText(value)
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  return (
+    options.find((option) => normalizeLookupText(option.label) === normalizedValue || normalizeLookupText(option.value) === normalizedValue) ??
+    (allowStylePrefix ? options.find((option) => normalizeLookupText(option.label).startsWith(`${normalizedValue} -`)) : undefined) ??
+    null
+  )
+}
+
+function formatAiAssistDateForInput(value: string | null | undefined) {
+  const normalizedValue = value?.trim()
+
+  if (!normalizedValue) {
+    return ""
+  }
+
+  const isoMatch = normalizedValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`
+  }
+
+  const monthMap: Record<string, string> = {
+    jan: "01",
+    january: "01",
+    feb: "02",
+    february: "02",
+    mar: "03",
+    march: "03",
+    apr: "04",
+    april: "04",
+    may: "05",
+    jun: "06",
+    june: "06",
+    jul: "07",
+    july: "07",
+    aug: "08",
+    august: "08",
+    sep: "09",
+    sept: "09",
+    september: "09",
+    oct: "10",
+    october: "10",
+    nov: "11",
+    november: "11",
+    dec: "12",
+    december: "12",
+  }
+  const parts = normalizedValue.toLowerCase().split(/[\s\-/.]+/).filter(Boolean)
+
+  if (parts.length >= 3) {
+    const [dayPart, monthPart, yearPart] = parts
+    const day = Number(dayPart)
+    const month = monthMap[monthPart] ?? (Number(monthPart) >= 1 && Number(monthPart) <= 12 ? String(Number(monthPart)).padStart(2, "0") : "")
+    const year = Number(yearPart)
+
+    if (day >= 1 && day <= 31 && month && year >= 1900) {
+      return `${year}-${month}-${String(day).padStart(2, "0")}`
+    }
+  }
+
+  return ""
+}
+
 function RailItem({
   section,
   active,
@@ -203,6 +301,7 @@ export function JobFormDialog({
   onMerchandiserOptionChange,
   onValuesChange,
   onAiAssistFileAnalyze,
+  onAiAssistMasterDataCreate,
   onOpenChange,
   onSubmit,
 }: JobFormDialogProps) {
@@ -218,6 +317,9 @@ export function JobFormDialog({
   const [aiAssistRows, setAiAssistRows] = useState<JobAiAssistRow[]>([])
   const [aiAssistError, setAiAssistError] = useState("")
   const [aiAssistWorking, setAiAssistWorking] = useState(false)
+  const [addingAiAssistRowIndex, setAddingAiAssistRowIndex] = useState<number | null>(null)
+  const [addedAiAssistRowKeys, setAddedAiAssistRowKeys] = useState<string[]>([])
+  const [pendingAiAssistAdd, setPendingAiAssistAdd] = useState<AiAssistPendingAdd | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -253,24 +355,120 @@ export function JobFormDialog({
     setAiAssistFileName(file?.name ?? "")
     setAiAssistRows([])
     setAiAssistError("")
+    setAddedAiAssistRowKeys([])
+
+    if (file) {
+      void analyzeAiAssistFile(file)
+    }
   }
 
-  async function analyzeAiAssistFile() {
-    if (!aiAssistFile || aiAssistWorking) {
+  async function analyzeAiAssistFile(fileToAnalyze = aiAssistFile) {
+    if (!fileToAnalyze || aiAssistWorking) {
       return
     }
 
     setAiAssistWorking(true)
     setAiAssistError("")
     try {
-      const rows = await onAiAssistFileAnalyze(aiAssistFile)
+      const rows = await onAiAssistFileAnalyze(fileToAnalyze)
       setAiAssistRows(rows)
+      setAddedAiAssistRowKeys([])
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
       setAiAssistRows([])
       setAiAssistError(message)
     } finally {
       setAiAssistWorking(false)
+    }
+  }
+
+  function getAiAssistRowKey(row: JobAiAssistRow, index: number) {
+    return [row.poNumber, row.styleNo, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
+  }
+
+  function appendAiAssistRowToDetails(row: JobAiAssistRow, index: number, matches: AiAssistMasterDataMatches) {
+    const previousDetail = values.jobDetails[values.jobDetails.length - 1]
+    const nextDetail: JobDetailFormValues = {
+      ...newDetailRow(previousDetail),
+      pono: row.poNumber.trim(),
+      styleId: matches.styleOption?.value ?? "",
+      styleLabel: matches.styleOption?.label ?? "",
+      sizeId: matches.sizeOption?.value ?? "",
+      sizeLabel: matches.sizeOption?.label ?? "",
+      colorId: matches.colorOption?.value ?? "",
+      colorLabel: matches.colorOption?.label ?? "",
+      quantity: String(row.quantity || 0),
+      fob: row.fob == null ? "0" : String(row.fob),
+      deliveryDate: formatAiAssistDateForInput(row.deliveryDate),
+    }
+
+    update("jobDetails", [...values.jobDetails, nextDetail])
+    setAddedAiAssistRowKeys((currentKeys) => [...currentKeys, getAiAssistRowKey(row, index)])
+  }
+
+  async function addAiAssistRowToDetails(row: JobAiAssistRow, index: number) {
+    if (addingAiAssistRowIndex !== null) {
+      return
+    }
+
+    setAddingAiAssistRowIndex(index)
+    setAiAssistError("")
+
+    try {
+      const [styleResult, sizeResult, colorResult] = await Promise.all([
+        row.styleNo.trim() ? loadStyleOptions({ query: row.styleNo.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
+        row.size.trim() ? loadSizeOptions({ query: row.size.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
+        row.color.trim() ? loadColorOptions({ query: row.color.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
+      ])
+      const styleOption = findBestAiAssistOption(styleResult.items, row.styleNo, true)
+      const sizeOption = findBestAiAssistOption(sizeResult.items, row.size)
+      const colorOption = findBestAiAssistOption(colorResult.items, row.color)
+      const matches = { styleOption, sizeOption, colorOption }
+      const missing: AiAssistMissingMasterData = {
+        styleNo: row.styleNo.trim() && !styleOption ? row.styleNo.trim() : undefined,
+        size: row.size.trim() && !sizeOption ? row.size.trim() : undefined,
+        color: row.color.trim() && !colorOption ? row.color.trim() : undefined,
+      }
+
+      if (missing.styleNo || missing.size || missing.color) {
+        setPendingAiAssistAdd({ row, index, matches, missing })
+        return
+      }
+
+      appendAiAssistRowToDetails(row, index, matches)
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to add this AI Assist row to PO Details."
+      setAiAssistError(message)
+    } finally {
+      setAddingAiAssistRowIndex(null)
+    }
+  }
+
+  async function confirmCreateAiAssistMasterData() {
+    if (!pendingAiAssistAdd || addingAiAssistRowIndex !== null) {
+      return
+    }
+
+    setAddingAiAssistRowIndex(pendingAiAssistAdd.index)
+    setAiAssistError("")
+
+    try {
+      const createdMatches = await onAiAssistMasterDataCreate({
+        row: pendingAiAssistAdd.row,
+        missing: pendingAiAssistAdd.missing,
+        matches: pendingAiAssistAdd.matches,
+      })
+      appendAiAssistRowToDetails(pendingAiAssistAdd.row, pendingAiAssistAdd.index, {
+        styleOption: createdMatches.styleOption ?? pendingAiAssistAdd.matches.styleOption,
+        sizeOption: createdMatches.sizeOption ?? pendingAiAssistAdd.matches.sizeOption,
+        colorOption: createdMatches.colorOption ?? pendingAiAssistAdd.matches.colorOption,
+      })
+      setPendingAiAssistAdd(null)
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to create the missing setup data for this AI Assist row."
+      setAiAssistError(message)
+    } finally {
+      setAddingAiAssistRowIndex(null)
     }
   }
 
@@ -883,21 +1081,41 @@ export function JobFormDialog({
             <div className="space-y-2">
               <Label htmlFor="job-ai-assist-file">File Upload</Label>
               <label
-                htmlFor="job-ai-assist-file"
-                className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition hover:bg-slate-100 dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:bg-white/[0.06]"
+                htmlFor={aiAssistWorking ? undefined : "job-ai-assist-file"}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300",
+                  aiAssistWorking ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.06]",
+                )}
               >
-                <Upload className="size-5 text-slate-400" />
+                {aiAssistWorking ? <Loader2 className="size-5 animate-spin text-blue-500" /> : <Upload className="size-5 text-slate-400" />}
                 <span className="max-w-full truncate font-medium">{aiAssistFileName || "Choose a file"}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">PDF, XLS, XLSX, or CSV</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {aiAssistWorking ? "Upload locked while AI Assist reviews this document" : "PDF, XLS, XLSX, or CSV"}
+                </span>
               </label>
               <Input
                 id="job-ai-assist-file"
                 type="file"
                 accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                disabled={aiAssistWorking}
                 className="sr-only"
                 onChange={(event) => handleAiAssistFileChange(event.target.files?.[0] ?? null)}
               />
             </div>
+
+            {aiAssistWorking ? (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
+                <div className="flex items-start gap-2">
+                  <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+                  <div>
+                    <p className="font-medium">Analyzing purchase order document</p>
+                    <p className="mt-0.5 text-xs leading-5 text-blue-700/80 dark:text-blue-100/75">
+                      Extracting PO number, style, color, size, quantity, FOB, and delivery date. This may take a moment for large files.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {aiAssistError ? (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -907,33 +1125,60 @@ export function JobFormDialog({
 
             {aiAssistRows.length ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
+                <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  AI-generated extraction may contain mistakes. Please review the original document and verify all values before saving or making decisions based on this information.
+                </div>
                 <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]">
                   Extracted PO Detail Rows
                 </div>
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <table className="w-full min-w-[560px] border-collapse text-xs sm:text-sm">
+                <ScrollArea className="min-h-0 flex-1">
+                  <table className="w-full min-w-[700px] table-fixed border-collapse text-xs sm:text-sm">
                     <thead className="sticky top-0 z-10 bg-white dark:bg-[#17131d]">
                       <tr className="border-b border-slate-200 dark:border-white/10">
-                        <th className="w-24 px-2 py-2 text-left font-medium">PO Number</th>
-                        <th className="min-w-48 px-2 py-2 text-left font-medium">Style No</th>
-                        <th className="w-24 px-2 py-2 text-left font-medium">Color</th>
-                        <th className="w-16 px-2 py-2 text-left font-medium">Size</th>
-                        <th className="w-20 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-20 px-2 py-2 text-left font-medium">PO Number</th>
+                        <th className="w-24 px-2 py-2 text-left font-medium">Style No</th>
+                        <th className="w-20 px-2 py-2 text-left font-medium">Color</th>
+                        <th className="w-14 px-2 py-2 text-left font-medium">Size</th>
+                        <th className="w-16 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-16 px-2 py-2 text-right font-medium">FOB</th>
+                        <th className="w-28 px-2 py-2 text-left font-medium">Delivery Date</th>
+                        <th className="w-20 px-2 py-2 text-right font-medium">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {aiAssistRows.map((row, index) => (
-                        <tr key={`${row.poNumber}-${row.styleNo}-${row.color}-${row.size}-${index}`} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
-                          <td className="px-2 py-2 align-top font-medium">{row.poNumber || "-"}</td>
-                          <td className="px-2 py-2 align-top leading-5">{row.styleNo || "-"}</td>
-                          <td className="px-2 py-2 align-top">{row.color || "-"}</td>
-                          <td className="px-2 py-2 align-top">{row.size || "-"}</td>
-                          <td className="px-2 py-2 text-right align-top font-medium">{row.quantity}</td>
-                        </tr>
-                      ))}
+                      {aiAssistRows.map((row, index) => {
+                        const rowKey = getAiAssistRowKey(row, index)
+                        const rowAdded = addedAiAssistRowKeys.includes(rowKey)
+                        const rowAdding = addingAiAssistRowIndex === index
+
+                        return (
+                          <tr key={rowKey} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
+                            <td className="truncate px-2 py-2 align-top font-medium">{row.poNumber || "-"}</td>
+                            <td className="whitespace-normal break-words px-2 py-2 align-top leading-5">{row.styleNo || "-"}</td>
+                            <td className="truncate px-2 py-2 align-top">{row.color || "-"}</td>
+                            <td className="px-2 py-2 align-top">{row.size || "-"}</td>
+                            <td className="px-2 py-2 text-right align-top font-medium">{row.quantity}</td>
+                            <td className="px-2 py-2 text-right align-top">{row.fob ?? "-"}</td>
+                            <td className="px-2 py-2 align-top">{row.deliveryDate || "-"}</td>
+                            <td className="px-2 py-2 text-right align-top">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={rowAdded ? "secondary" : "outline"}
+                                className="h-7 rounded-md px-2 text-xs"
+                                disabled={rowAdding || addingAiAssistRowIndex !== null}
+                                onClick={() => void addAiAssistRowToDetails(row, index)}
+                              >
+                                {rowAdding ? <Loader2 className="size-3 animate-spin" /> : null}
+                                {rowAdded ? "Added" : "Add"}
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
-                </div>
+                </ScrollArea>
               </div>
             ) : null}
           </div>
@@ -941,11 +1186,40 @@ export function JobFormDialog({
             <Button type="button" variant="outline" onClick={() => setAiAssistOpen(false)}>Cancel</Button>
             <Button type="button" disabled={!aiAssistFile || aiAssistWorking} onClick={() => void analyzeAiAssistFile()}>
               {aiAssistWorking ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              Analyze
+              {aiAssistWorking ? "Analyzing" : aiAssistRows.length ? "Analyze Again" : "Analyze"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={Boolean(pendingAiAssistAdd)} onOpenChange={(open) => {
+        if (!open && addingAiAssistRowIndex === null) setPendingAiAssistAdd(null)
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add missing setup data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This AI Assist row contains setup values that are not available in the system yet. Add the missing records first, then this row will be inserted into PO Details.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingAiAssistAdd ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+              {pendingAiAssistAdd.missing.styleNo ? <p><span className="font-semibold">Style No:</span> {pendingAiAssistAdd.missing.styleNo}</p> : null}
+              {pendingAiAssistAdd.missing.color ? <p><span className="font-semibold">Color:</span> {pendingAiAssistAdd.missing.color}</p> : null}
+              {pendingAiAssistAdd.missing.size ? <p><span className="font-semibold">Size:</span> {pendingAiAssistAdd.missing.size}</p> : null}
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={addingAiAssistRowIndex !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={addingAiAssistRowIndex !== null} onClick={(event) => {
+              event.preventDefault()
+              void confirmCreateAiAssistMasterData()
+            }}>
+              {addingAiAssistRowIndex !== null ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Add setup data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
