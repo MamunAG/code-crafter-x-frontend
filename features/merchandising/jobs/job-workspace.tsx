@@ -45,7 +45,7 @@ type JobAccessRules = {
   canDelete: boolean
 }
 
-const MENU_NAME = "Purchase Order"
+const MENU_NAME = "Job Entry"
 const EMPTY_ACCESS_RULES: JobAccessRules = { canView: false, canCreate: false, canUpdate: false, canDelete: false }
 
 const DEFAULT_FILTERS: JobFilterValues = {
@@ -74,7 +74,7 @@ function normalizeAuthFailure(message: string) {
 
 function getJobLabel(job?: JobRecord | null) {
   const po = job?.jobDetails?.[0]?.purchaseOrder?.pono
-  return po?.trim() || "this purchase order"
+  return po?.trim() || "this job entry"
 }
 
 function detailToFormValue(detail: JobDetailRecord): JobDetailFormValues {
@@ -82,7 +82,7 @@ function detailToFormValue(detail: JobDetailRecord): JobDetailFormValues {
     id: detail.id || crypto.randomUUID(),
     pono: detail.purchaseOrder?.pono ?? "",
     styleId: detail.styleId ?? "",
-    styleLabel: detail.style?.styleNo?.trim() || detail.style?.styleName?.trim() || "",
+    styleLabel: formatStyleLabel(detail.style?.styleNo, detail.style?.styleName) || "",
     sizeId: detail.sizeId == null ? "" : String(detail.sizeId),
     sizeLabel: detail.size?.sizeName ?? "",
     colorId: detail.colorId == null ? "" : String(detail.colorId),
@@ -107,6 +107,17 @@ function normalizeJobFormErrors(values: JobFormValues): JobFormError[] {
     if (!detail.colorId.trim()) errors.push({ section: "details", message: `Row ${index + 1}: Color is required.` })
   })
   return errors
+}
+
+function formatStyleLabel(styleNo?: string | null, styleName?: string | null) {
+  const normalizedStyleNo = styleNo?.trim() ?? ""
+  const normalizedStyleName = styleName?.trim() ?? ""
+
+  if (normalizedStyleNo && normalizedStyleName) {
+    return `${normalizedStyleNo} - ${normalizedStyleName}`
+  }
+
+  return normalizedStyleNo || normalizedStyleName
 }
 
 function WorkspaceSkeleton() {
@@ -417,9 +428,16 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
       const token = window.localStorage.getItem("access_token")
       if (!token) throw new Error("Your session expired. Please sign in again.")
-      const response = await fetchStyles({ apiUrl, accessToken: token, page: pageNumber, limit: pageLimit, filters: { styleNo: query, isActive: "true" }, organizationId: selectedOrganizationId || undefined })
+      const response = await fetchStyles({
+        apiUrl,
+        accessToken: token,
+        page: pageNumber,
+        limit: pageLimit,
+        filters: { styleNo: query, styleName: query, isActive: "true" },
+        organizationId: selectedOrganizationId || undefined,
+      })
       return {
-        items: response.items.map((style) => ({ value: style.id, label: style.styleNo?.trim() || style.styleName?.trim() || style.id })),
+        items: response.items.map((style) => ({ value: style.id, label: formatStyleLabel(style.styleNo, style.styleName) || style.id })),
         hasNextPage: response.meta.hasNextPage,
       }
     },
@@ -645,8 +663,8 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Merchandising orders</p>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Purchase Order</h1>
-                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain purchase order job records.</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Job Entry</h1>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Create, review, and maintain job entry records.</p>
                   <div className="flex flex-wrap gap-2 pt-2">
                     <Badge variant="secondary" className="rounded-full px-3 py-1">Total {activeTotal}</Badge>
                     <Badge variant="outline" className="rounded-full px-3 py-1">Active {activeCount}</Badge>
@@ -656,7 +674,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" /> Refresh</Button>
-                  {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" /> New purchase order</Button> : null}
+                  {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" /> New job entry</Button> : null}
                 </div>
               </div>
             </CardContent>

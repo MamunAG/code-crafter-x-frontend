@@ -115,8 +115,24 @@ export function AppCombobox<T extends AppComboboxOption>({
   const resolvedDisabled = disabled || loading
   const resolvedShowClear = showClear ?? Boolean(value)
   const resolvedItems = loadItems ? remoteItems : items ?? []
+  const resolvedItemValues = resolvedItems.map((item) => item.value)
   const resolvedLoading = loading || remoteLoading
   const inputElementId = inputProps?.id ?? `app-combobox-${generatedInputName}-input`
+
+  const findResolvedItem = useCallback(
+    (itemValue: string | null | undefined) => {
+      if (!itemValue) {
+        return null
+      }
+
+      return resolvedItems.find((item) => item.value === itemValue) ?? null
+    },
+    [resolvedItems],
+  )
+
+  useEffect(() => {
+    setInputValue(value?.label ?? "")
+  }, [value?.label, value?.value])
 
   const runLoad = useCallback(
     async (query: string, page: number, limit: number, replace = true) => {
@@ -277,6 +293,21 @@ export function AppCombobox<T extends AppComboboxOption>({
   )
 
   const handleValueChange = useCallback(
+    (nextValue: string | null) => {
+      const normalizedValue = findResolvedItem(nextValue)
+
+      onValueChange(normalizedValue)
+      ignoreNextInputChangeRef.current = true
+      window.setTimeout(() => {
+        ignoreNextInputChangeRef.current = false
+      }, 0)
+      setInputValue(normalizedValue?.label ?? "")
+      setSearchQuery("")
+    },
+    [findResolvedItem, onValueChange],
+  )
+
+  const commitValue = useCallback(
     (nextValue: T | null) => {
       onValueChange(nextValue)
       ignoreNextInputChangeRef.current = true
@@ -285,20 +316,23 @@ export function AppCombobox<T extends AppComboboxOption>({
       }, 0)
       setInputValue(nextValue?.label ?? "")
       setSearchQuery("")
+      handleOpenChange(false)
     },
-    [onValueChange],
+    [handleOpenChange, onValueChange],
   )
 
   return (
     <Combobox
       open={resolvedOpen}
       onOpenChange={handleOpenChange}
-      items={resolvedItems}
-      value={value}
+      items={resolvedItemValues}
+      value={value?.value ?? null}
       inputValue={inputValue}
       onInputValueChange={handleInputValueChange}
       onValueChange={handleValueChange}
-      isItemEqualToValue={isItemEqualToValue ?? ((item, currentValue) => item.value === currentValue.value)}
+      itemToStringLabel={(itemValue) => findResolvedItem(itemValue)?.label ?? itemValue}
+      itemToStringValue={(itemValue) => itemValue}
+      isItemEqualToValue={(itemValue, currentValue) => itemValue === currentValue}
     >
       <ComboboxInput
         {...inputProps}
@@ -322,15 +356,29 @@ export function AppCombobox<T extends AppComboboxOption>({
           onScroll={handleListScroll}
           onWheel={handleListWheel}
         >
-          {(item) => (
+          {(itemValue) => {
+            const item = findResolvedItem(itemValue)
+
+            if (!item) {
+              return null
+            }
+
+            return (
             <ComboboxItem
               key={item.value}
-              value={item}
+              value={item.value}
+              onPointerDownCapture={() => {
+                commitValue(item)
+              }}
+              onClickCapture={() => {
+                commitValue(item)
+              }}
               className={cn("cursor-pointer px-3 py-2 text-xs font-medium", itemClassName)}
             >
               {renderItem ? renderItem(item) : item.label}
             </ComboboxItem>
-          )}
+            )
+          }}
         </ComboboxList>
         {footer}
       </ComboboxContent>

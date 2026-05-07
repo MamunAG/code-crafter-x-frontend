@@ -267,9 +267,9 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             href: "/merchandising/production",
             children: [
               {
-                label: "Purchase Order",
+                label: "Job Entry",
                 href: "/merchandising/production/orders/purchase-order",
-                permissionMenuName: "Purchase Order",
+                permissionMenuName: "Job Entry",
               },
               { label: "Work orders", href: "/merchandising/production/orders/work-orders" },
               { label: "Status", href: "/merchandising/production/orders/status" },

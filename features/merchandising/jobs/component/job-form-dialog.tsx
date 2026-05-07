@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -51,7 +52,7 @@ const ORDER_TYPE_OPTIONS = [
 
 const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
-const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-md text-xs"
+const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-md px-1.5 text-xs"
 const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
 
 type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
@@ -70,10 +71,10 @@ function FieldLabel({ children, required = false }: { children: React.ReactNode;
   )
 }
 
-function newDetailRow(): JobDetailFormValues {
+function newDetailRow(previousDetail?: Partial<JobDetailFormValues>): JobDetailFormValues {
   return {
     id: crypto.randomUUID(),
-    pono: "",
+    pono: previousDetail?.pono ?? "",
     styleId: "",
     styleLabel: "",
     sizeId: "",
@@ -81,11 +82,68 @@ function newDetailRow(): JobDetailFormValues {
     colorId: "",
     colorLabel: "",
     quantity: "0",
-    fob: "0",
-    cm: "0",
-    deliveryDate: "",
+    fob: previousDetail?.fob ?? "0",
+    cm: previousDetail?.cm ?? "0",
+    deliveryDate: previousDetail?.deliveryDate ?? "",
     remarks: "",
   }
+}
+
+function calculateTotalFob(quantity: string | number | null | undefined, fob: string | number | null | undefined) {
+  const quantityValue = Number(quantity)
+  const fobValue = Number(fob)
+
+  if (!Number.isFinite(quantityValue) || !Number.isFinite(fobValue)) {
+    return "0"
+  }
+
+  const total = quantityValue * fobValue
+
+  if (Number.isInteger(total)) {
+    return String(total)
+  }
+
+  return total.toFixed(2).replace(/\.?0+$/, "")
+}
+
+function sumJobDetails<T extends { quantity?: string | number | null; fob?: string | number | null; cm?: string | number | null }>(
+  details: T[],
+  valueKey: "fob" | "cm",
+) {
+  return details.reduce((total, detail) => {
+    const quantityValue = Number(detail.quantity)
+    const unitValue = Number(detail[valueKey])
+
+    if (!Number.isFinite(quantityValue) || !Number.isFinite(unitValue)) {
+      return total
+    }
+
+    return total + quantityValue * unitValue
+  }, 0)
+}
+
+function sumJobQuantities<T extends { quantity?: string | number | null }>(details: T[]) {
+  return details.reduce((total, detail) => {
+    const quantityValue = Number(detail.quantity)
+
+    if (!Number.isFinite(quantityValue)) {
+      return total
+    }
+
+    return total + quantityValue
+  }, 0)
+}
+
+function formatSummaryValue(value: number) {
+  if (!Number.isFinite(value)) {
+    return "0"
+  }
+
+  if (Number.isInteger(value)) {
+    return String(value)
+  }
+
+  return value.toFixed(2).replace(/\.?0+$/, "")
 }
 
 function RailItem({
@@ -178,7 +236,8 @@ export function JobFormDialog({
   }
 
   function addDetail() {
-    update("jobDetails", [...values.jobDetails, newDetailRow()])
+    const previousDetail = values.jobDetails[values.jobDetails.length - 1]
+    update("jobDetails", [...values.jobDetails, newDetailRow(previousDetail)])
   }
 
   function removeDetail(id: string) {
@@ -255,6 +314,10 @@ export function JobFormDialog({
     setActiveSection(sectionId)
   }
 
+  const totalFobSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "fob"))
+  const totalCmSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "cm"))
+  const totalQuantitySummary = formatSummaryValue(sumJobQuantities(values.jobDetails))
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-slate-200/70 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#080a14] sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:max-w-7xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
@@ -284,7 +347,7 @@ export function JobFormDialog({
             <div className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
               <div className="min-w-0 space-y-2.5 p-2 sm:p-3">
                 <DialogHeader className="rounded-lg border border-slate-200/70 bg-white/90 p-3 dark:border-white/10 dark:bg-[#17131d]/90">
-                  <DialogTitle>{mode === "create" ? "Create purchase order" : "Edit purchase order"}</DialogTitle>
+                  <DialogTitle>{mode === "create" ? "Create job entry" : "Edit job entry"}</DialogTitle>
                   <DialogDescription>
                     Manage order header data and PO detail rows. PO numbers are resolved automatically by the backend.
                   </DialogDescription>
@@ -450,7 +513,7 @@ export function JobFormDialog({
                                       <AppCombobox
                                         open={openRowControl === `${detail.id}:style`}
                                         onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
-                                        value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel } : null}
+                                        value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
                                         onValueChange={(option) => {
                                           updateDetail(detail.id, { styleId: option?.value ?? "", styleLabel: option?.label ?? "" })
                                           setOpenRowControl("")
@@ -516,6 +579,12 @@ export function JobFormDialog({
                                     />
                                     <Input
                                       className={JOB_DIALOG_INPUT_CLASS}
+                                      value={calculateTotalFob(detail.quantity, detail.fob)}
+                                      readOnly
+                                      placeholder="Total FOB"
+                                    />
+                                    <Input
+                                      className={JOB_DIALOG_INPUT_CLASS}
                                       value={detail.cm}
                                       onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
                                       onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cm")}
@@ -529,7 +598,7 @@ export function JobFormDialog({
                                       value={detail.deliveryDate}
                                       onChange={(event) => updateDetailFromRow(index, { deliveryDate: event.target.value })}
                                       onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
-                                      data-job-detail-deliveryDate={detail.id}
+                                      data-job-detail-deliverydate={detail.id}
                                     />
                                     <Textarea
                                       className="w-full min-w-0 rounded-md text-sm md:col-span-2 xl:col-span-4"
@@ -546,20 +615,21 @@ export function JobFormDialog({
                             </div>
 
                             <div className="hidden w-full min-w-0 overflow-x-scroll rounded-md border border-slate-200/70 overscroll-x-contain pb-2 [scrollbar-gutter:stable] lg:block dark:border-white/10">
-                              <table className="w-max min-w-[1700px] border-collapse text-xs">
+                              <table className="w-max min-w-[1180px] border-collapse text-xs">
                                 <thead>
                                   <tr className="h-9 border-b hover:bg-transparent">
-                                    <th className="w-14 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">#</th>
-                                    <th className="min-w-52 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">PO Number</th>
-                                    <th className="min-w-60 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Style</th>
-                                    <th className="min-w-56 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Size</th>
-                                    <th className="min-w-56 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Color</th>
-                                    <th className="min-w-32 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Quantity</th>
-                                    <th className="min-w-28 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">FOB</th>
-                                    <th className="min-w-28 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">CM</th>
-                                    <th className="min-w-40 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Delivery Date</th>
-                                    <th className="min-w-72 whitespace-nowrap px-2 py-2 text-left font-medium text-foreground">Remarks</th>
-                                    <th className="w-16 whitespace-nowrap px-2 py-2 text-right font-medium text-foreground">Action</th>
+                                    <th className="w-12 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">#</th>
+                                    <th className="min-w-44 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">PO Number</th>
+                                    <th className="min-w-48 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Style</th>
+                                    <th className="min-w-28 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Size</th>
+                                    <th className="min-w-32 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Color</th>
+                                    <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Qty</th>
+                                    <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">FOB</th>
+                                    <th className="whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Total FOB</th>
+                                    <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">CM</th>
+                                    <th className="min-w-32 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Delivery</th>
+                                    <th className="min-w-56 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Remarks</th>
+                                    <th className="w-12 whitespace-nowrap px-1.5 py-2 text-right font-medium text-foreground">Action</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -573,7 +643,7 @@ export function JobFormDialog({
                                         draggingDetailId === detail.id ? "opacity-60" : "",
                                       )}
                                     >
-                                      <td className="whitespace-nowrap px-2 py-2 align-top text-xs">
+                                      <td className="whitespace-nowrap px-1.5 py-2 align-top text-xs">
                                         <div className="flex items-center gap-1.5">
                                           <button
                                             type="button"
@@ -588,7 +658,7 @@ export function JobFormDialog({
                                           <span>{index + 1}</span>
                                         </div>
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           value={detail.pono}
                                           onChange={(event) => updateDetail(detail.id, { pono: event.target.value })}
@@ -596,11 +666,11 @@ export function JobFormDialog({
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
-                                        <AppCombobox
-                                          open={openRowControl === `${detail.id}:style`}
-                                          onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
-                                          value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel } : null}
+                                      <td className="px-1.5 py-2 align-top">
+                                      <AppCombobox
+                                        open={openRowControl === `${detail.id}:style`}
+                                        onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
+                                        value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
                                           onValueChange={(option) => {
                                             updateDetail(detail.id, { styleId: option?.value ?? "", styleLabel: option?.label ?? "" })
                                             setOpenRowControl("")
@@ -612,7 +682,7 @@ export function JobFormDialog({
                                           contentClassName="rounded-lg"
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <AppCombobox
                                           open={openRowControl === `${detail.id}:size`}
                                           onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:size` : "")}
@@ -628,7 +698,7 @@ export function JobFormDialog({
                                           contentClassName="rounded-lg"
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <AppCombobox
                                           open={openRowControl === `${detail.id}:color`}
                                           onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:color` : "")}
@@ -644,7 +714,7 @@ export function JobFormDialog({
                                           contentClassName="rounded-lg"
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           value={detail.quantity}
                                           onChange={(event) => updateDetail(detail.id, { quantity: event.target.value })}
@@ -655,7 +725,7 @@ export function JobFormDialog({
                                           data-job-detail-quantity={detail.id}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           value={detail.fob}
                                           onChange={(event) => updateDetailFromRow(index, { fob: event.target.value })}
@@ -666,7 +736,15 @@ export function JobFormDialog({
                                           data-job-detail-fob={detail.id}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
+                                        <Input
+                                          value={calculateTotalFob(detail.quantity, detail.fob)}
+                                          readOnly
+                                          placeholder="Total FOB"
+                                          className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                        />
+                                      </td>
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           value={detail.cm}
                                           onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
@@ -677,17 +755,17 @@ export function JobFormDialog({
                                           data-job-detail-cm={detail.id}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           type="date"
                                           value={detail.deliveryDate}
                                           onChange={(event) => updateDetailFromRow(index, { deliveryDate: event.target.value })}
                                           onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                          data-job-detail-deliveryDate={detail.id}
+                                          data-job-detail-deliverydate={detail.id}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top">
+                                      <td className="px-1.5 py-2 align-top">
                                         <Input
                                           type="text"
                                           value={detail.remarks}
@@ -698,7 +776,7 @@ export function JobFormDialog({
                                           data-job-detail-remarks={detail.id}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 align-top text-right">
+                                      <td className="px-1.5 py-2 align-top text-right">
                                         <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md text-red-500 hover:text-red-600" onClick={() => removeDetail(detail.id)}>
                                           <Trash2 className="size-3.5" />
                                         </Button>
@@ -707,6 +785,15 @@ export function JobFormDialog({
                                   ))}
                                 </tbody>
                               </table>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200/70 bg-slate-50/80 px-3 py-2 text-xs text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">
+                              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Quantity:</Label>
+                              <span className="font-medium text-slate-900 dark:text-white">{totalQuantitySummary}</span>
+                              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total FOB:</Label>
+                              <span className="font-medium text-slate-900 dark:text-white">{totalFobSummary}</span>
+                              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total CM:</Label>
+                              <span className="font-medium text-slate-900 dark:text-white">{totalCmSummary}</span>
                             </div>
                           </>
                         )}
@@ -740,7 +827,7 @@ export function JobFormDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
               <Button type="submit" disabled={loading || submitting} className="rounded-xl">
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                {mode === "create" ? "Save Purchase Order" : "Save Changes"}
+                {mode === "create" ? "Save Job Entry" : "Save Changes"}
               </Button>
             </DialogFooter>
           </div>
