@@ -272,7 +272,7 @@ export function AccountDashboard() {
     document.cookie = clearAuthSessionCookie()
     document.cookie = clearAuthUserLabelCookie()
     document.cookie = clearAuthUserAvatarCookie()
-    router.replace("/sign-in")
+    window.location.replace("/sign-in")
   }
 
   if (!isReady || !profile) {
