@@ -1,4 +1,4 @@
-import type { ApiResponse, JobFilterValues, JobFormValues, JobRecord, PaginatedResponse } from "./job.types"
+import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobRecord, PaginatedResponse } from "./job.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -211,4 +211,29 @@ export async function permanentlyDeleteJob({ apiUrl, accessToken, id, organizati
     headers: buildRequestHeaders({ accessToken, organizationId }),
   })
   await readJsonResponse(response)
+}
+
+export async function analyzeJobAiAssistFile({
+  apiUrl,
+  accessToken,
+  file,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+  organizationId?: string
+}): Promise<JobAiAssistResult> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/ai-assist"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    body: formData,
+  })
+
+  const payload = await readJsonResponse<JobAiAssistResult>(response)
+  if (!payload.data?.rows) throw new Error("AI Assist finished, but no PO detail rows were returned.")
+  return payload.data
 }

@@ -26,6 +26,7 @@ import { ActiveJobsSection } from "./component/active-jobs-section"
 import { DeletedJobsSection } from "./component/deleted-jobs-section"
 import { JobFormDialog } from "./component/job-form-dialog"
 import {
+  analyzeJobAiAssistFile,
   createJob,
   fetchJob,
   fetchJobs,
@@ -34,7 +35,7 @@ import {
   softDeleteJob,
   updateJob,
 } from "./job.service"
-import type { JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobRecord, PaginationMeta } from "./job.types"
+import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobRecord, PaginationMeta } from "./job.types"
 
 type JobEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -584,6 +585,29 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
+  async function analyzeAiAssistFile(file: File): Promise<JobAiAssistRow[]> {
+    const token = window.localStorage.getItem("access_token")
+    if (!token) {
+      handleAuthFailure("Your session expired. Please sign in again.")
+      return []
+    }
+
+    try {
+      const result = await analyzeJobAiAssistFile({
+        apiUrl,
+        accessToken: token,
+        file,
+        organizationId: selectedOrganizationId || undefined,
+      })
+      toast.success(`AI Assist extracted ${result.rows.length} row${result.rows.length === 1 ? "" : "s"}.`)
+      return result.rows
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
+      if (!handleAuthFailure(message)) toast.error(message)
+      throw caughtError
+    }
+  }
+
   function requestSoftDelete(job: JobRecord) {
     if (!accessRules?.canDelete) {
       toast.error("You do not have permission to delete purchase orders.")
@@ -765,6 +789,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           const totalPoQty = values.jobDetails.reduce((total, detail) => total + (Number(detail.quantity) || 0), 0)
           setEditorValues({ ...values, totalPoQty: String(totalPoQty) })
         }}
+        onAiAssistFileAnalyze={analyzeAiAssistFile}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {

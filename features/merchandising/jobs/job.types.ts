@@ -152,3 +152,15 @@ export type JobFormError = {
   section: JobDialogSectionId
   message: string
 }
+
+export type JobAiAssistRow = {
+  poNumber: string
+  styleNo: string
+  color: string
+  size: string
+  quantity: number
+}
+
+export type JobAiAssistResult = {
+  rows: JobAiAssistRow[]
+}
