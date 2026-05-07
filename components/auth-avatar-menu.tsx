@@ -1,6 +1,5 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { LogOut, UserRound, Settings2 } from "lucide-react"
 
@@ -26,14 +25,12 @@ type AuthAvatarMenuProps = {
 }
 
 export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
-  const router = useRouter()
-
   function handleLogout() {
     clearStoredAuthSession()
     document.cookie = clearAuthSessionCookie()
     document.cookie = clearAuthUserLabelCookie()
     document.cookie = clearAuthUserAvatarCookie()
-    router.replace("/sign-in")
+    window.location.replace("/sign-in")
   }
 
   return (

@@ -32,7 +32,7 @@ export function OrganizationAccessRequestPage() {
     document.cookie = clearAuthSessionCookie()
     document.cookie = clearAuthUserLabelCookie()
     document.cookie = clearAuthUserAvatarCookie()
-    router.replace("/sign-in")
+    window.location.replace("/sign-in")
   }
 
   async function handleSubmit() {

@@ -219,7 +219,7 @@ export function SecuritySettings({ apiUrl }: SecuritySettingsProps) {
 
   function handleLogout() {
     clearSession()
-    router.replace("/sign-in")
+    window.location.replace("/sign-in")
   }
 
   async function handleRecoverySubmit(event: FormEvent<HTMLFormElement>) {
