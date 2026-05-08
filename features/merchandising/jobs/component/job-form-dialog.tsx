@@ -82,8 +82,14 @@ const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
 const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-sm px-1.5 text-xs"
 const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
+const AI_ASSIST_FOCUS_COLUMNS = ["poNumber", "styleNo", "styleName", "color", "size", "quantity", "fob", "deliveryDate"] as const
 
 type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
+type AiAssistFocusColumn = (typeof AI_ASSIST_FOCUS_COLUMNS)[number]
+type AiAssistFocusedCell = {
+  rowIndex: number
+  column: AiAssistFocusColumn
+}
 
 const JOB_DIALOG_SECTIONS: Array<{ id: JobDialogSectionId; label: string; icon: typeof Info }> = [
   { id: "basic-info", label: "Basic Info", icon: Info },
@@ -321,6 +327,7 @@ export function JobFormDialog({
   const [addingAiAssistRowIndex, setAddingAiAssistRowIndex] = useState<number | null>(null)
   const [addedAiAssistRowKeys, setAddedAiAssistRowKeys] = useState<string[]>([])
   const [pendingAiAssistAdd, setPendingAiAssistAdd] = useState<AiAssistPendingAdd | null>(null)
+  const [focusedAiAssistCell, setFocusedAiAssistCell] = useState<AiAssistFocusedCell | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -357,6 +364,7 @@ export function JobFormDialog({
     setAiAssistRows([])
     setAiAssistError("")
     setAddedAiAssistRowKeys([])
+    setFocusedAiAssistCell(null)
 
     if (file) {
       void analyzeAiAssistFile(file)
@@ -383,6 +391,7 @@ export function JobFormDialog({
       const rows = await onAiAssistFileAnalyze(fileToAnalyze)
       setAiAssistRows(rows)
       setAddedAiAssistRowKeys([])
+      setFocusedAiAssistCell(null)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
       setAiAssistRows([])
@@ -398,6 +407,31 @@ export function JobFormDialog({
 
   function updateAiAssistRow(index: number, patch: Partial<JobAiAssistRow>) {
     setAiAssistRows((currentRows) => currentRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
+  }
+
+  function getAiAssistCellValue(row: JobAiAssistRow, column: AiAssistFocusColumn) {
+    if (column === "deliveryDate") {
+      return formatAiAssistDateForInput(row.deliveryDate)
+    }
+
+    return row[column]
+  }
+
+  function fillAiAssistColumnDown(cell = focusedAiAssistCell) {
+    if (!cell || cell.rowIndex >= aiAssistRows.length - 1) {
+      return
+    }
+
+    const sourceRow = aiAssistRows[cell.rowIndex]
+    if (!sourceRow) {
+      return
+    }
+
+    const value = getAiAssistCellValue(sourceRow, cell.column)
+    setAiAssistRows((currentRows) =>
+      currentRows.map((row, rowIndex) => (rowIndex > cell.rowIndex ? { ...row, [cell.column]: value } : row)),
+    )
+    focusAiAssistField(cell.rowIndex, cell.column)
   }
 
   function appendAiAssistRowToDetails(row: JobAiAssistRow, index: number, matches: AiAssistMasterDataMatches) {
@@ -529,6 +563,21 @@ export function JobFormDialog({
     return `data-job-detail-${column}`
   }
 
+  function getAiAssistFocusAttribute(column: AiAssistFocusColumn) {
+    const attributes: Record<AiAssistFocusColumn, string> = {
+      poNumber: "data-ai-assist-po-number",
+      styleNo: "data-ai-assist-style-no",
+      styleName: "data-ai-assist-style-name",
+      color: "data-ai-assist-color",
+      size: "data-ai-assist-size",
+      quantity: "data-ai-assist-quantity",
+      fob: "data-ai-assist-fob",
+      deliveryDate: "data-ai-assist-delivery-date",
+    }
+
+    return attributes[column]
+  }
+
   function focusNextDetailField(currentIndex: number, column: DetailFocusColumn) {
     const nextDetail = values.jobDetails[currentIndex + 1]
 
@@ -555,6 +604,36 @@ export function JobFormDialog({
     focusNextDetailField(currentIndex, column)
   }
 
+  function focusAiAssistField(rowIndex: number, column: AiAssistFocusColumn) {
+    const row = aiAssistRows[rowIndex]
+
+    if (!row) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      const attribute = getAiAssistFocusAttribute(column)
+      const input = Array.from(document.querySelectorAll<HTMLInputElement>(`[${attribute}="${rowIndex}"]`)).find((field) => field.offsetParent !== null)
+      input?.focus()
+      input?.select()
+    })
+  }
+
+  function handleAiAssistFieldKeyDown(event: React.KeyboardEvent<HTMLInputElement>, currentIndex: number, column: AiAssistFocusColumn) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+      event.preventDefault()
+      fillAiAssistColumnDown({ rowIndex: currentIndex, column })
+      return
+    }
+
+    if (event.key !== "Enter") {
+      return
+    }
+
+    event.preventDefault()
+    focusAiAssistField(event.ctrlKey ? currentIndex - 1 : currentIndex + 1, column)
+  }
+
   function scrollToSection(sectionId: JobDialogSectionId) {
     sectionRefs.current[sectionId]?.scrollIntoView({ behavior: "smooth", block: "start" })
     setActiveSection(sectionId)
@@ -563,6 +642,7 @@ export function JobFormDialog({
   const totalFobSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "fob"))
   const totalCmSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "cm"))
   const totalQuantitySummary = formatSummaryValue(sumJobQuantities(values.jobDetails))
+  const canFillAiAssistDown = Boolean(focusedAiAssistCell && focusedAiAssistCell.rowIndex < aiAssistRows.length - 1)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1142,8 +1222,21 @@ export function JobFormDialog({
                 <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                   AI-generated extraction may contain mistakes. Please review the original document and verify all values before saving or making decisions based on this information.
                 </div>
-                <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]">
-                  Extracted PO Detail Rows
+                <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-sm font-semibold">Extracted PO Detail Rows</span>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Enter: next row | Ctrl+Enter: previous row | Ctrl/Cmd+D: fill down</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-sm px-2 text-xs"
+                      disabled={!canFillAiAssistDown}
+                      onClick={() => fillAiAssistColumnDown()}
+                    >
+                      Fill Down
+                    </Button>
+                  </div>
                 </div>
                 <ScrollArea className="min-h-0 flex-1">
                   <table className="w-full min-w-[1120px] table-auto border-collapse text-xs sm:text-sm">
@@ -1169,32 +1262,86 @@ export function JobFormDialog({
                         return (
                           <tr key={`ai-assist-row-${index}`} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.poNumber} onChange={(event) => updateAiAssistRow(index, { poNumber: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                              <Input
+                                value={row.poNumber}
+                                onChange={(event) => updateAiAssistRow(index, { poNumber: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "poNumber" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "poNumber")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-po-number={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.styleNo} onChange={(event) => updateAiAssistRow(index, { styleNo: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                              <Input
+                                value={row.styleNo}
+                                onChange={(event) => updateAiAssistRow(index, { styleNo: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleNo" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleNo")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-style-no={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.styleName} onChange={(event) => updateAiAssistRow(index, { styleName: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                              <Input
+                                value={row.styleName}
+                                onChange={(event) => updateAiAssistRow(index, { styleName: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleName" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleName")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-style-name={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.color} onChange={(event) => updateAiAssistRow(index, { color: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                              <Input
+                                value={row.color}
+                                onChange={(event) => updateAiAssistRow(index, { color: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "color" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "color")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-color={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.size} onChange={(event) => updateAiAssistRow(index, { size: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                              <Input
+                                value={row.size}
+                                onChange={(event) => updateAiAssistRow(index, { size: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "size" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "size")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-size={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={String(row.quantity ?? "")} onChange={(event) => updateAiAssistRow(index, { quantity: event.target.value })} inputMode="decimal" className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")} />
+                              <Input
+                                value={String(row.quantity ?? "")}
+                                onChange={(event) => updateAiAssistRow(index, { quantity: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "quantity" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "quantity")}
+                                inputMode="decimal"
+                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
+                                data-ai-assist-quantity={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
-                              <Input value={row.fob == null ? "" : String(row.fob)} onChange={(event) => updateAiAssistRow(index, { fob: event.target.value })} inputMode="decimal" className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")} />
+                              <Input
+                                value={row.fob == null ? "" : String(row.fob)}
+                                onChange={(event) => updateAiAssistRow(index, { fob: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "fob" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "fob")}
+                                inputMode="decimal"
+                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
+                                data-ai-assist-fob={index}
+                              />
                             </td>
                             <td className="px-2 py-2 align-top">
                               <Input
                                 type="date"
                                 value={formatAiAssistDateForInput(row.deliveryDate)}
                                 onChange={(event) => updateAiAssistRow(index, { deliveryDate: event.target.value || null })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "deliveryDate" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "deliveryDate")}
                                 className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-delivery-date={index}
                               />
                             </td>
                             <td className="sticky right-0 bg-white px-2 py-2 text-right align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] dark:bg-[#17131d]">
