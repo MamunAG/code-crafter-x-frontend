@@ -2,6 +2,7 @@
 
 import { useRef, useState, type DragEvent } from "react"
 import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
 import { AppSelect } from "@/components/app-select"
@@ -328,6 +329,16 @@ export function JobFormDialog({
   function addDetail() {
     const previousDetail = values.jobDetails[values.jobDetails.length - 1]
     update("jobDetails", [...values.jobDetails, newDetailRow(previousDetail)])
+  }
+
+  function openAiAssistDialog() {
+    if (!values.buyerId.trim()) {
+      toast.error("Please select a buyer before using AI Assist.")
+      scrollToSection("basic-info")
+      return
+    }
+
+    setAiAssistOpen(true)
   }
 
   function handleAiAssistFileChange(file: File | null) {
@@ -674,7 +685,7 @@ export function JobFormDialog({
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <CardTitle className="text-sm">PO Details</CardTitle>
                           <div className="flex flex-col gap-2 sm:flex-row">
-                            <Button type="button" variant="outline" size="sm" className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 dark:text-blue-300 sm:h-7 sm:w-auto" onClick={() => setAiAssistOpen(true)}>
+                            <Button type="button" variant="outline" size="sm" className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 dark:text-blue-300 sm:h-7 sm:w-auto" onClick={openAiAssistDialog}>
                               <Sparkles className="size-3.5" />
                               AI Assist
                             </Button>
