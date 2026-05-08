@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, type DragEvent } from "react"
-import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2, Upload } from "lucide-react"
+import { ChevronDown, ChevronUp, GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
@@ -321,6 +321,7 @@ export function JobFormDialog({
   const [aiAssistOpen, setAiAssistOpen] = useState(false)
   const [aiAssistFile, setAiAssistFile] = useState<File | null>(null)
   const [aiAssistFileName, setAiAssistFileName] = useState("")
+  const [aiAssistUploadCollapsed, setAiAssistUploadCollapsed] = useState(false)
   const [aiAssistRows, setAiAssistRows] = useState<JobAiAssistRow[]>([])
   const [aiAssistError, setAiAssistError] = useState("")
   const [aiAssistWorking, setAiAssistWorking] = useState(false)
@@ -365,6 +366,7 @@ export function JobFormDialog({
     setAiAssistError("")
     setAddedAiAssistRowKeys([])
     setFocusedAiAssistCell(null)
+    setAiAssistUploadCollapsed(false)
 
     if (file) {
       void analyzeAiAssistFile(file)
@@ -392,6 +394,7 @@ export function JobFormDialog({
       setAiAssistRows(rows)
       setAddedAiAssistRowKeys([])
       setFocusedAiAssistCell(null)
+      setAiAssistUploadCollapsed(Boolean(rows.length))
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
       setAiAssistRows([])
@@ -1172,29 +1175,52 @@ export function JobFormDialog({
             <DialogDescription>Upload a PDF or Excel file. AI Assist will extract PO number, style no, style name, color, size, and quantity rows.</DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden px-4 py-3">
-            <div className="space-y-2">
-              <Label htmlFor="job-ai-assist-file">File Upload</Label>
-              <label
-                htmlFor={aiAssistWorking ? undefined : "job-ai-assist-file"}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300",
-                  aiAssistWorking ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.06]",
-                )}
-              >
-                {aiAssistWorking ? <Loader2 className="size-5 animate-spin text-blue-500" /> : <Upload className="size-5 text-slate-400" />}
-                <span className="max-w-full truncate font-medium">{aiAssistFileName || "Choose a file"}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {aiAssistWorking ? "Upload locked while AI Assist reviews this document" : "PDF, XLS, XLSX, or CSV"}
-                </span>
-              </label>
-              <Input
-                id="job-ai-assist-file"
-                type="file"
-                accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-                disabled={aiAssistWorking}
-                className="sr-only"
-                onChange={(event) => handleAiAssistFileChange(event.target.files?.[0] ?? null)}
-              />
+            <div className="space-y-2 rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label htmlFor="job-ai-assist-file">File Upload</Label>
+                  {aiAssistUploadCollapsed ? (
+                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{aiAssistFileName || "No file selected"}</p>
+                  ) : null}
+                </div>
+                {aiAssistRows.length ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-sm px-2 text-xs"
+                    onClick={() => setAiAssistUploadCollapsed((collapsed) => !collapsed)}
+                  >
+                    {aiAssistUploadCollapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+                    {aiAssistUploadCollapsed ? "Expand" : "Minimize"}
+                  </Button>
+                ) : null}
+              </div>
+              {!aiAssistUploadCollapsed ? (
+                <>
+                  <label
+                    htmlFor={aiAssistWorking ? undefined : "job-ai-assist-file"}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1.5 rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300",
+                      aiAssistWorking ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.06]",
+                    )}
+                  >
+                    {aiAssistWorking ? <Loader2 className="size-5 animate-spin text-blue-500" /> : <Upload className="size-5 text-slate-400" />}
+                    <span className="max-w-full truncate font-medium">{aiAssistFileName || "Choose a file"}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {aiAssistWorking ? "Upload locked while AI Assist reviews this document" : "PDF, XLS, XLSX, or CSV"}
+                    </span>
+                  </label>
+                  <Input
+                    id="job-ai-assist-file"
+                    type="file"
+                    accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    disabled={aiAssistWorking}
+                    className="sr-only"
+                    onChange={(event) => handleAiAssistFileChange(event.target.files?.[0] ?? null)}
+                  />
+                </>
+              ) : null}
             </div>
 
             {aiAssistWorking ? (
