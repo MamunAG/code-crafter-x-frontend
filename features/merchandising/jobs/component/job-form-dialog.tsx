@@ -2,6 +2,7 @@
 
 import { useRef, useState, type DragEvent } from "react"
 import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2, Upload } from "lucide-react"
+import { toast } from "sonner"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
 import { AppSelect } from "@/components/app-select"
@@ -79,7 +80,7 @@ const ORDER_TYPE_OPTIONS = [
 
 const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
-const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-md px-1.5 text-xs"
+const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-sm px-1.5 text-xs"
 const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
 
 type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
@@ -362,6 +363,15 @@ export function JobFormDialog({
     }
   }
 
+  function openAiAssistDialog() {
+    if (!values.buyerId.trim()) {
+      toast.info("Please select a buyer before using AI Assist.")
+      return
+    }
+
+    setAiAssistOpen(true)
+  }
+
   async function analyzeAiAssistFile(fileToAnalyze = aiAssistFile) {
     if (!fileToAnalyze || aiAssistWorking) {
       return
@@ -383,7 +393,11 @@ export function JobFormDialog({
   }
 
   function getAiAssistRowKey(row: JobAiAssistRow, index: number) {
-    return [row.poNumber, row.styleNo, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
+    return [row.poNumber, row.styleNo, row.styleName, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
+  }
+
+  function updateAiAssistRow(index: number, patch: Partial<JobAiAssistRow>) {
+    setAiAssistRows((currentRows) => currentRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
   }
 
   function appendAiAssistRowToDetails(row: JobAiAssistRow, index: number, matches: AiAssistMasterDataMatches) {
@@ -694,7 +708,7 @@ export function JobFormDialog({
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <CardTitle className="text-sm">PO Details</CardTitle>
                           <div className="flex flex-col gap-2 sm:flex-row">
-                            <Button type="button" variant="outline" size="sm" className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 dark:text-blue-300 sm:h-7 sm:w-auto" onClick={() => setAiAssistOpen(true)}>
+                            <Button type="button" variant="outline" size="sm" className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 dark:text-blue-300 sm:h-7 sm:w-auto" onClick={openAiAssistDialog}>
                               <Sparkles className="size-3.5" />
                               AI Assist
                             </Button>
@@ -1072,10 +1086,10 @@ export function JobFormDialog({
         </form>
       </DialogContent>
       <Dialog open={aiAssistOpen} onOpenChange={setAiAssistOpen}>
-        <DialogContent className="grid max-h-[88dvh] max-w-[calc(100vw-1.5rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-lg p-0 sm:max-w-3xl">
+        <DialogContent className="grid max-h-[92dvh] max-w-[calc(100vw-1.5rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-lg p-0 sm:max-w-6xl">
           <DialogHeader className="border-b border-slate-200/70 px-4 py-3 dark:border-white/10">
             <DialogTitle>AI Assist</DialogTitle>
-            <DialogDescription>Upload a PDF or Excel file. AI Assist will extract PO number, style, color, size, and quantity rows.</DialogDescription>
+            <DialogDescription>Upload a PDF or Excel file. AI Assist will extract PO number, style no, style name, color, size, and quantity rows.</DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden px-4 py-3">
             <div className="space-y-2">
@@ -1110,7 +1124,7 @@ export function JobFormDialog({
                   <div>
                     <p className="font-medium">Analyzing purchase order document</p>
                     <p className="mt-0.5 text-xs leading-5 text-blue-700/80 dark:text-blue-100/75">
-                      Extracting PO number, style, color, size, quantity, FOB, and delivery date. This may take a moment for large files.
+                      Extracting PO number, style no, style name, color, size, quantity, FOB, and delivery date. This may take a moment for large files.
                     </p>
                   </div>
                 </div>
@@ -1132,17 +1146,18 @@ export function JobFormDialog({
                   Extracted PO Detail Rows
                 </div>
                 <ScrollArea className="min-h-0 flex-1">
-                  <table className="w-full min-w-[700px] table-fixed border-collapse text-xs sm:text-sm">
+                  <table className="w-full min-w-[1120px] table-auto border-collapse text-xs sm:text-sm">
                     <thead className="sticky top-0 z-10 bg-white dark:bg-[#17131d]">
                       <tr className="border-b border-slate-200 dark:border-white/10">
-                        <th className="w-20 px-2 py-2 text-left font-medium">PO Number</th>
-                        <th className="w-24 px-2 py-2 text-left font-medium">Style No</th>
-                        <th className="w-20 px-2 py-2 text-left font-medium">Color</th>
+                        <th className="min-w-36 px-2 py-2 text-left font-medium">PO Number</th>
+                        <th className="min-w-32 px-2 py-2 text-left font-medium">Style No</th>
+                        <th className="min-w-56 px-2 py-2 text-left font-medium">Style Name</th>
+                        <th className="min-w-36 px-2 py-2 text-left font-medium">Color</th>
                         <th className="w-14 px-2 py-2 text-left font-medium">Size</th>
                         <th className="w-16 px-2 py-2 text-right font-medium">Qty</th>
                         <th className="w-16 px-2 py-2 text-right font-medium">FOB</th>
                         <th className="w-28 px-2 py-2 text-left font-medium">Delivery Date</th>
-                        <th className="w-20 px-2 py-2 text-right font-medium">Action</th>
+                        <th className="sticky right-0 w-20 bg-white px-2 py-2 text-right font-medium shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)] dark:bg-[#17131d]">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1152,15 +1167,37 @@ export function JobFormDialog({
                         const rowAdding = addingAiAssistRowIndex === index
 
                         return (
-                          <tr key={rowKey} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
-                            <td className="truncate px-2 py-2 align-top font-medium">{row.poNumber || "-"}</td>
-                            <td className="whitespace-normal wrap-break-word px-2 py-2 align-top leading-5">{row.styleNo || "-"}</td>
-                            <td className="truncate px-2 py-2 align-top">{row.color || "-"}</td>
-                            <td className="px-2 py-2 align-top">{row.size || "-"}</td>
-                            <td className="px-2 py-2 text-right align-top font-medium">{row.quantity}</td>
-                            <td className="px-2 py-2 text-right align-top">{row.fob ?? "-"}</td>
-                            <td className="px-2 py-2 align-top">{row.deliveryDate || "-"}</td>
-                            <td className="px-2 py-2 text-right align-top">
+                          <tr key={`ai-assist-row-${index}`} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.poNumber} onChange={(event) => updateAiAssistRow(index, { poNumber: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.styleNo} onChange={(event) => updateAiAssistRow(index, { styleNo: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.styleName} onChange={(event) => updateAiAssistRow(index, { styleName: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.color} onChange={(event) => updateAiAssistRow(index, { color: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.size} onChange={(event) => updateAiAssistRow(index, { size: event.target.value })} className={JOB_DIALOG_TABLE_INPUT_CLASS} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={String(row.quantity ?? "")} onChange={(event) => updateAiAssistRow(index, { quantity: event.target.value })} inputMode="decimal" className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input value={row.fob == null ? "" : String(row.fob)} onChange={(event) => updateAiAssistRow(index, { fob: event.target.value })} inputMode="decimal" className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")} />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                type="date"
+                                value={formatAiAssistDateForInput(row.deliveryDate)}
+                                onChange={(event) => updateAiAssistRow(index, { deliveryDate: event.target.value || null })}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                              />
+                            </td>
+                            <td className="sticky right-0 bg-white px-2 py-2 text-right align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] dark:bg-[#17131d]">
                               <Button
                                 type="button"
                                 size="sm"
@@ -1183,8 +1220,8 @@ export function JobFormDialog({
             ) : null}
           </div>
           <DialogFooter className="border-t border-slate-200/70 px-4 py-3 dark:border-white/10">
-            <Button type="button" variant="outline" onClick={() => setAiAssistOpen(false)}>Cancel</Button>
-            <Button type="button" disabled={!aiAssistFile || aiAssistWorking} onClick={() => void analyzeAiAssistFile()}>
+            <Button type="button" className="h-7 rounded-md px-3 text-xs" variant="outline" onClick={() => setAiAssistOpen(false)}>Cancel</Button>
+            <Button type="button" className="h-7 rounded-md px-3 text-xs" disabled={!aiAssistFile || aiAssistWorking} onClick={() => void analyzeAiAssistFile()}>
               {aiAssistWorking ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {aiAssistWorking ? "Analyzing" : aiAssistRows.length ? "Analyze Again" : "Analyze"}
             </Button>
@@ -1204,6 +1241,7 @@ export function JobFormDialog({
           {pendingAiAssistAdd ? (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
               {pendingAiAssistAdd.missing.styleNo ? <p><span className="font-semibold">Style No:</span> {pendingAiAssistAdd.missing.styleNo}</p> : null}
+              {pendingAiAssistAdd.missing.styleNo && pendingAiAssistAdd.row.styleName?.trim() ? <p><span className="font-semibold">Style Name:</span> {pendingAiAssistAdd.row.styleName.trim()}</p> : null}
               {pendingAiAssistAdd.missing.color ? <p><span className="font-semibold">Color:</span> {pendingAiAssistAdd.missing.color}</p> : null}
               {pendingAiAssistAdd.missing.size ? <p><span className="font-semibold">Size:</span> {pendingAiAssistAdd.missing.size}</p> : null}
             </div>

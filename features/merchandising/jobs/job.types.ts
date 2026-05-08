@@ -156,11 +156,12 @@ export type JobFormError = {
 export type JobAiAssistRow = {
   poNumber: string
   styleNo: string
+  styleName: string
   color: string
   size: string
-  quantity: number
+  quantity: number | string
   deliveryDate: string | null
-  fob: number | null
+  fob: number | string | null
 }
 
 export type JobAiAssistResult = {
