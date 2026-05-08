@@ -13,13 +13,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchFactories } from "@/features/app-config/factory/factory.service"
-import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
-import { createColor, fetchColors } from "@/features/merchandising/colors/color.service"
+import { fetchColors } from "@/features/merchandising/colors/color.service"
 import { fetchEmployee, fetchEmployees } from "@/features/hr-payroll/employee/employee.service"
-import { createSize, fetchSizes } from "@/features/merchandising/sizes/size.service"
-import { createStyle, fetchStyles } from "@/features/merchandising/styles/style.service"
+import { fetchSizes } from "@/features/merchandising/sizes/size.service"
+import { fetchStyles } from "@/features/merchandising/styles/style.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
@@ -31,9 +30,11 @@ import {
   createJob,
   fetchJob,
   fetchJobs,
+  fetchNextJobNumber,
   permanentlyDeleteJob,
   restoreJob,
   softDeleteJob,
+  resolveJobAiAssistRow,
   updateJob,
 } from "./job.service"
 import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobRecord, PaginationMeta } from "./job.types"
@@ -79,6 +80,19 @@ function getJobLabel(job?: JobRecord | null) {
   return po?.trim() || "this job entry"
 }
 
+function formatDetailNumberForInput(value: string | number | null | undefined) {
+  if (value == null || value === "") {
+    return "0"
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return String(value)
+  }
+
+  return String(numericValue)
+}
+
 function detailToFormValue(detail: JobDetailRecord): JobDetailFormValues {
   return {
     id: detail.id || crypto.randomUUID(),
@@ -89,10 +103,11 @@ function detailToFormValue(detail: JobDetailRecord): JobDetailFormValues {
     sizeLabel: detail.size?.sizeName ?? "",
     colorId: detail.colorId == null ? "" : String(detail.colorId),
     colorLabel: detail.color?.colorDisplayName?.trim() || detail.color?.colorName?.trim() || "",
-    quantity: String(detail.quantity ?? 0),
-    fob: String(detail.fob ?? 0),
-    cm: String(detail.cm ?? 0),
+    quantity: formatDetailNumberForInput(detail.quantity),
+    fob: formatDetailNumberForInput(detail.fob),
+    cm: formatDetailNumberForInput(detail.cm),
     deliveryDate: detail.deliveryDate ? String(detail.deliveryDate).slice(0, 10) : "",
+    cuttingLimitPercentage: formatDetailNumberForInput(detail.cuttingLimitPercentage),
     remarks: detail.remarks ?? "",
   }
 }
@@ -232,6 +247,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorSubmitting, setEditorSubmitting] = useState(false)
   const [editorErrors, setEditorErrors] = useState<JobFormError[]>([])
   const [editorValues, setEditorValues] = useState<JobFormValues>(DEFAULT_FORM_VALUES)
+  const [editorJobNo, setEditorJobNo] = useState("")
   const [selectedFactory, setSelectedFactory] = useState<AppComboboxOption | null>(null)
   const [selectedBuyer, setSelectedBuyer] = useState<AppComboboxOption | null>(null)
   const [selectedMerchandiser, setSelectedMerchandiser] = useState<AppComboboxOption | null>(null)
@@ -483,9 +499,34 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setSelectedFactory(null)
     setSelectedBuyer(null)
     setSelectedMerchandiser(null)
+    setEditorJobNo("Loading...")
     setEditorErrors([])
     setEditorLoading(false)
     setEditorOpen(true)
+
+    async function loadNextJobNumber() {
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+        const nextJobNumber = await fetchNextJobNumber({
+          apiUrl,
+          accessToken: token,
+          organizationId: selectedOrganizationId || undefined,
+        })
+        setEditorJobNo(nextJobNumber.jobNo)
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load the next job number right now."
+        if (!handleAuthFailure(message)) {
+          setEditorJobNo("Unavailable")
+          toast.error(message)
+        }
+      }
+    }
+
+    void loadNextJobNumber()
   }
 
   async function openEditDialog(id: string) {
@@ -498,6 +539,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorLoading(true)
     setEditorOpen(true)
     setEditorErrors([])
+    setEditorJobNo("")
     setSelectedMerchandiser(null)
     try {
       const token = window.localStorage.getItem("access_token")
@@ -536,6 +578,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         isActive: record.isActive !== false,
         jobDetails: (record.jobDetails ?? []).map(detailToFormValue),
       })
+      setEditorJobNo(record.jobNo ?? "")
       setSelectedFactory({ value: record.factoryId, label: record.factory?.displayName?.trim() || record.factory?.name?.trim() || record.factoryId })
       setSelectedBuyer({ value: record.buyerId, label: record.buyer?.displayName?.trim() || record.buyer?.name?.trim() || record.buyerId })
       setSelectedMerchandiser(nextMerchandiser)
@@ -567,8 +610,8 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
       if (editorMode === "create") {
-        await createJob({ apiUrl, accessToken: token, payload: nextValues, organizationId: selectedOrganizationId || undefined })
-        toast.success("Purchase order created successfully.")
+        const createdJob = await createJob({ apiUrl, accessToken: token, payload: nextValues, organizationId: selectedOrganizationId || undefined })
+        toast.success(`Job ${createdJob.jobNo || "record"} has been created successfully.`)
       } else if (editingId) {
         await updateJob({ apiUrl, accessToken: token, id: editingId, payload: nextValues, organizationId: selectedOrganizationId || undefined })
         toast.success("Purchase order updated successfully.")
@@ -609,119 +652,34 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  async function createAiAssistMasterData({
+  async function resolveAiAssistRowMasterData({
     row,
-    missing,
-    matches,
+    buyerId,
   }: {
     row: JobAiAssistRow
-    missing: { styleNo?: string; size?: string; color?: string }
-    matches: { styleOption: AppComboboxOption | null; sizeOption: AppComboboxOption | null; colorOption: AppComboboxOption | null }
-  }): Promise<Partial<{ styleOption: AppComboboxOption | null; sizeOption: AppComboboxOption | null; colorOption: AppComboboxOption | null }>> {
+    buyerId?: string
+  }): Promise<{ styleOption: AppComboboxOption | null; sizeOption: AppComboboxOption | null; colorOption: AppComboboxOption | null }> {
     const token = window.localStorage.getItem("access_token")
     if (!token) {
       handleAuthFailure("Your session expired. Please sign in again.")
-      return {}
+      return { styleOption: null, sizeOption: null, colorOption: null }
     }
 
-    const organizationId = selectedOrganizationId || undefined
-    let colorOption = matches.colorOption
-    let sizeOption = matches.sizeOption
-
     try {
-      if (missing.color?.trim()) {
-        const color = await createColor({
-          apiUrl,
-          accessToken: token,
-          organizationId,
-          payload: {
-            colorName: missing.color.trim(),
-            colorDisplayName: missing.color.trim(),
-            colorDescription: "Created from Job Entry AI Assist.",
-            colorHexCode: "",
-            isActive: true,
-          },
-        })
-        colorOption = {
-          value: String(color.id),
-          label: color.colorDisplayName?.trim() || color.colorName,
-        }
+      const resolved = await resolveJobAiAssistRow({
+        apiUrl,
+        accessToken: token,
+        row,
+        buyerId,
+        organizationId: selectedOrganizationId || undefined,
+      })
+      return {
+        styleOption: resolved.styleOption,
+        sizeOption: resolved.sizeOption,
+        colorOption: resolved.colorOption,
       }
-
-      if (missing.size?.trim()) {
-        const size = await createSize({
-          apiUrl,
-          accessToken: token,
-          organizationId,
-          payload: {
-            sizeName: missing.size.trim(),
-            isActive: true,
-          },
-        })
-        sizeOption = {
-          value: String(size.id),
-          label: size.sizeName,
-        }
-      }
-
-      let styleOption = matches.styleOption
-      if (missing.styleNo?.trim()) {
-        if (!editorValues.buyerId.trim()) {
-          throw new Error("Please select a buyer before adding a new style from AI Assist.")
-        }
-
-        const currencies = await fetchCurrencies({
-          apiUrl,
-          accessToken: token,
-          page: 1,
-          limit: 100,
-          filters: {},
-          organizationId,
-        })
-        const currency = currencies.items.find((item) => item.isActive !== false && item.isDefault) ?? currencies.items.find((item) => item.isActive !== false) ?? currencies.items[0]
-
-        if (!currency?.id) {
-          throw new Error("Please create an active currency before adding a new style from AI Assist.")
-        }
-
-        const style = await createStyle({
-          apiUrl,
-          accessToken: token,
-          organizationId,
-          payload: {
-            productType: "",
-            buyerId: editorValues.buyerId.trim(),
-            styleNo: missing.styleNo.trim(),
-            styleName: row.styleName?.trim() ?? "",
-            itemType: "",
-            productDepartment: "",
-            cmSewing: "0",
-            currencyId: String(currency.id),
-            smvSewing: "0",
-            smvSewingSideSeam: "0",
-            smvCutting: "0",
-            smvCuttingSideSeam: "0",
-            smvFinishing: "0",
-            imageId: "",
-            remarks: "Created from Job Entry AI Assist.",
-            isActive: true,
-            itemUom: "Pcs",
-            productFamily: "",
-            colors: colorOption ? [{ id: crypto.randomUUID(), value: colorOption.value, label: colorOption.label }] : [],
-            sizes: sizeOption ? [{ id: crypto.randomUUID(), value: sizeOption.value, label: sizeOption.label }] : [],
-            embellishments: [],
-          },
-        })
-        styleOption = {
-          value: style.id,
-          label: formatStyleLabel(style.styleNo, style.styleName) || style.id,
-        }
-      }
-
-      toast.success("Missing setup data added successfully.")
-      return { styleOption, sizeOption, colorOption }
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to add missing setup data right now."
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to resolve this AI Assist row right now."
       if (!handleAuthFailure(message)) toast.error(message)
       throw caughtError
     }
@@ -817,7 +775,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" /> Refresh</Button>
-                  {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" /> New job entry</Button> : null}
+                  {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" /> New job</Button> : null}
                 </div>
               </div>
             </CardContent>
@@ -849,6 +807,9 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             loadingJobs={loadingJobs}
             draftFilters={draftFilters}
             activeFilters={activeFilters}
+            loadFactoryOptions={loadFactoryOptions}
+            loadBuyerOptions={loadBuyerOptions}
+            loadEmployeeOptions={loadEmployeeOptions}
             onDraftFiltersChange={setDraftFilters}
             onActiveFiltersChange={setActiveFilters}
             onPageChange={setPage}
@@ -892,6 +853,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         submitting={editorSubmitting}
         values={editorValues}
         errors={editorErrors}
+        jobNo={editorJobNo}
         selectedFactory={selectedFactory}
         selectedBuyer={selectedBuyer}
         selectedMerchandiser={selectedMerchandiser}
@@ -909,7 +871,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           setEditorValues({ ...values, totalPoQty: String(totalPoQty) })
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
-        onAiAssistMasterDataCreate={createAiAssistMasterData}
+        onAiAssistRowResolve={({ row, buyerId }) => resolveAiAssistRowMasterData({ row, buyerId })}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {
@@ -917,6 +879,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             setSelectedFactory(null)
             setSelectedBuyer(null)
             setSelectedMerchandiser(null)
+            setEditorJobNo("")
             setEditorErrors([])
             setEditorLoading(false)
             setEditorSubmitting(false)

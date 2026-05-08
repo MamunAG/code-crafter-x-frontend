@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, type DragEvent } from "react"
-import { ChevronDown, ChevronUp, GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2, Upload } from "lucide-react"
+import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
@@ -18,7 +18,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 import type { JobAiAssistRow, JobDetailFormValues, JobDialogSectionId, JobFormError, JobFormValues } from "../job.types"
-import { JobAiAssistDialog, type AiAssistMasterDataMatches, type AiAssistMissingMasterData, type AiAssistPendingAdd } from "./job-ai-assist-dialog"
+import { JobAiAssistDialog } from "./job-ai-assist-dialog"
+import { type AiAssistFocusColumn, type AiAssistMasterDataMatches, useJobAiAssistStore } from "./job-ai-assist.store"
 
 type SelectOption = AppComboboxOption
 
@@ -29,6 +30,7 @@ type JobFormDialogProps = {
   submitting: boolean
   values: JobFormValues
   errors: JobFormError[]
+  jobNo?: string
   selectedFactory: SelectOption | null
   selectedBuyer: SelectOption | null
   selectedMerchandiser: SelectOption | null
@@ -43,11 +45,7 @@ type JobFormDialogProps = {
   onMerchandiserOptionChange: (option: SelectOption | null) => void
   onValuesChange: (values: JobFormValues) => void
   onAiAssistFileAnalyze: (file: File) => Promise<JobAiAssistRow[]>
-  onAiAssistMasterDataCreate: (params: {
-    row: JobAiAssistRow
-    missing: AiAssistMissingMasterData
-    matches: AiAssistMasterDataMatches
-  }) => Promise<Partial<AiAssistMasterDataMatches>>
+  onAiAssistRowResolve: (params: { row: JobAiAssistRow; buyerId?: string }) => Promise<AiAssistMasterDataMatches>
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
 }
@@ -61,16 +59,8 @@ const ORDER_TYPE_OPTIONS = [
 const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
 const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-sm px-1.5 text-xs"
-const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
-const AI_ASSIST_FOCUS_COLUMNS = ["poNumber", "styleNo", "styleName", "color", "size", "quantity", "fob", "deliveryDate"] as const
 
-type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
-type AiAssistFocusColumn = (typeof AI_ASSIST_FOCUS_COLUMNS)[number]
-type AiAssistFocusedCell = {
-  rowIndex: number
-  column: AiAssistFocusColumn
-}
-
+type DetailFocusColumn = "quantity" | "fob" | "cm" | "deliveryDate" | "cuttingLimitPercentage" | "remarks"
 const JOB_DIALOG_SECTIONS: Array<{ id: JobDialogSectionId; label: string; icon: typeof Info }> = [
   { id: "basic-info", label: "Basic Info", icon: Info },
   { id: "details", label: "PO Details", icon: PackageCheck },
@@ -99,6 +89,7 @@ function newDetailRow(previousDetail?: Partial<JobDetailFormValues>): JobDetailF
     fob: previousDetail?.fob ?? "0",
     cm: previousDetail?.cm ?? "0",
     deliveryDate: previousDetail?.deliveryDate ?? "",
+    cuttingLimitPercentage: previousDetail?.cuttingLimitPercentage ?? "0",
     remarks: "",
   }
 }
@@ -136,6 +127,19 @@ function sumJobDetails<T extends { quantity?: string | number | null; fob?: stri
   }, 0)
 }
 
+function sumJobCmPerDzn<T extends { quantity?: string | number | null; cm?: string | number | null }>(details: T[]) {
+  return details.reduce((total, detail) => {
+    const quantityValue = Number(detail.quantity)
+    const cmPerDznValue = Number(detail.cm)
+
+    if (!Number.isFinite(quantityValue) || !Number.isFinite(cmPerDznValue)) {
+      return total
+    }
+
+    return total + quantityValue * (cmPerDznValue / 12)
+  }, 0)
+}
+
 function sumJobQuantities<T extends { quantity?: string | number | null }>(details: T[]) {
   return details.reduce((total, detail) => {
     const quantityValue = Number(detail.quantity)
@@ -158,24 +162,6 @@ function formatSummaryValue(value: number) {
   }
 
   return value.toFixed(2).replace(/\.?0+$/, "")
-}
-
-function normalizeLookupText(value: string | null | undefined) {
-  return value?.trim().toLowerCase() ?? ""
-}
-
-function findBestAiAssistOption(options: SelectOption[], value: string, allowStylePrefix = false) {
-  const normalizedValue = normalizeLookupText(value)
-
-  if (!normalizedValue) {
-    return null
-  }
-
-  return (
-    options.find((option) => normalizeLookupText(option.label) === normalizedValue || normalizeLookupText(option.value) === normalizedValue) ??
-    (allowStylePrefix ? options.find((option) => normalizeLookupText(option.label).startsWith(`${normalizedValue} -`)) : undefined) ??
-    null
-  )
 }
 
 function formatAiAssistDateForInput(value: string | null | undefined) {
@@ -274,6 +260,7 @@ export function JobFormDialog({
   submitting,
   values,
   errors,
+  jobNo,
   selectedFactory,
   selectedBuyer,
   selectedMerchandiser,
@@ -288,7 +275,7 @@ export function JobFormDialog({
   onMerchandiserOptionChange,
   onValuesChange,
   onAiAssistFileAnalyze,
-  onAiAssistMasterDataCreate,
+  onAiAssistRowResolve,
   onOpenChange,
   onSubmit,
 }: JobFormDialogProps) {
@@ -298,17 +285,20 @@ export function JobFormDialog({
   const [activeSection, setActiveSection] = useState<JobDialogSectionId>("basic-info")
   const [openRowControl, setOpenRowControl] = useState("")
   const [draggingDetailId, setDraggingDetailId] = useState("")
-  const [aiAssistOpen, setAiAssistOpen] = useState(false)
-  const [aiAssistFile, setAiAssistFile] = useState<File | null>(null)
-  const [aiAssistFileName, setAiAssistFileName] = useState("")
-  const [aiAssistUploadCollapsed, setAiAssistUploadCollapsed] = useState(false)
-  const [aiAssistRows, setAiAssistRows] = useState<JobAiAssistRow[]>([])
-  const [aiAssistError, setAiAssistError] = useState("")
-  const [aiAssistWorking, setAiAssistWorking] = useState(false)
-  const [addingAiAssistRowIndex, setAddingAiAssistRowIndex] = useState<number | null>(null)
-  const [addedAiAssistRowKeys, setAddedAiAssistRowKeys] = useState<string[]>([])
-  const [pendingAiAssistAdd, setPendingAiAssistAdd] = useState<AiAssistPendingAdd | null>(null)
-  const [focusedAiAssistCell, setFocusedAiAssistCell] = useState<AiAssistFocusedCell | null>(null)
+  const aiAssistFile = useJobAiAssistStore((state) => state.file)
+  const aiAssistRows = useJobAiAssistStore((state) => state.rows)
+  const aiAssistWorking = useJobAiAssistStore((state) => state.working)
+  const addingAiAssistRowIndex = useJobAiAssistStore((state) => state.addingRowIndex)
+  const focusedAiAssistCell = useJobAiAssistStore((state) => state.focusedCell)
+  const setAiAssistOpen = useJobAiAssistStore((state) => state.setOpen)
+  const selectAiAssistFile = useJobAiAssistStore((state) => state.selectFile)
+  const setAiAssistError = useJobAiAssistStore((state) => state.setError)
+  const setAiAssistWorking = useJobAiAssistStore((state) => state.setWorking)
+  const setAddingAiAssistRowIndex = useJobAiAssistStore((state) => state.setAddingRowIndex)
+  const fillAiAssistColumnDownInStore = useJobAiAssistStore((state) => state.fillColumnDown)
+  const markAiAssistRowAdded = useJobAiAssistStore((state) => state.markRowAdded)
+  const resetAiAssistRowsForAnalyze = useJobAiAssistStore((state) => state.resetRowsForAnalyze)
+  const completeAiAssistAnalyze = useJobAiAssistStore((state) => state.completeAnalyze)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -340,36 +330,15 @@ export function JobFormDialog({
   }
 
   function openAiAssistDialog() {
-    if (!values.buyerId.trim()) {
-      toast.error("Please select a buyer before using AI Assist.")
-      scrollToSection("basic-info")
-      return
-    }
-
     setAiAssistOpen(true)
   }
 
   function handleAiAssistFileChange(file: File | null) {
-    setAiAssistFile(file)
-    setAiAssistFileName(file?.name ?? "")
-    setAiAssistRows([])
-    setAiAssistError("")
-    setAddedAiAssistRowKeys([])
-    setFocusedAiAssistCell(null)
-    setAiAssistUploadCollapsed(false)
+    selectAiAssistFile(file)
 
     if (file) {
       void analyzeAiAssistFile(file)
     }
-  }
-
-  function openAiAssistDialog() {
-    if (!values.buyerId.trim()) {
-      toast.info("Please select a buyer before using AI Assist.")
-      return
-    }
-
-    setAiAssistOpen(true)
   }
 
   async function analyzeAiAssistFile(fileToAnalyze = aiAssistFile) {
@@ -381,25 +350,14 @@ export function JobFormDialog({
     setAiAssistError("")
     try {
       const rows = await onAiAssistFileAnalyze(fileToAnalyze)
-      setAiAssistRows(rows)
-      setAddedAiAssistRowKeys([])
-      setFocusedAiAssistCell(null)
-      setAiAssistUploadCollapsed(Boolean(rows.length))
+      completeAiAssistAnalyze(rows)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
-      setAiAssistRows([])
+      resetAiAssistRowsForAnalyze()
       setAiAssistError(message)
     } finally {
       setAiAssistWorking(false)
     }
-  }
-
-  function getAiAssistRowKey(row: JobAiAssistRow, index: number) {
-    return [row.poNumber, row.styleNo, row.styleName, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
-  }
-
-  function updateAiAssistRow(index: number, patch: Partial<JobAiAssistRow>) {
-    setAiAssistRows((currentRows) => currentRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
   }
 
   function getAiAssistCellValue(row: JobAiAssistRow, column: AiAssistFocusColumn) {
@@ -421,9 +379,7 @@ export function JobFormDialog({
     }
 
     const value = getAiAssistCellValue(sourceRow, cell.column)
-    setAiAssistRows((currentRows) =>
-      currentRows.map((row, rowIndex) => (rowIndex > cell.rowIndex ? { ...row, [cell.column]: value } : row)),
-    )
+    fillAiAssistColumnDownInStore(cell, value)
     focusAiAssistField(cell.rowIndex, cell.column)
   }
 
@@ -441,10 +397,11 @@ export function JobFormDialog({
       quantity: String(row.quantity || 0),
       fob: row.fob == null ? "0" : String(row.fob),
       deliveryDate: formatAiAssistDateForInput(row.deliveryDate),
+      cuttingLimitPercentage: previousDetail?.cuttingLimitPercentage ?? "0",
     }
 
     update("jobDetails", [...values.jobDetails, nextDetail])
-    setAddedAiAssistRowKeys((currentKeys) => [...currentKeys, getAiAssistRowKey(row, index)])
+    markAiAssistRowAdded(row, index)
   }
 
   async function addAiAssistRowToDetails(row: JobAiAssistRow, index: number) {
@@ -456,57 +413,10 @@ export function JobFormDialog({
     setAiAssistError("")
 
     try {
-      const [styleResult, sizeResult, colorResult] = await Promise.all([
-        row.styleNo.trim() ? loadStyleOptions({ query: row.styleNo.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
-        row.size.trim() ? loadSizeOptions({ query: row.size.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
-        row.color.trim() ? loadColorOptions({ query: row.color.trim(), page: 1, limit: 10 }) : Promise.resolve({ items: [], hasNextPage: false }),
-      ])
-      const styleOption = findBestAiAssistOption(styleResult.items, row.styleNo, true)
-      const sizeOption = findBestAiAssistOption(sizeResult.items, row.size)
-      const colorOption = findBestAiAssistOption(colorResult.items, row.color)
-      const matches = { styleOption, sizeOption, colorOption }
-      const missing: AiAssistMissingMasterData = {
-        styleNo: row.styleNo.trim() && !styleOption ? row.styleNo.trim() : undefined,
-        size: row.size.trim() && !sizeOption ? row.size.trim() : undefined,
-        color: row.color.trim() && !colorOption ? row.color.trim() : undefined,
-      }
-
-      if (missing.styleNo || missing.size || missing.color) {
-        setPendingAiAssistAdd({ row, index, matches, missing })
-        return
-      }
-
+      const matches = await onAiAssistRowResolve({ row, buyerId: values.buyerId.trim() || undefined })
       appendAiAssistRowToDetails(row, index, matches)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to add this AI Assist row to PO Details."
-      setAiAssistError(message)
-    } finally {
-      setAddingAiAssistRowIndex(null)
-    }
-  }
-
-  async function confirmCreateAiAssistMasterData() {
-    if (!pendingAiAssistAdd || addingAiAssistRowIndex !== null) {
-      return
-    }
-
-    setAddingAiAssistRowIndex(pendingAiAssistAdd.index)
-    setAiAssistError("")
-
-    try {
-      const createdMatches = await onAiAssistMasterDataCreate({
-        row: pendingAiAssistAdd.row,
-        missing: pendingAiAssistAdd.missing,
-        matches: pendingAiAssistAdd.matches,
-      })
-      appendAiAssistRowToDetails(pendingAiAssistAdd.row, pendingAiAssistAdd.index, {
-        styleOption: createdMatches.styleOption ?? pendingAiAssistAdd.matches.styleOption,
-        sizeOption: createdMatches.sizeOption ?? pendingAiAssistAdd.matches.sizeOption,
-        colorOption: createdMatches.colorOption ?? pendingAiAssistAdd.matches.colorOption,
-      })
-      setPendingAiAssistAdd(null)
-    } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "Unable to create the missing setup data for this AI Assist row."
       setAiAssistError(message)
     } finally {
       setAddingAiAssistRowIndex(null)
@@ -553,7 +463,16 @@ export function JobFormDialog({
   }
 
   function getDetailFocusAttribute(column: DetailFocusColumn) {
-    return `data-job-detail-${column}`
+    const attributes: Record<DetailFocusColumn, string> = {
+      quantity: "data-job-detail-quantity",
+      fob: "data-job-detail-fob",
+      cm: "data-job-detail-cm",
+      deliveryDate: "data-job-detail-deliverydate",
+      cuttingLimitPercentage: "data-job-detail-cutting-limit-percentage",
+      remarks: "data-job-detail-remarks",
+    }
+
+    return attributes[column]
   }
 
   function getAiAssistFocusAttribute(column: AiAssistFocusColumn) {
@@ -633,10 +552,8 @@ export function JobFormDialog({
   }
 
   const totalFobSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "fob"))
-  const totalCmSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "cm"))
+  const totalCmSummary = formatSummaryValue(sumJobCmPerDzn(values.jobDetails))
   const totalQuantitySummary = formatSummaryValue(sumJobQuantities(values.jobDetails))
-  const canFillAiAssistDown = Boolean(focusedAiAssistCell && focusedAiAssistCell.rowIndex < aiAssistRows.length - 1)
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-slate-200/70 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#080a14] sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:max-w-7xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
@@ -696,6 +613,10 @@ export function JobFormDialog({
                         <CardTitle className="text-sm">Basic Info</CardTitle>
                       </CardHeader>
                       <CardContent className="grid min-w-0 gap-4 px-3 pb-3 sm:px-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div className={JOB_DIALOG_FIELD_CLASS}>
+                          <FieldLabel>Job No</FieldLabel>
+                          <Input value={jobNo || ""} readOnly placeholder="Auto generated" className="w-full min-w-0 bg-slate-100 dark:bg-white/[0.04]" />
+                        </div>
                         <div className={JOB_DIALOG_FIELD_CLASS}>
                           <FieldLabel required>Factory</FieldLabel>
                           <AppCombobox
@@ -914,7 +835,7 @@ export function JobFormDialog({
                                       onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
                                       onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cm")}
                                       inputMode="decimal"
-                                      placeholder="CM"
+                                  placeholder="CM/Dzn"
                                       data-job-detail-cm={detail.id}
                                     />
                                     <Input
@@ -924,6 +845,15 @@ export function JobFormDialog({
                                       onChange={(event) => updateDetailFromRow(index, { deliveryDate: event.target.value })}
                                       onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
                                       data-job-detail-deliverydate={detail.id}
+                                    />
+                                    <Input
+                                      className={JOB_DIALOG_INPUT_CLASS}
+                                      value={detail.cuttingLimitPercentage}
+                                      onChange={(event) => updateDetailFromRow(index, { cuttingLimitPercentage: event.target.value })}
+                                      onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cuttingLimitPercentage")}
+                                      inputMode="decimal"
+                                      placeholder="Cutting Limit %"
+                                      data-job-detail-cutting-limit-percentage={detail.id}
                                     />
                                     <Textarea
                                       className="w-full min-w-0 rounded-md text-sm md:col-span-2 xl:col-span-4"
@@ -940,7 +870,7 @@ export function JobFormDialog({
                             </div>
 
                             <div className="hidden w-full min-w-0 overflow-x-scroll rounded-md border border-slate-200/70 overscroll-x-contain pb-2 [scrollbar-gutter:stable] lg:block dark:border-white/10">
-                              <table className="w-max min-w-[1180px] border-collapse text-xs">
+                              <table className="w-max min-w-[1300px] border-collapse text-xs">
                                 <thead>
                                   <tr className="h-9 border-b hover:bg-transparent">
                                     <th className="w-12 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">#</th>
@@ -951,8 +881,9 @@ export function JobFormDialog({
                                     <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Qty</th>
                                     <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">FOB</th>
                                     <th className="whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Total FOB</th>
-                                    <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">CM</th>
+                                    <th className="w-20 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">CM/Dzn</th>
                                     <th className="min-w-32 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Delivery</th>
+                                    <th className="min-w-32 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Cutting Limit %</th>
                                     <th className="min-w-56 whitespace-nowrap px-1.5 py-2 text-left font-medium text-foreground">Remarks</th>
                                     <th className="w-12 whitespace-nowrap px-1.5 py-2 text-right font-medium text-foreground">Action</th>
                                   </tr>
@@ -1075,7 +1006,7 @@ export function JobFormDialog({
                                           onChange={(event) => updateDetailFromRow(index, { cm: event.target.value })}
                                           onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cm")}
                                           inputMode="decimal"
-                                          placeholder="CM"
+                                      placeholder="CM/Dzn"
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
                                           data-job-detail-cm={detail.id}
                                         />
@@ -1088,6 +1019,17 @@ export function JobFormDialog({
                                           onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "deliveryDate")}
                                           className={JOB_DIALOG_TABLE_INPUT_CLASS}
                                           data-job-detail-deliverydate={detail.id}
+                                        />
+                                      </td>
+                                      <td className="px-1.5 py-2 align-top">
+                                        <Input
+                                          value={detail.cuttingLimitPercentage}
+                                          onChange={(event) => updateDetailFromRow(index, { cuttingLimitPercentage: event.target.value })}
+                                          onKeyDown={(event) => handleDetailFieldKeyDown(event, index, "cuttingLimitPercentage")}
+                                          inputMode="decimal"
+                                          placeholder="Cutting Limit %"
+                                          className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                          data-job-detail-cutting-limit-percentage={detail.id}
                                         />
                                       </td>
                                       <td className="px-1.5 py-2 align-top">
@@ -1158,269 +1100,15 @@ export function JobFormDialog({
           </div>
         </form>
       </DialogContent>
-      <Dialog open={aiAssistOpen} onOpenChange={setAiAssistOpen}>
-        <DialogContent className="grid max-h-[92dvh] max-w-[calc(100vw-1.5rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-lg p-0 sm:max-w-6xl">
-          <DialogHeader className="border-b border-slate-200/70 px-4 py-3 dark:border-white/10">
-            <DialogTitle>AI Assist</DialogTitle>
-            <DialogDescription>Upload a PDF or Excel file. AI Assist will extract PO number, style no, style name, color, size, and quantity rows.</DialogDescription>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-col gap-3 overflow-hidden px-4 py-3">
-            <div className="space-y-2 rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <Label htmlFor="job-ai-assist-file">File Upload</Label>
-                  {aiAssistUploadCollapsed ? (
-                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{aiAssistFileName || "No file selected"}</p>
-                  ) : null}
-                </div>
-                {aiAssistRows.length ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-sm px-2 text-xs"
-                    onClick={() => setAiAssistUploadCollapsed((collapsed) => !collapsed)}
-                  >
-                    {aiAssistUploadCollapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
-                    {aiAssistUploadCollapsed ? "Expand" : "Minimize"}
-                  </Button>
-                ) : null}
-              </div>
-              {!aiAssistUploadCollapsed ? (
-                <>
-                  <label
-                    htmlFor={aiAssistWorking ? undefined : "job-ai-assist-file"}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-1.5 rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300",
-                      aiAssistWorking ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.06]",
-                    )}
-                  >
-                    {aiAssistWorking ? <Loader2 className="size-5 animate-spin text-blue-500" /> : <Upload className="size-5 text-slate-400" />}
-                    <span className="max-w-full truncate font-medium">{aiAssistFileName || "Choose a file"}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {aiAssistWorking ? "Upload locked while AI Assist reviews this document" : "PDF, XLS, XLSX, or CSV"}
-                    </span>
-                  </label>
-                  <Input
-                    id="job-ai-assist-file"
-                    type="file"
-                    accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-                    disabled={aiAssistWorking}
-                    className="sr-only"
-                    onChange={(event) => handleAiAssistFileChange(event.target.files?.[0] ?? null)}
-                  />
-                </>
-              ) : null}
-            </div>
-
-            {aiAssistWorking ? (
-              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
-                <div className="flex items-start gap-2">
-                  <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
-                  <div>
-                    <p className="font-medium">Analyzing purchase order document</p>
-                    <p className="mt-0.5 text-xs leading-5 text-blue-700/80 dark:text-blue-100/75">
-                      Extracting PO number, style no, style name, color, size, quantity, FOB, and delivery date. This may take a moment for large files.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {aiAssistError ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-                {aiAssistError}
-              </div>
-            ) : null}
-
-            {aiAssistRows.length ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
-                <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                  AI-generated extraction may contain mistakes. Please review the original document and verify all values before saving or making decisions based on this information.
-                </div>
-                <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-sm font-semibold">Extracted PO Detail Rows</span>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Enter: next row | Ctrl+Enter: previous row | Ctrl/Cmd+D: fill down</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 rounded-sm px-2 text-xs"
-                      disabled={!canFillAiAssistDown}
-                      onClick={() => fillAiAssistColumnDown()}
-                    >
-                      Fill Down
-                    </Button>
-                  </div>
-                </div>
-                <ScrollArea className="min-h-0 flex-1">
-                  <table className="w-full min-w-[1120px] table-auto border-collapse text-xs sm:text-sm">
-                    <thead className="sticky top-0 z-10 bg-white dark:bg-[#17131d]">
-                      <tr className="border-b border-slate-200 dark:border-white/10">
-                        <th className="min-w-36 px-2 py-2 text-left font-medium">PO Number</th>
-                        <th className="min-w-32 px-2 py-2 text-left font-medium">Style No</th>
-                        <th className="min-w-56 px-2 py-2 text-left font-medium">Style Name</th>
-                        <th className="min-w-36 px-2 py-2 text-left font-medium">Color</th>
-                        <th className="w-14 px-2 py-2 text-left font-medium">Size</th>
-                        <th className="w-16 px-2 py-2 text-right font-medium">Qty</th>
-                        <th className="w-16 px-2 py-2 text-right font-medium">FOB</th>
-                        <th className="w-28 px-2 py-2 text-left font-medium">Delivery Date</th>
-                        <th className="sticky right-0 w-20 bg-white px-2 py-2 text-right font-medium shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)] dark:bg-[#17131d]">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {aiAssistRows.map((row, index) => {
-                        const rowKey = getAiAssistRowKey(row, index)
-                        const rowAdded = addedAiAssistRowKeys.includes(rowKey)
-                        const rowAdding = addingAiAssistRowIndex === index
-
-                        return (
-                          <tr key={`ai-assist-row-${index}`} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.poNumber}
-                                onChange={(event) => updateAiAssistRow(index, { poNumber: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "poNumber" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "poNumber")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-po-number={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.styleNo}
-                                onChange={(event) => updateAiAssistRow(index, { styleNo: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleNo" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleNo")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-style-no={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.styleName}
-                                onChange={(event) => updateAiAssistRow(index, { styleName: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleName" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleName")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-style-name={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.color}
-                                onChange={(event) => updateAiAssistRow(index, { color: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "color" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "color")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-color={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.size}
-                                onChange={(event) => updateAiAssistRow(index, { size: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "size" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "size")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-size={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={String(row.quantity ?? "")}
-                                onChange={(event) => updateAiAssistRow(index, { quantity: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "quantity" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "quantity")}
-                                inputMode="decimal"
-                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
-                                data-ai-assist-quantity={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                value={row.fob == null ? "" : String(row.fob)}
-                                onChange={(event) => updateAiAssistRow(index, { fob: event.target.value })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "fob" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "fob")}
-                                inputMode="decimal"
-                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
-                                data-ai-assist-fob={index}
-                              />
-                            </td>
-                            <td className="px-2 py-2 align-top">
-                              <Input
-                                type="date"
-                                value={formatAiAssistDateForInput(row.deliveryDate)}
-                                onChange={(event) => updateAiAssistRow(index, { deliveryDate: event.target.value || null })}
-                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "deliveryDate" })}
-                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "deliveryDate")}
-                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
-                                data-ai-assist-delivery-date={index}
-                              />
-                            </td>
-                            <td className="sticky right-0 bg-white px-2 py-2 text-right align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] dark:bg-[#17131d]">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={rowAdded ? "secondary" : "outline"}
-                                className="h-6 rounded-md px-3 text-xs"
-                                disabled={rowAdding || addingAiAssistRowIndex !== null}
-                                onClick={() => void addAiAssistRowToDetails(row, index)}
-                              >
-                                {rowAdding ? <Loader2 className="size-3 animate-spin" /> : null}
-                                {rowAdded ? "Added" : "Add"}
-                              </Button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </ScrollArea>
-              </div>
-            ) : null}
-          </div>
-          <DialogFooter className="border-t border-slate-200/70 px-4 py-3 dark:border-white/10">
-            <Button type="button" className="h-7 rounded-md px-3 text-xs" variant="outline" onClick={() => setAiAssistOpen(false)}>Cancel</Button>
-            <Button type="button" className="h-7 rounded-md px-3 text-xs" disabled={!aiAssistFile || aiAssistWorking} onClick={() => void analyzeAiAssistFile()}>
-              {aiAssistWorking ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              {aiAssistWorking ? "Analyzing" : aiAssistRows.length ? "Analyze Again" : "Analyze"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={Boolean(pendingAiAssistAdd)} onOpenChange={(open) => {
-        if (!open && addingAiAssistRowIndex === null) setPendingAiAssistAdd(null)
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Add missing setup data?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This AI Assist row contains setup values that are not available in the system yet. Add the missing records first, then this row will be inserted into PO Details.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {pendingAiAssistAdd ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
-              {pendingAiAssistAdd.missing.styleNo ? <p><span className="font-semibold">Style No:</span> {pendingAiAssistAdd.missing.styleNo}</p> : null}
-              {pendingAiAssistAdd.missing.styleNo && pendingAiAssistAdd.row.styleName?.trim() ? <p><span className="font-semibold">Style Name:</span> {pendingAiAssistAdd.row.styleName.trim()}</p> : null}
-              {pendingAiAssistAdd.missing.color ? <p><span className="font-semibold">Color:</span> {pendingAiAssistAdd.missing.color}</p> : null}
-              {pendingAiAssistAdd.missing.size ? <p><span className="font-semibold">Size:</span> {pendingAiAssistAdd.missing.size}</p> : null}
-            </div>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={addingAiAssistRowIndex !== null}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={addingAiAssistRowIndex !== null} onClick={(event) => {
-              event.preventDefault()
-              void confirmCreateAiAssistMasterData()
-            }}>
-              {addingAiAssistRowIndex !== null ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              Add setup data
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <JobAiAssistDialog
+        tableInputClassName={JOB_DIALOG_TABLE_INPUT_CLASS}
+        onFileChange={handleAiAssistFileChange}
+        onAnalyze={() => void analyzeAiAssistFile()}
+        onAddRow={(row, index) => void addAiAssistRowToDetails(row, index)}
+        onFieldKeyDown={handleAiAssistFieldKeyDown}
+        onFillDown={() => fillAiAssistColumnDown()}
+        onFormatDateForInput={formatAiAssistDateForInput}
+      />
     </Dialog>
   )
 }

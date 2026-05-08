@@ -83,11 +83,14 @@ export type JobDetailRecord = {
   fob?: number | null
   cm?: number | null
   deliveryDate?: string | null
+  cuttingLimitPercentage?: number | null
   remarks?: string | null
 }
 
 export type JobRecord = {
   id: string
+  jobNo?: string | null
+  jobSerial?: number | null
   factoryId: string
   factory?: FactorySummary | null
   buyerId: string
@@ -132,6 +135,7 @@ export type JobDetailFormValues = {
   fob: string
   cm: string
   deliveryDate: string
+  cuttingLimitPercentage: string
   remarks: string
 }
 
@@ -166,4 +170,9 @@ export type JobAiAssistRow = {
 
 export type JobAiAssistResult = {
   rows: JobAiAssistRow[]
+}
+
+export type NextJobNumber = {
+  jobNo: string
+  jobSerial: number
 }

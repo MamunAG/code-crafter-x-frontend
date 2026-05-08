@@ -1,4 +1,5 @@
-import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobRecord, PaginatedResponse } from "./job.types"
+import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
+import type { AiAssistMasterDataMatches } from "./component/job-ai-assist.store"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -82,6 +83,7 @@ function buildJobPayload(values: JobFormValues) {
       fob: normalizeNumber(detail.fob),
       cm: normalizeNumber(detail.cm),
       deliveryDate: optionalString(detail.deliveryDate),
+      cuttingLimitPercentage: normalizeNumber(detail.cuttingLimitPercentage),
       remarks: optionalString(detail.remarks),
     })),
   }
@@ -140,6 +142,26 @@ export async function fetchJob({
 
   const payload = await readJsonResponse<JobRecord>(response)
   if (!payload.data) throw new Error("The purchase order record was returned without data.")
+  return payload.data
+}
+
+export async function fetchNextJobNumber({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+}): Promise<NextJobNumber> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/next-number"), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<NextJobNumber>(response)
+  if (!payload.data) throw new Error("The next job number was not returned.")
   return payload.data
 }
 
@@ -235,5 +257,48 @@ export async function analyzeJobAiAssistFile({
 
   const payload = await readJsonResponse<JobAiAssistResult>(response)
   if (!payload.data?.rows) throw new Error("AI Assist finished, but no PO detail rows were returned.")
+  return payload.data
+}
+
+export async function resolveJobAiAssistRow({
+  apiUrl,
+  accessToken,
+  row,
+  buyerId,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  row: {
+    poNumber: string
+    styleNo: string
+    styleName: string
+    color: string
+    size: string
+    quantity: number | string
+    deliveryDate: string | null
+    fob: number | string | null
+  }
+  buyerId?: string
+  organizationId?: string
+}): Promise<AiAssistMasterDataMatches> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/ai-assist/resolve-row"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
+    body: JSON.stringify({
+      poNumber: row.poNumber,
+      styleNo: row.styleNo,
+      styleName: row.styleName,
+      color: row.color,
+      size: row.size,
+      quantity: row.quantity,
+      deliveryDate: row.deliveryDate,
+      fob: row.fob,
+      buyerId,
+    }),
+  })
+
+  const payload = await readJsonResponse<AiAssistMasterDataMatches>(response)
+  if (!payload.data) throw new Error("AI Assist resolved the row, but no master data response was returned.")
   return payload.data
 }

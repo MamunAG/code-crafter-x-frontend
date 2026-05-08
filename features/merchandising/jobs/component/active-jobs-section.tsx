@@ -1,12 +1,47 @@
+/* eslint-disable react-hooks/incompatible-library */
 "use client"
 
-import { Search, MoreHorizontal } from "lucide-react"
+import { useMemo, useState } from "react"
+import {
+  BriefcaseBusiness,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  MoreHorizontal,
+  Plus,
+  Search,
+} from "lucide-react"
+import {
+  type ColumnDef,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
 
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxLoadResult,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
+import { AppDataTable } from "@/components/app-data-table"
 import { AppSelect } from "@/components/app-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -20,6 +55,9 @@ type ActiveJobsSectionProps = {
   loadingJobs: boolean
   draftFilters: JobFilterValues
   activeFilters: JobFilterValues
+  loadFactoryOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  loadBuyerOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  loadEmployeeOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   onDraftFiltersChange: (nextValues: JobFilterValues) => void
   onActiveFiltersChange: (nextValues: JobFilterValues) => void
   onPageChange: (nextPage: number | ((current: number) => number)) => void
@@ -33,11 +71,7 @@ type ActiveJobsSectionProps = {
   canDeleteJob: boolean
 }
 
-const STATUS_OPTIONS = [
-  { value: "__all__", label: "All statuses" },
-  { value: "true", label: "Active" },
-  { value: "false", label: "Inactive" },
-]
+const ALL_STATUS_VALUE = "__all_statuses__"
 
 function getFactoryLabel(job: JobRecord) {
   return job.factory?.displayName?.trim() || job.factory?.name?.trim() || "No factory"
@@ -56,7 +90,40 @@ function getPoLabel(job: JobRecord) {
 
 function formatDate(value?: string | null) {
   if (!value) return "Not available"
-  return String(value).slice(0, 10)
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10)
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(parsed)
+}
+
+function jobStatusTone(job?: JobRecord | null) {
+  if (!job) return "outline" as const
+  if (job.deleted_at) return "destructive" as const
+  return job.isActive === false ? "outline" : "secondary"
+}
+
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string
+  description: string
+  actionLabel: string
+  onAction: () => void
+}) {
+  return (
+    <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+        <BriefcaseBusiness className="size-5" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">{title}</h3>
+      <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
+      <Button type="button" onClick={onAction} className="mt-6 rounded-xl">
+        {actionLabel}
+      </Button>
+    </div>
+  )
 }
 
 export function ActiveJobsSection({
@@ -67,6 +134,9 @@ export function ActiveJobsSection({
   loadingJobs,
   draftFilters,
   activeFilters,
+  loadFactoryOptions,
+  loadBuyerOptions,
+  loadEmployeeOptions,
   onDraftFiltersChange,
   onActiveFiltersChange,
   onPageChange,
@@ -79,15 +149,34 @@ export function ActiveJobsSection({
   canUpdateJob,
   canDeleteJob,
 }: ActiveJobsSectionProps) {
-  const totalPages = meta?.totalPages ?? 1
-  const filterCount = [
-    draftFilters.factoryId,
-    draftFilters.buyerId,
-    draftFilters.merchandiserId,
-    draftFilters.ordertype,
-    draftFilters.pono,
-    draftFilters.isActive,
-  ].filter((value) => value.trim()).length
+  const [selectedFilterFactory, setSelectedFilterFactory] = useState<AppComboboxOption | null>(null)
+  const [selectedFilterBuyer, setSelectedFilterBuyer] = useState<AppComboboxOption | null>(null)
+  const [selectedFilterMerchandiser, setSelectedFilterMerchandiser] = useState<AppComboboxOption | null>(null)
+  const filterFactoryValue =
+    draftFilters.factoryId && selectedFilterFactory?.value === draftFilters.factoryId
+      ? selectedFilterFactory
+      : null
+  const filterBuyerValue =
+    draftFilters.buyerId && selectedFilterBuyer?.value === draftFilters.buyerId
+      ? selectedFilterBuyer
+      : null
+  const filterMerchandiserValue =
+    draftFilters.merchandiserId && selectedFilterMerchandiser?.value === draftFilters.merchandiserId
+      ? selectedFilterMerchandiser
+      : null
+  const filterCount = useMemo(
+    () =>
+      [
+        draftFilters.factoryId,
+        draftFilters.buyerId,
+        draftFilters.merchandiserId,
+        draftFilters.ordertype,
+        draftFilters.pono,
+        draftFilters.isActive,
+      ].filter((value) => value.trim()).length,
+    [draftFilters],
+  )
+
   const filtersActive = Boolean(
     activeFilters.factoryId ||
       activeFilters.buyerId ||
@@ -97,95 +186,401 @@ export function ActiveJobsSection({
       activeFilters.isActive,
   )
 
-  return (
-    <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
-      <CardHeader className="border-b border-slate-200/70 p-4 dark:border-white/10 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <CardTitle className="text-lg">Active purchase orders</CardTitle>
-            <CardDescription>Review and maintain merchandising order entries.</CardDescription>
+  const pageSummary = useMemo(() => {
+    if (!meta || meta.total === 0) return "No jobs found"
+    const start = (meta.page - 1) * meta.limit + 1
+    const end = Math.min(meta.page * meta.limit, meta.total)
+    return `Showing ${start}-${end} of ${meta.total}`
+  }, [meta])
+
+  const columns = useMemo<ColumnDef<JobRecord>[]>(
+    () => [
+      {
+        id: "jobNo",
+        header: "Job No",
+        cell: ({ row }) => (
+          <div className="pl-4">
+            <p className="whitespace-nowrap text-xs font-semibold">{row.original.jobNo || "-"}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="rounded-full px-3 py-1">Total {meta?.total ?? jobs.length}</Badge>
-            {filtersActive ? <Badge variant="outline" className="rounded-full px-3 py-1">{filterCount} filters</Badge> : null}
-            {canCreateJob ? <Button type="button" onClick={onCreateJob} className="h-8 rounded-xl">New purchase order</Button> : null}
+        ),
+      },
+      {
+        id: "po",
+        header: "PO",
+        cell: ({ row }) => (
+          <div>
+            <p className="max-w-56 truncate text-xs font-semibold">{getPoLabel(row.original)}</p>
+          </div>
+        ),
+      },
+      {
+        id: "factory",
+        header: "Factory",
+        cell: ({ row }) => (
+          <span className="text-xs font-medium">{getFactoryLabel(row.original)}</span>
+        ),
+      },
+      {
+        id: "buyer",
+        header: "Buyer",
+        cell: ({ row }) => (
+          <span className="text-xs font-medium">{getBuyerLabel(row.original)}</span>
+        ),
+      },
+      {
+        id: "orderType",
+        header: "Order Type",
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.ordertype ?? "-"}</span>
+        ),
+      },
+      {
+        id: "quantity",
+        header: "Qty",
+        cell: ({ row }) => (
+          <span className="text-xs">{Number(row.original.totalPoQty ?? 0)}</span>
+        ),
+      },
+      {
+        id: "details",
+        header: "Details",
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.jobDetails?.length ?? 0}</span>
+        ),
+      },
+      {
+        id: "received",
+        header: "Received",
+        cell: ({ row }) => (
+          <span className="text-xs">{formatDate(row.original.poReceiveDate)}</span>
+        ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const job = row.original
+          const label = job.deleted_at ? "Deleted" : job.isActive === false ? "Inactive" : "Active"
+
+          return (
+            <Badge variant={jobStatusTone(job)} className="rounded-full px-3 py-1">
+              {label}
+            </Badge>
+          )
+        },
+      },
+      {
+        id: "actions",
+        header: () => <span className="pr-4">Actions</span>,
+        cell: ({ row }) => {
+          const job = row.original
+          const hasActions = canUpdateJob || canDeleteJob
+
+          if (!hasActions) {
+            return (
+              <div className="pr-4 text-right text-xs text-slate-400">
+                No actions
+              </div>
+            )
+          }
+
+          return (
+            <div className="pr-4 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon-sm">
+                    <MoreHorizontal className="size-3.5" />
+                    <span className="sr-only">Open actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {canUpdateJob ? (
+                    <DropdownMenuItem onSelect={() => onEditJob(job.id)}>
+                      Edit
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canUpdateJob && canDeleteJob ? <DropdownMenuSeparator /> : null}
+                  {canDeleteJob ? (
+                    <DropdownMenuItem variant="destructive" onSelect={() => onDeleteJob(job)}>
+                      Delete
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+    ],
+    [canDeleteJob, canUpdateJob, onDeleteJob, onEditJob],
+  )
+
+  const table = useReactTable({
+    data: jobs,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+      <CardHeader className="border-b border-slate-200/70 py-0 dark:border-white/10">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="text-base">Jobs</CardTitle>
+            <CardDescription>{pageSummary}</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
+              Page {meta?.totalPages ? meta.page : 0} of {meta?.totalPages ?? 0}
+            </Badge>
+            <Badge variant="outline" className="w-fit rounded-full px-2.5 py-0.5 text-[11px]">
+              {filterCount} active filter{filterCount === 1 ? "" : "s"}
+            </Badge>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="border-b border-slate-200/70 p-3 dark:border-white/10 sm:p-4">
+      <CardContent className="p-3 sm:p-0 sm:px-2">
         <form
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-6"
           onSubmit={(event) => {
             event.preventDefault()
             onActiveFiltersChange(draftFilters)
             onPageChange(1)
           }}
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
         >
-          <Input value={draftFilters.pono} onChange={(event) => onDraftFiltersChange({ ...draftFilters, pono: event.target.value })} placeholder="Search PO number" />
-          <Input value={draftFilters.factoryId} onChange={(event) => onDraftFiltersChange({ ...draftFilters, factoryId: event.target.value })} placeholder="Factory ID" />
-          <Input value={draftFilters.buyerId} onChange={(event) => onDraftFiltersChange({ ...draftFilters, buyerId: event.target.value })} placeholder="Buyer ID" />
-          <Input value={draftFilters.merchandiserId} onChange={(event) => onDraftFiltersChange({ ...draftFilters, merchandiserId: event.target.value })} placeholder="Merchandiser ID" />
-          <Input value={draftFilters.ordertype} onChange={(event) => onDraftFiltersChange({ ...draftFilters, ordertype: event.target.value })} placeholder="Retail / Promotional" />
-          <AppSelect
-            value={draftFilters.isActive || "__all__"}
-            onValueChange={(value) => onDraftFiltersChange({ ...draftFilters, isActive: value === "__all__" ? "" : value })}
-            options={STATUS_OPTIONS}
-          />
-          <div className="flex flex-col gap-2 md:flex-row xl:col-span-6 xl:justify-end">
-            <Button type="submit" className="rounded-xl"><Search className="size-3.5" /> Apply</Button>
-            <Button type="button" variant="outline" onClick={onResetFilters} className="rounded-xl">Reset</Button>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobPo" className="text-xs font-medium text-slate-700 dark:text-slate-300">PO Number</label>
+            <Input
+              id="filterJobPo"
+              value={draftFilters.pono}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDraftFiltersChange({ ...draftFilters, pono: event.target.value })}
+              placeholder="Input PO number"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobFactory" className="text-xs font-medium text-slate-700 dark:text-slate-300">Factory</label>
+            <AppCombobox
+              value={filterFactoryValue}
+              onValueChange={(factory) => {
+                setSelectedFilterFactory(factory)
+                onDraftFiltersChange({ ...draftFilters, factoryId: factory?.value ?? "" })
+              }}
+              loadItems={loadFactoryOptions}
+              initialLimit={10}
+              searchLimit={10}
+              inputProps={{ id: "filterJobFactory" }}
+              placeholder="All factories"
+              loadingMessage="Loading factories..."
+              emptyMessage="No factories match your search."
+              showClear={Boolean(draftFilters.factoryId)}
+              inputClassName="h-7 rounded-md px-2 text-xs"
+              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobBuyer" className="text-xs font-medium text-slate-700 dark:text-slate-300">Buyer</label>
+            <AppCombobox
+              value={filterBuyerValue}
+              onValueChange={(buyer) => {
+                setSelectedFilterBuyer(buyer)
+                onDraftFiltersChange({ ...draftFilters, buyerId: buyer?.value ?? "" })
+              }}
+              loadItems={loadBuyerOptions}
+              initialLimit={10}
+              searchLimit={10}
+              inputProps={{ id: "filterJobBuyer" }}
+              placeholder="All buyers"
+              loadingMessage="Loading buyers..."
+              emptyMessage="No buyers match your search."
+              showClear={Boolean(draftFilters.buyerId)}
+              inputClassName="h-7 rounded-md px-2 text-xs"
+              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobMerchandiser" className="text-xs font-medium text-slate-700 dark:text-slate-300">Merchandiser</label>
+            <AppCombobox
+              value={filterMerchandiserValue}
+              onValueChange={(merchandiser) => {
+                setSelectedFilterMerchandiser(merchandiser)
+                onDraftFiltersChange({ ...draftFilters, merchandiserId: merchandiser?.value ?? "" })
+              }}
+              loadItems={loadEmployeeOptions}
+              initialLimit={10}
+              searchLimit={10}
+              inputProps={{ id: "filterJobMerchandiser" }}
+              placeholder="All merchandisers"
+              loadingMessage="Loading merchandisers..."
+              emptyMessage="No merchandisers match your search."
+              showClear={Boolean(draftFilters.merchandiserId)}
+              inputClassName="h-7 rounded-md px-2 text-xs"
+              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobOrderType" className="text-xs font-medium text-slate-700 dark:text-slate-300">Order Type</label>
+            <Input
+              id="filterJobOrderType"
+              value={draftFilters.ordertype}
+              className="h-7 rounded-md px-2 text-xs"
+              onChange={(event) => onDraftFiltersChange({ ...draftFilters, ordertype: event.target.value })}
+              placeholder="Retail / Promotional"
+            />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterJobStatus" className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
+            <AppSelect
+              triggerId="filterJobStatus"
+              value={draftFilters.isActive || ALL_STATUS_VALUE}
+              onValueChange={(value) => onDraftFiltersChange({ ...draftFilters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
+              placeholder="All statuses"
+              options={[
+                { value: ALL_STATUS_VALUE, label: "All statuses" },
+                { value: "true", label: "Active" },
+                { value: "false", label: "Inactive" },
+              ]}
+            />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-6 xl:justify-self-end">
+            <Button type="submit" className="w-full rounded-xl sm:w-auto">
+              <Search className="size-3.5" />
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onResetFilters}>
+              Reset
+            </Button>
+            {canCreateJob ? (
+              <Button type="button" onClick={onCreateJob} className="w-full rounded-xl sm:w-auto">
+                <Plus className="size-3.5" />
+                New job
+              </Button>
+            ) : null}
           </div>
         </form>
       </CardContent>
 
-      <CardContent className="space-y-3 p-4">
-        {loadingJobs && jobs.length === 0 ? (
-          Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)
-        ) : jobs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-white/10">
-            No purchase orders found.
-          </div>
-        ) : (
-          jobs.map((job) => (
-            <div key={job.id} className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold">{getPoLabel(job)}</p>
-                    <Badge variant={job.isActive === false ? "outline" : "secondary"} className="rounded-full">{job.isActive === false ? "Inactive" : "Active"}</Badge>
-                    {job.ordertype ? <Badge variant="outline" className="rounded-full">{job.ordertype}</Badge> : null}
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{getFactoryLabel(job)} · {getBuyerLabel(job)}</p>
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span>Qty: {Number(job.totalPoQty ?? 0)}</span>
-                    <span>Details: {job.jobDetails?.length ?? 0}</span>
-                    <span>Received: {formatDate(job.poReceiveDate)}</span>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" className="rounded-xl"><MoreHorizontal className="size-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => onEditJob(job.id)} disabled={!canUpdateJob}>Edit</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onDeleteJob(job)} disabled={!canDeleteJob} className="text-destructive">Delete</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+      <CardContent className="border-t border-slate-200/70 p-0 dark:border-white/10">
+        <div className="lg:hidden">
+          {loadingJobs ? (
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-32 rounded-2xl" />
+              ))}
             </div>
-          ))
-        )}
+          ) : jobs.length > 0 ? (
+            <div className="space-y-3 p-4">
+              {jobs.map((job) => {
+                const label = job.deleted_at ? "Deleted" : job.isActive === false ? "Inactive" : "Active"
 
-        <div className="flex flex-col gap-3 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">Page {page} of {totalPages}</p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange((current) => Math.max(1, current - 1))}>Previous</Button>
-            <Button type="button" variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange((current) => current + 1)}>Next</Button>
-            <select value={String(limit)} onChange={(event) => onLimitChange(Number(event.target.value))} className="h-8 rounded-xl border border-input bg-input/20 px-3 text-xs">
-              {[5, 10, 20, 50].map((item) => <option key={item} value={item}>{item} / page</option>)}
-            </select>
+                return (
+                  <article
+                    key={job.id}
+                    className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{job.jobNo || "No job no"}</p>
+                      <p className="mt-1 truncate text-xs font-medium text-slate-600 dark:text-slate-300">PO: {getPoLabel(job)}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{getFactoryLabel(job)}</p>
+                    </div>
+
+                      {canUpdateJob || canDeleteJob ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+                              <MoreHorizontal className="size-3.5" />
+                              <span className="sr-only">Open actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            {canUpdateJob ? <DropdownMenuItem onSelect={() => onEditJob(job.id)}>Edit</DropdownMenuItem> : null}
+                            {canUpdateJob && canDeleteJob ? <DropdownMenuSeparator /> : null}
+                            {canDeleteJob ? <DropdownMenuItem variant="destructive" onSelect={() => onDeleteJob(job)}>Delete</DropdownMenuItem> : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant={jobStatusTone(job)} className="rounded-full px-3 py-1">{label}</Badge>
+                      <Badge variant="outline" className="rounded-full px-3 py-1">{getBuyerLabel(job)}</Badge>
+                      {job.ordertype ? <Badge variant="outline" className="rounded-full px-3 py-1">{job.ordertype}</Badge> : null}
+                    </div>
+
+                    <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <p>Qty: {Number(job.totalPoQty ?? 0)}</p>
+                      <p>Details: {job.jobDetails?.length ?? 0}</p>
+                      <p>Received: {formatDate(job.poReceiveDate)}</p>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="p-4">
+              <EmptyState
+                title="No jobs found"
+                description={
+                  filtersActive
+                    ? "Try clearing or relaxing the current filters."
+                    : canCreateJob
+                      ? "Create the first job to get started."
+                      : "No job records are available for the selected organization."
+                }
+                actionLabel={filtersActive || !canCreateJob ? "Reset filters" : "New job"}
+                onAction={filtersActive || !canCreateJob ? onResetFilters : onCreateJob}
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-slate-200/70 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{pageSummary}</p>
+            <div className="flex items-center justify-between gap-2">
+              <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(1)} disabled={loadingJobs || page <= 1}>
+                <ChevronsLeft className="size-3.5" />
+              </Button>
+              <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange((current) => Math.max(1, current - 1))} disabled={loadingJobs || page <= 1}>
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange((current) => Math.min(meta?.totalPages ?? 1, current + 1))} disabled={loadingJobs || page >= (meta?.totalPages ?? 1)}>
+                <ChevronRight className="size-3.5" />
+              </Button>
+              <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(meta?.totalPages ?? 1)} disabled={loadingJobs || page >= (meta?.totalPages ?? 1)}>
+                <ChevronsRight className="size-3.5" />
+              </Button>
+            </div>
           </div>
+        </div>
+
+        <div className="hidden lg:block">
+          <AppDataTable
+            table={table}
+            pageSummary={pageSummary}
+            page={page}
+            totalPages={meta?.totalPages ?? 1}
+            pageSize={limit}
+            isLoading={loadingJobs}
+            pageSizeOptions={[10, 25, 50, 100]}
+          leadingColumnIds={["jobNo"]}
+            onPageChange={(nextPage) => onPageChange(nextPage)}
+            onPageSizeChange={(nextPageSize) => onLimitChange(nextPageSize)}
+            emptyState={
+              <EmptyState
+                title="No jobs found"
+                description={
+                  filtersActive
+                    ? "Try clearing or relaxing the current filters."
+                    : canCreateJob
+                      ? "Create the first job to get started."
+                      : "No job records are available for the selected organization."
+                }
+                actionLabel={filtersActive || !canCreateJob ? "Reset filters" : "New job"}
+                onAction={filtersActive || !canCreateJob ? onResetFilters : onCreateJob}
+              />
+            }
+          />
         </div>
       </CardContent>
     </Card>
