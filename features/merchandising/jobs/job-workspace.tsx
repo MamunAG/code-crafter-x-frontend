@@ -435,7 +435,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         accessToken: token,
         page: pageNumber,
         limit: pageLimit,
-        filters: { styleNo: query, styleName: query, isActive: "true" },
+        filters: { styleNo: query, isActive: "true" },
         organizationId: selectedOrganizationId || undefined,
       })
       return {
@@ -692,7 +692,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             productType: "",
             buyerId: editorValues.buyerId.trim(),
             styleNo: missing.styleNo.trim(),
-            styleName: "",
+            styleName: row.styleName?.trim() ?? "",
             itemType: "",
             productDepartment: "",
             cmSewing: "0",

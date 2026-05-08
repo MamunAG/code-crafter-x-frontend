@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, type DragEvent } from "react"
-import { GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, GripVertical, Info, Loader2, PackageCheck, Plus, Settings, Sparkles, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxOption } from "@/components/app-combobox"
@@ -60,10 +60,16 @@ const ORDER_TYPE_OPTIONS = [
 
 const JOB_DIALOG_INPUT_CLASS = "w-full min-w-0"
 const JOB_DIALOG_FIELD_CLASS = "min-w-0 space-y-2"
-const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-md px-1.5 text-xs"
+const JOB_DIALOG_TABLE_INPUT_CLASS = "h-7 rounded-sm px-1.5 text-xs"
 const DETAIL_FOCUS_COLUMNS = ["quantity", "fob", "cm", "deliveryDate", "remarks"] as const
+const AI_ASSIST_FOCUS_COLUMNS = ["poNumber", "styleNo", "styleName", "color", "size", "quantity", "fob", "deliveryDate"] as const
 
 type DetailFocusColumn = (typeof DETAIL_FOCUS_COLUMNS)[number]
+type AiAssistFocusColumn = (typeof AI_ASSIST_FOCUS_COLUMNS)[number]
+type AiAssistFocusedCell = {
+  rowIndex: number
+  column: AiAssistFocusColumn
+}
 
 const JOB_DIALOG_SECTIONS: Array<{ id: JobDialogSectionId; label: string; icon: typeof Info }> = [
   { id: "basic-info", label: "Basic Info", icon: Info },
@@ -295,12 +301,14 @@ export function JobFormDialog({
   const [aiAssistOpen, setAiAssistOpen] = useState(false)
   const [aiAssistFile, setAiAssistFile] = useState<File | null>(null)
   const [aiAssistFileName, setAiAssistFileName] = useState("")
+  const [aiAssistUploadCollapsed, setAiAssistUploadCollapsed] = useState(false)
   const [aiAssistRows, setAiAssistRows] = useState<JobAiAssistRow[]>([])
   const [aiAssistError, setAiAssistError] = useState("")
   const [aiAssistWorking, setAiAssistWorking] = useState(false)
   const [addingAiAssistRowIndex, setAddingAiAssistRowIndex] = useState<number | null>(null)
   const [addedAiAssistRowKeys, setAddedAiAssistRowKeys] = useState<string[]>([])
   const [pendingAiAssistAdd, setPendingAiAssistAdd] = useState<AiAssistPendingAdd | null>(null)
+  const [focusedAiAssistCell, setFocusedAiAssistCell] = useState<AiAssistFocusedCell | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -347,10 +355,21 @@ export function JobFormDialog({
     setAiAssistRows([])
     setAiAssistError("")
     setAddedAiAssistRowKeys([])
+    setFocusedAiAssistCell(null)
+    setAiAssistUploadCollapsed(false)
 
     if (file) {
       void analyzeAiAssistFile(file)
     }
+  }
+
+  function openAiAssistDialog() {
+    if (!values.buyerId.trim()) {
+      toast.info("Please select a buyer before using AI Assist.")
+      return
+    }
+
+    setAiAssistOpen(true)
   }
 
   async function analyzeAiAssistFile(fileToAnalyze = aiAssistFile) {
@@ -364,6 +383,8 @@ export function JobFormDialog({
       const rows = await onAiAssistFileAnalyze(fileToAnalyze)
       setAiAssistRows(rows)
       setAddedAiAssistRowKeys([])
+      setFocusedAiAssistCell(null)
+      setAiAssistUploadCollapsed(Boolean(rows.length))
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to analyze this file right now."
       setAiAssistRows([])
@@ -374,7 +395,36 @@ export function JobFormDialog({
   }
 
   function getAiAssistRowKey(row: JobAiAssistRow, index: number) {
-    return [row.poNumber, row.styleNo, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
+    return [row.poNumber, row.styleNo, row.styleName, row.color, row.size, row.quantity, row.fob ?? "", row.deliveryDate ?? "", index].join(":")
+  }
+
+  function updateAiAssistRow(index: number, patch: Partial<JobAiAssistRow>) {
+    setAiAssistRows((currentRows) => currentRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
+  }
+
+  function getAiAssistCellValue(row: JobAiAssistRow, column: AiAssistFocusColumn) {
+    if (column === "deliveryDate") {
+      return formatAiAssistDateForInput(row.deliveryDate)
+    }
+
+    return row[column]
+  }
+
+  function fillAiAssistColumnDown(cell = focusedAiAssistCell) {
+    if (!cell || cell.rowIndex >= aiAssistRows.length - 1) {
+      return
+    }
+
+    const sourceRow = aiAssistRows[cell.rowIndex]
+    if (!sourceRow) {
+      return
+    }
+
+    const value = getAiAssistCellValue(sourceRow, cell.column)
+    setAiAssistRows((currentRows) =>
+      currentRows.map((row, rowIndex) => (rowIndex > cell.rowIndex ? { ...row, [cell.column]: value } : row)),
+    )
+    focusAiAssistField(cell.rowIndex, cell.column)
   }
 
   function appendAiAssistRowToDetails(row: JobAiAssistRow, index: number, matches: AiAssistMasterDataMatches) {
@@ -506,6 +556,21 @@ export function JobFormDialog({
     return `data-job-detail-${column}`
   }
 
+  function getAiAssistFocusAttribute(column: AiAssistFocusColumn) {
+    const attributes: Record<AiAssistFocusColumn, string> = {
+      poNumber: "data-ai-assist-po-number",
+      styleNo: "data-ai-assist-style-no",
+      styleName: "data-ai-assist-style-name",
+      color: "data-ai-assist-color",
+      size: "data-ai-assist-size",
+      quantity: "data-ai-assist-quantity",
+      fob: "data-ai-assist-fob",
+      deliveryDate: "data-ai-assist-delivery-date",
+    }
+
+    return attributes[column]
+  }
+
   function focusNextDetailField(currentIndex: number, column: DetailFocusColumn) {
     const nextDetail = values.jobDetails[currentIndex + 1]
 
@@ -532,6 +597,36 @@ export function JobFormDialog({
     focusNextDetailField(currentIndex, column)
   }
 
+  function focusAiAssistField(rowIndex: number, column: AiAssistFocusColumn) {
+    const row = aiAssistRows[rowIndex]
+
+    if (!row) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      const attribute = getAiAssistFocusAttribute(column)
+      const input = Array.from(document.querySelectorAll<HTMLInputElement>(`[${attribute}="${rowIndex}"]`)).find((field) => field.offsetParent !== null)
+      input?.focus()
+      input?.select()
+    })
+  }
+
+  function handleAiAssistFieldKeyDown(event: React.KeyboardEvent<HTMLInputElement>, currentIndex: number, column: AiAssistFocusColumn) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+      event.preventDefault()
+      fillAiAssistColumnDown({ rowIndex: currentIndex, column })
+      return
+    }
+
+    if (event.key !== "Enter") {
+      return
+    }
+
+    event.preventDefault()
+    focusAiAssistField(event.ctrlKey ? currentIndex - 1 : currentIndex + 1, column)
+  }
+
   function scrollToSection(sectionId: JobDialogSectionId) {
     sectionRefs.current[sectionId]?.scrollIntoView({ behavior: "smooth", block: "start" })
     setActiveSection(sectionId)
@@ -540,6 +635,7 @@ export function JobFormDialog({
   const totalFobSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "fob"))
   const totalCmSummary = formatSummaryValue(sumJobDetails(values.jobDetails, "cm"))
   const totalQuantitySummary = formatSummaryValue(sumJobQuantities(values.jobDetails))
+  const canFillAiAssistDown = Boolean(focusedAiAssistCell && focusedAiAssistCell.rowIndex < aiAssistRows.length - 1)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -896,10 +992,10 @@ export function JobFormDialog({
                                         />
                                       </td>
                                       <td className="px-1.5 py-2 align-top">
-                                      <AppCombobox
-                                        open={openRowControl === `${detail.id}:style`}
-                                        onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
-                                        value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
+                                        <AppCombobox
+                                          open={openRowControl === `${detail.id}:style`}
+                                          onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
+                                          value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
                                           onValueChange={(option) => {
                                             updateDetail(detail.id, { styleId: option?.value ?? "", styleLabel: option?.label ?? "" })
                                             setOpenRowControl("")
@@ -1062,26 +1158,269 @@ export function JobFormDialog({
           </div>
         </form>
       </DialogContent>
-      <JobAiAssistDialog
-        open={aiAssistOpen}
-        file={aiAssistFile}
-        fileName={aiAssistFileName}
-        rows={aiAssistRows}
-        error={aiAssistError}
-        working={aiAssistWorking}
-        addingRowIndex={addingAiAssistRowIndex}
-        addedRowKeys={addedAiAssistRowKeys}
-        pendingAdd={pendingAiAssistAdd}
-        onOpenChange={setAiAssistOpen}
-        onFileChange={handleAiAssistFileChange}
-        onAnalyze={() => void analyzeAiAssistFile()}
-        onAddRow={(row, index) => void addAiAssistRowToDetails(row, index)}
-        onGetRowKey={getAiAssistRowKey}
-        onPendingAddOpenChange={(open) => {
-          if (!open && addingAiAssistRowIndex === null) setPendingAiAssistAdd(null)
-        }}
-        onConfirmCreateMasterData={() => void confirmCreateAiAssistMasterData()}
-      />
+      <Dialog open={aiAssistOpen} onOpenChange={setAiAssistOpen}>
+        <DialogContent className="grid max-h-[92dvh] max-w-[calc(100vw-1.5rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-lg p-0 sm:max-w-6xl">
+          <DialogHeader className="border-b border-slate-200/70 px-4 py-3 dark:border-white/10">
+            <DialogTitle>AI Assist</DialogTitle>
+            <DialogDescription>Upload a PDF or Excel file. AI Assist will extract PO number, style no, style name, color, size, and quantity rows.</DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-col gap-3 overflow-hidden px-4 py-3">
+            <div className="space-y-2 rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label htmlFor="job-ai-assist-file">File Upload</Label>
+                  {aiAssistUploadCollapsed ? (
+                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{aiAssistFileName || "No file selected"}</p>
+                  ) : null}
+                </div>
+                {aiAssistRows.length ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-sm px-2 text-xs"
+                    onClick={() => setAiAssistUploadCollapsed((collapsed) => !collapsed)}
+                  >
+                    {aiAssistUploadCollapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+                    {aiAssistUploadCollapsed ? "Expand" : "Minimize"}
+                  </Button>
+                ) : null}
+              </div>
+              {!aiAssistUploadCollapsed ? (
+                <>
+                  <label
+                    htmlFor={aiAssistWorking ? undefined : "job-ai-assist-file"}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1.5 rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600 transition dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-300",
+                      aiAssistWorking ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.06]",
+                    )}
+                  >
+                    {aiAssistWorking ? <Loader2 className="size-5 animate-spin text-blue-500" /> : <Upload className="size-5 text-slate-400" />}
+                    <span className="max-w-full truncate font-medium">{aiAssistFileName || "Choose a file"}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {aiAssistWorking ? "Upload locked while AI Assist reviews this document" : "PDF, XLS, XLSX, or CSV"}
+                    </span>
+                  </label>
+                  <Input
+                    id="job-ai-assist-file"
+                    type="file"
+                    accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    disabled={aiAssistWorking}
+                    className="sr-only"
+                    onChange={(event) => handleAiAssistFileChange(event.target.files?.[0] ?? null)}
+                  />
+                </>
+              ) : null}
+            </div>
+
+            {aiAssistWorking ? (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
+                <div className="flex items-start gap-2">
+                  <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+                  <div>
+                    <p className="font-medium">Analyzing purchase order document</p>
+                    <p className="mt-0.5 text-xs leading-5 text-blue-700/80 dark:text-blue-100/75">
+                      Extracting PO number, style no, style name, color, size, quantity, FOB, and delivery date. This may take a moment for large files.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {aiAssistError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                {aiAssistError}
+              </div>
+            ) : null}
+
+            {aiAssistRows.length ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
+                <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  AI-generated extraction may contain mistakes. Please review the original document and verify all values before saving or making decisions based on this information.
+                </div>
+                <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-sm font-semibold">Extracted PO Detail Rows</span>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Enter: next row | Ctrl+Enter: previous row | Ctrl/Cmd+D: fill down</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-sm px-2 text-xs"
+                      disabled={!canFillAiAssistDown}
+                      onClick={() => fillAiAssistColumnDown()}
+                    >
+                      Fill Down
+                    </Button>
+                  </div>
+                </div>
+                <ScrollArea className="min-h-0 flex-1">
+                  <table className="w-full min-w-[1120px] table-auto border-collapse text-xs sm:text-sm">
+                    <thead className="sticky top-0 z-10 bg-white dark:bg-[#17131d]">
+                      <tr className="border-b border-slate-200 dark:border-white/10">
+                        <th className="min-w-36 px-2 py-2 text-left font-medium">PO Number</th>
+                        <th className="min-w-32 px-2 py-2 text-left font-medium">Style No</th>
+                        <th className="min-w-56 px-2 py-2 text-left font-medium">Style Name</th>
+                        <th className="min-w-36 px-2 py-2 text-left font-medium">Color</th>
+                        <th className="w-14 px-2 py-2 text-left font-medium">Size</th>
+                        <th className="w-16 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-16 px-2 py-2 text-right font-medium">FOB</th>
+                        <th className="w-28 px-2 py-2 text-left font-medium">Delivery Date</th>
+                        <th className="sticky right-0 w-20 bg-white px-2 py-2 text-right font-medium shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)] dark:bg-[#17131d]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiAssistRows.map((row, index) => {
+                        const rowKey = getAiAssistRowKey(row, index)
+                        const rowAdded = addedAiAssistRowKeys.includes(rowKey)
+                        const rowAdding = addingAiAssistRowIndex === index
+
+                        return (
+                          <tr key={`ai-assist-row-${index}`} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.poNumber}
+                                onChange={(event) => updateAiAssistRow(index, { poNumber: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "poNumber" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "poNumber")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-po-number={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.styleNo}
+                                onChange={(event) => updateAiAssistRow(index, { styleNo: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleNo" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleNo")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-style-no={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.styleName}
+                                onChange={(event) => updateAiAssistRow(index, { styleName: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "styleName" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "styleName")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-style-name={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.color}
+                                onChange={(event) => updateAiAssistRow(index, { color: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "color" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "color")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-color={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.size}
+                                onChange={(event) => updateAiAssistRow(index, { size: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "size" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "size")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-size={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={String(row.quantity ?? "")}
+                                onChange={(event) => updateAiAssistRow(index, { quantity: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "quantity" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "quantity")}
+                                inputMode="decimal"
+                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
+                                data-ai-assist-quantity={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                value={row.fob == null ? "" : String(row.fob)}
+                                onChange={(event) => updateAiAssistRow(index, { fob: event.target.value })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "fob" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "fob")}
+                                inputMode="decimal"
+                                className={cn(JOB_DIALOG_TABLE_INPUT_CLASS, "text-right")}
+                                data-ai-assist-fob={index}
+                              />
+                            </td>
+                            <td className="px-2 py-2 align-top">
+                              <Input
+                                type="date"
+                                value={formatAiAssistDateForInput(row.deliveryDate)}
+                                onChange={(event) => updateAiAssistRow(index, { deliveryDate: event.target.value || null })}
+                                onFocus={() => setFocusedAiAssistCell({ rowIndex: index, column: "deliveryDate" })}
+                                onKeyDown={(event) => handleAiAssistFieldKeyDown(event, index, "deliveryDate")}
+                                className={JOB_DIALOG_TABLE_INPUT_CLASS}
+                                data-ai-assist-delivery-date={index}
+                              />
+                            </td>
+                            <td className="sticky right-0 bg-white px-2 py-2 text-right align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] dark:bg-[#17131d]">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={rowAdded ? "secondary" : "outline"}
+                                className="h-6 rounded-md px-3 text-xs"
+                                disabled={rowAdding || addingAiAssistRowIndex !== null}
+                                onClick={() => void addAiAssistRowToDetails(row, index)}
+                              >
+                                {rowAdding ? <Loader2 className="size-3 animate-spin" /> : null}
+                                {rowAdded ? "Added" : "Add"}
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter className="border-t border-slate-200/70 px-4 py-3 dark:border-white/10">
+            <Button type="button" className="h-7 rounded-md px-3 text-xs" variant="outline" onClick={() => setAiAssistOpen(false)}>Cancel</Button>
+            <Button type="button" className="h-7 rounded-md px-3 text-xs" disabled={!aiAssistFile || aiAssistWorking} onClick={() => void analyzeAiAssistFile()}>
+              {aiAssistWorking ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {aiAssistWorking ? "Analyzing" : aiAssistRows.length ? "Analyze Again" : "Analyze"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={Boolean(pendingAiAssistAdd)} onOpenChange={(open) => {
+        if (!open && addingAiAssistRowIndex === null) setPendingAiAssistAdd(null)
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add missing setup data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This AI Assist row contains setup values that are not available in the system yet. Add the missing records first, then this row will be inserted into PO Details.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingAiAssistAdd ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+              {pendingAiAssistAdd.missing.styleNo ? <p><span className="font-semibold">Style No:</span> {pendingAiAssistAdd.missing.styleNo}</p> : null}
+              {pendingAiAssistAdd.missing.styleNo && pendingAiAssistAdd.row.styleName?.trim() ? <p><span className="font-semibold">Style Name:</span> {pendingAiAssistAdd.row.styleName.trim()}</p> : null}
+              {pendingAiAssistAdd.missing.color ? <p><span className="font-semibold">Color:</span> {pendingAiAssistAdd.missing.color}</p> : null}
+              {pendingAiAssistAdd.missing.size ? <p><span className="font-semibold">Size:</span> {pendingAiAssistAdd.missing.size}</p> : null}
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={addingAiAssistRowIndex !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={addingAiAssistRowIndex !== null} onClick={(event) => {
+              event.preventDefault()
+              void confirmCreateAiAssistMasterData()
+            }}>
+              {addingAiAssistRowIndex !== null ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Add setup data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
