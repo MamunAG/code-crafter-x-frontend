@@ -905,10 +905,10 @@ export function JobFormDialog({
                                         />
                                       </td>
                                       <td className="px-1.5 py-2 align-top">
-                                      <AppCombobox
-                                        open={openRowControl === `${detail.id}:style`}
-                                        onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
-                                        value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
+                                        <AppCombobox
+                                          open={openRowControl === `${detail.id}:style`}
+                                          onOpenChange={(open) => setOpenRowControl(open ? `${detail.id}:style` : "")}
+                                          value={detail.styleId ? { value: detail.styleId, label: detail.styleLabel || detail.styleId } : null}
                                           onValueChange={(option) => {
                                             updateDetail(detail.id, { styleId: option?.value ?? "", styleLabel: option?.label ?? "" })
                                             setOpenRowControl("")
@@ -1154,7 +1154,7 @@ export function JobFormDialog({
                         return (
                           <tr key={rowKey} className="border-b border-slate-100 last:border-b-0 dark:border-white/10">
                             <td className="truncate px-2 py-2 align-top font-medium">{row.poNumber || "-"}</td>
-                            <td className="whitespace-normal break-words px-2 py-2 align-top leading-5">{row.styleNo || "-"}</td>
+                            <td className="whitespace-normal wrap-break-word px-2 py-2 align-top leading-5">{row.styleNo || "-"}</td>
                             <td className="truncate px-2 py-2 align-top">{row.color || "-"}</td>
                             <td className="px-2 py-2 align-top">{row.size || "-"}</td>
                             <td className="px-2 py-2 text-right align-top font-medium">{row.quantity}</td>
@@ -1165,7 +1165,7 @@ export function JobFormDialog({
                                 type="button"
                                 size="sm"
                                 variant={rowAdded ? "secondary" : "outline"}
-                                className="h-7 rounded-md px-2 text-xs"
+                                className="h-6 rounded-md px-3 text-xs"
                                 disabled={rowAdding || addingAiAssistRowIndex !== null}
                                 onClick={() => void addAiAssistRowToDetails(row, index)}
                               >
