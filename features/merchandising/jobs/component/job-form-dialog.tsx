@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -299,7 +300,7 @@ export function JobFormDialog({
   const markAiAssistRowAdded = useJobAiAssistStore((state) => state.markRowAdded)
   const resetAiAssistRowsForAnalyze = useJobAiAssistStore((state) => state.resetRowsForAnalyze)
   const completeAiAssistAnalyze = useJobAiAssistStore((state) => state.completeAnalyze)
-  const contentScrollRef = useRef<HTMLDivElement | null>(null)
+  const contentViewportRef = useRef<HTMLDivElement | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -549,7 +550,7 @@ export function JobFormDialog({
 
   function scrollToSection(sectionId: JobDialogSectionId) {
     const sectionElement = sectionRefs.current[sectionId]
-    const scrollContainer = contentScrollRef.current
+    const scrollContainer = contentViewportRef.current
 
     if (!sectionElement || !scrollContainer) {
       sectionElement?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -597,7 +598,7 @@ export function JobFormDialog({
               </nav>
             </aside>
 
-            <div ref={contentScrollRef} className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+            <ScrollArea className="h-full min-h-0 min-w-0" viewportRef={contentViewportRef}>
               <div className="min-w-0 space-y-2.5 p-2 sm:p-3">
                 <DialogHeader className="rounded-lg border border-slate-200/70 bg-white/90 p-3 dark:border-white/10 dark:bg-[#17131d]/90">
                   <DialogTitle>{mode === "create" ? "Create job entry" : "Edit job entry"}</DialogTitle>
@@ -1103,7 +1104,7 @@ export function JobFormDialog({
                   </>
                 )}
               </div>
-            </div>
+            </ScrollArea>
           </div>
 
           <div className="border-t border-slate-200/70 bg-white/80 px-3 py-3 dark:border-white/10 dark:bg-[#0a0d19]/95 sm:px-4">
