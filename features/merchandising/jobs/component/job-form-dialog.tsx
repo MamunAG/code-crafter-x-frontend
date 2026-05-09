@@ -96,6 +96,9 @@ type JobFormDialogProps = {
     row: JobAiAssistRow
     buyerId?: string
   }) => Promise<AiAssistMasterDataMatches>
+  loadRecentPoOptions: (
+    limit: number
+  ) => Promise<Array<AppComboboxOption & { jobCount: number; rowCount: number }>>
   onPoSummarySearch: (poNumber: string) => Promise<JobPoSummaryResult>
   onUseSuggestedJobNo?: (jobNo: string) => void
   onOpenChange: (open: boolean) => void
@@ -373,6 +376,7 @@ export function JobFormDialog({
   onValuesChange,
   onAiAssistFileAnalyze,
   onAiAssistRowResolve,
+  loadRecentPoOptions,
   onPoSummarySearch,
   onUseSuggestedJobNo,
   onOpenChange,
@@ -1810,6 +1814,7 @@ export function JobFormDialog({
       <JobPoSummaryDialog
         open={poSummaryOpen}
         onOpenChange={setPoSummaryOpen}
+        loadRecentPoOptions={loadRecentPoOptions}
         onSearch={onPoSummarySearch}
       />
     </Dialog>

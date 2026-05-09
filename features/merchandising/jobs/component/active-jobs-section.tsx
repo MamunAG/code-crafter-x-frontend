@@ -65,6 +65,7 @@ type ActiveJobsSectionProps = {
   onCreateJob: () => void
   onEditJob: (jobId: string) => void
   onDeleteJob: (job: JobRecord) => void
+  onOpenPoSummary: (job: JobRecord) => void
   onResetFilters: () => void
   canCreateJob: boolean
   canUpdateJob: boolean
@@ -145,6 +146,7 @@ export function ActiveJobsSection({
   onCreateJob,
   onEditJob,
   onDeleteJob,
+  onOpenPoSummary,
   onResetFilters,
   canCreateJob,
   canUpdateJob,
@@ -275,15 +277,6 @@ export function ActiveJobsSection({
         header: () => <span className="pr-4">Actions</span>,
         cell: ({ row }) => {
           const job = row.original
-          const hasActions = canUpdateJob || canDeleteJob
-
-          if (!hasActions) {
-            return (
-              <div className="pr-4 text-right text-xs text-slate-400">
-                No actions
-              </div>
-            )
-          }
 
           return (
             <div className="pr-4 text-right">
@@ -295,12 +288,15 @@ export function ActiveJobsSection({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => onOpenPoSummary(job)}>
+                    Po Summary
+                  </DropdownMenuItem>
+                  {canUpdateJob || canDeleteJob ? <DropdownMenuSeparator /> : null}
                   {canUpdateJob ? (
                     <DropdownMenuItem onSelect={() => onEditJob(job.id)}>
                       Edit
                     </DropdownMenuItem>
                   ) : null}
-                  {canUpdateJob && canDeleteJob ? <DropdownMenuSeparator /> : null}
                   {canDeleteJob ? (
                     <DropdownMenuItem variant="destructive" onSelect={() => onDeleteJob(job)}>
                       Delete
@@ -313,7 +309,7 @@ export function ActiveJobsSection({
         },
       },
     ],
-    [canDeleteJob, canUpdateJob, onDeleteJob, onEditJob],
+    [canDeleteJob, canUpdateJob, onDeleteJob, onEditJob, onOpenPoSummary],
   )
 
   const table = useReactTable({

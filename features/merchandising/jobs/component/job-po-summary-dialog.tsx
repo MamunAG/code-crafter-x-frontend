@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, type FormEvent, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { Loader2, Search } from "lucide-react"
 
 import {
@@ -26,6 +26,9 @@ import type { JobPoSummaryResult } from "../job.types"
 type JobPoSummaryDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  loadRecentPoOptions: (limit: number) => Promise<PoSummaryOption[]>
+  initialPoNumbers?: string[] | null
+  initialPoNumber?: string | null
   onSearch: (poNumber: string) => Promise<JobPoSummaryResult>
 }
 
@@ -60,6 +63,9 @@ function formatDate(value: string | null | undefined) {
 export function JobPoSummaryDialog({
   open,
   onOpenChange,
+  loadRecentPoOptions,
+  initialPoNumbers,
+  initialPoNumber,
   onSearch,
 }: JobPoSummaryDialogProps) {
   const [selectedPoOption, setSelectedPoOption] = useState<PoSummaryOption | null>(null)
@@ -69,14 +75,44 @@ export function JobPoSummaryDialog({
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
 
+  const initialPoChoices = useMemo(() => {
+    const source = (initialPoNumbers?.length ? initialPoNumbers : initialPoNumber ? [initialPoNumber] : [])
+      .map((value) => value.trim())
+      .filter((value): value is string => Boolean(value))
+
+    return [...new Set(source)]
+  }, [initialPoNumber, initialPoNumbers])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    if (initialPoChoices.length === 1) {
+      setSelectedPoOption({
+        label: initialPoChoices[0],
+        value: initialPoChoices[0],
+        jobCount: 0,
+        rowCount: 0,
+      })
+    } else {
+      setSelectedPoOption(null)
+    }
+
+    setError("")
+    setResult(null)
+    setSearched(false)
+  }, [initialPoChoices, open])
+
   const loadPoOptions = useCallback(
     async ({
       query,
+      limit,
     }: AppComboboxLoadParams): Promise<{ items: PoSummaryOption[]; hasNextPage: boolean }> => {
       const searchQuery = query.trim()
 
       if (!searchQuery) {
-        return { items: [], hasNextPage: false }
+        return { items: await loadRecentPoOptions(limit), hasNextPage: false }
       }
 
       const summary = await onSearch(searchQuery)
@@ -89,6 +125,37 @@ export function JobPoSummaryDialog({
           rowCount: group.rowCount,
         })),
         hasNextPage: false,
+      }
+    },
+    [loadRecentPoOptions, onSearch]
+  )
+
+  const submitPoSummarySearch = useCallback(
+    async (nextSearchText: string) => {
+      const normalizedSearchText = nextSearchText.trim()
+
+      if (!normalizedSearchText) {
+        setError("Please enter a PO number to view the summary.")
+        setResult(null)
+        setSearched(false)
+        return
+      }
+
+      setLoading(true)
+      setError("")
+      setSearched(true)
+
+      try {
+        setResult(await onSearch(normalizedSearchText))
+      } catch (caughtError) {
+        setResult(null)
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load PO summary right now."
+        )
+      } finally {
+        setLoading(false)
       }
     },
     [onSearch]
@@ -105,22 +172,23 @@ export function JobPoSummaryDialog({
       return
     }
 
-    setLoading(true)
-    setError("")
-    setSearched(true)
+    await submitPoSummarySearch(nextSearchText)
+  }
 
-    try {
-      setResult(await onSearch(nextSearchText))
-    } catch (caughtError) {
-      setResult(null)
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to load PO summary right now."
-      )
-    } finally {
-      setLoading(false)
+  function handlePoBadgeClick(poNumber: string) {
+    if (loading) {
+      return
     }
+
+    setSelectedPoOption({
+      label: poNumber,
+      value: poNumber,
+      jobCount: 0,
+      rowCount: 0,
+    })
+    setPoComboboxOpen(false)
+    setError("")
+    void submitPoSummarySearch(poNumber)
   }
 
   return (
@@ -142,54 +210,70 @@ export function JobPoSummaryDialog({
             <Label htmlFor="job-po-summary-search" className="text-xs">
               PO Number
             </Label>
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="min-w-0">
-              <AppCombobox<PoSummaryOption>
-                open={poComboboxOpen}
-                onOpenChange={setPoComboboxOpen}
-                value={selectedPoOption}
-                onValueChange={(option) => {
-                  setSelectedPoOption(option)
-                  setError("")
-                  if (!option) {
-                    setSearched(false)
-                    setResult(null)
-                  }
-                }}
-                loadItems={loadPoOptions}
-                initialLimit={10}
-                searchLimit={10}
-                placeholder="Search PO number"
-                emptyMessage="Type a PO number to search saved entries."
-                loadingMessage="Searching PO numbers..."
-                showClear={Boolean(selectedPoOption)}
-                inputClassName="h-7 rounded-md px-2 text-xs"
-                inputProps={{ id: "job-po-summary-search" }}
-                contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
-                renderItem={(item) => (
-                  <div className="flex w-full min-w-0 items-center justify-between gap-3">
-                    <span className="min-w-0 truncate">{item.label}</span>
-                    <span className="shrink-0 text-[11px] font-normal text-slate-500 dark:text-slate-400">
-                      {item.jobCount} job{item.jobCount === 1 ? "" : "s"} ·{" "}
-                      {item.rowCount} row{item.rowCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
+                <AppCombobox<PoSummaryOption>
+                  open={poComboboxOpen}
+                  onOpenChange={setPoComboboxOpen}
+                  value={selectedPoOption}
+                  onValueChange={(option) => {
+                    setSelectedPoOption(option)
+                    setError("")
+                    if (!option) {
+                      setSearched(false)
+                      setResult(null)
+                    }
+                  }}
+                  loadItems={loadPoOptions}
+                  initialLimit={10}
+                  searchLimit={10}
+                  placeholder="Search PO number"
+                  emptyMessage="Type a PO number to search saved entries."
+                  loadingMessage="Searching PO numbers..."
+                  showClear={Boolean(selectedPoOption)}
+                  inputClassName="h-7 rounded-md px-2 text-xs"
+                  inputProps={{ id: "job-po-summary-search" }}
+                  contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                  renderItem={(item) => (
+                    <div className="flex w-full min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate">{item.label}</span>
+                      <span className="shrink-0 text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                        {item.jobCount} job{item.jobCount === 1 ? "" : "s"} -{" "}
+                        {item.rowCount} row{item.rowCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  )}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-7 rounded-md px-3 text-xs sm:self-end"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Search className="size-3.5" />
                 )}
-              />
+                Search
+              </Button>
             </div>
-            <Button
-              type="submit"
-              className="h-7 rounded-md px-3 text-xs"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Search className="size-3.5" />
-              )}
-              Search
-            </Button>
-            </div>
+            {initialPoChoices.length > 1 ? (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {initialPoChoices.map((poNumber) => (
+                  <Badge asChild key={poNumber} variant="secondary">
+                    <button
+                      type="button"
+                      className="cursor-pointer"
+                      onClick={() => handlePoBadgeClick(poNumber)}
+                      disabled={loading}
+                    >
+                      {poNumber}
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
           </div>
           {error ? (
             <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -415,3 +499,4 @@ function EmptySummary({ search }: { search: string }) {
     </div>
   )
 }
+

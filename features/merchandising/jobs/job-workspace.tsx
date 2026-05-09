@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
+import { Loader2, Plus, RefreshCcw, Search, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { AppComboboxLoadParams, AppComboboxOption } from "@/components/app-combobox"
@@ -24,6 +24,7 @@ import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from 
 
 import { ActiveJobsSection } from "./component/active-jobs-section"
 import { DeletedJobsSection } from "./component/deleted-jobs-section"
+import { JobPoSummaryDialog } from "./component/job-po-summary-dialog"
 import { JobFormDialog } from "./component/job-form-dialog"
 import {
   analyzeJobAiAssistFile,
@@ -71,6 +72,13 @@ const DEFAULT_FORM_VALUES: JobFormValues = {
   poReceiveDate: "",
   isActive: true,
   jobDetails: [],
+}
+
+function getJobPoNumbers(job?: JobRecord | null) {
+  const values = (job?.jobDetails ?? [])
+    .map((detail) => detail.purchaseOrder?.pono?.trim())
+    .filter((value): value is string => Boolean(value))
+  return [...new Set(values)]
 }
 
 function normalizeAuthFailure(message: string) {
@@ -251,6 +259,8 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedDraftFilters, setDeletedDraftFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
   const [deletedActiveFilters, setDeletedActiveFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [poSummaryOpen, setPoSummaryOpen] = useState(false)
+  const [poSummaryInitialPoNumbers, setPoSummaryInitialPoNumbers] = useState<string[]>([])
   const [editorMode, setEditorMode] = useState<JobEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
@@ -729,6 +739,68 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
+  const loadRecentPoSummaryOptions = useCallback(
+    async (limit: number) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      try {
+        const response = await fetchJobs({
+          apiUrl,
+          accessToken: token,
+          page: 1,
+          limit: Math.max(limit * 5, 50),
+          filters: {},
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        const recentOptions = new Map<
+          string,
+          { label: string; value: string; jobIds: Set<string>; rowCount: number }
+        >()
+
+        for (const job of response.items) {
+          for (const detail of job.jobDetails ?? []) {
+            const poNumber = detail.purchaseOrder?.pono?.trim()
+            if (!poNumber) continue
+
+            const currentOption = recentOptions.get(poNumber) ?? {
+              label: poNumber,
+              value: poNumber,
+              jobIds: new Set<string>(),
+              rowCount: 0,
+            }
+
+            currentOption.jobIds.add(job.id)
+            currentOption.rowCount += 1
+            recentOptions.set(poNumber, currentOption)
+          }
+        }
+
+        return Array.from(recentOptions.values())
+          .slice(0, limit)
+          .map(({ jobIds, rowCount, ...option }) => ({
+            ...option,
+            jobCount: jobIds.size,
+            rowCount,
+          }))
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load recent PO numbers right now."
+        if (!handleAuthFailure(message)) throw caughtError
+        throw caughtError
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId]
+  )
+
+  const openPoSummaryDialog = useCallback((job?: JobRecord | null) => {
+    setPoSummaryInitialPoNumbers(getJobPoNumbers(job))
+    setPoSummaryOpen(true)
+  }, [])
+
   function requestSoftDelete(job: JobRecord) {
     if (!accessRules?.canDelete) {
       toast.error("You do not have permission to delete purchase orders.")
@@ -817,8 +889,9 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
                     {recentlyDeletedJob ? <Badge variant="destructive" className="rounded-full px-3 py-1">Recently deleted</Badge> : null}
                   </div>
                 </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" /> Refresh</Button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" /> Refresh</Button>
+                  <Button type="button" variant="outline" onClick={() => openPoSummaryDialog()} className="rounded-xl"><Search className="size-3.5" /> PO Summary</Button>
                   {accessRules?.canCreate ? <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" /> New job</Button> : null}
                 </div>
               </div>
@@ -861,6 +934,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             onCreateJob={openCreateDialog}
             onEditJob={openEditDialog}
             onDeleteJob={requestSoftDelete}
+            onOpenPoSummary={openPoSummaryDialog}
             onResetFilters={() => {
               setDraftFilters(DEFAULT_FILTERS)
               setActiveFilters(DEFAULT_FILTERS)
@@ -928,6 +1002,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
         onAiAssistRowResolve={({ row, buyerId }) => resolveAiAssistRowMasterData({ row, buyerId })}
+        loadRecentPoOptions={loadRecentPoSummaryOptions}
         onPoSummarySearch={searchPoSummary}
         onUseSuggestedJobNo={(nextJobNo) => {
           setEditorValues((currentValues) => ({ ...currentValues, jobNo: nextJobNo }))
@@ -951,6 +1026,21 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         }}
         onSubmit={() => void submitEditor(editorValues)}
       />
+
+      {poSummaryOpen ? (
+        <JobPoSummaryDialog
+          open={poSummaryOpen}
+          onOpenChange={(open) => {
+            setPoSummaryOpen(open)
+            if (!open) {
+              setPoSummaryInitialPoNumbers([])
+            }
+          }}
+          loadRecentPoOptions={loadRecentPoSummaryOptions}
+          initialPoNumbers={poSummaryInitialPoNumbers}
+          onSearch={searchPoSummary}
+        />
+      ) : null}
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
