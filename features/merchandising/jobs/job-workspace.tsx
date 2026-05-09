@@ -474,6 +474,14 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
 
   const loadStyleOptions = useCallback(
     async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
+      const buyerId = editorValues.buyerId.trim()
+      if (!buyerId) {
+        return {
+          items: [],
+          hasNextPage: false,
+        }
+      }
+
       const token = window.localStorage.getItem("access_token")
       if (!token) throw new Error("Your session expired. Please sign in again.")
       const response = await fetchStyles({
@@ -481,7 +489,11 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         accessToken: token,
         page: pageNumber,
         limit: pageLimit,
-        filters: { styleNo: query, isActive: "true" },
+        filters: {
+          styleNo: query,
+          buyerId,
+          isActive: "true",
+        },
         organizationId: selectedOrganizationId || undefined,
       })
       return {
@@ -489,7 +501,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         hasNextPage: response.meta.hasNextPage,
       }
     },
-    [apiUrl, selectedOrganizationId],
+    [apiUrl, editorValues.buyerId, selectedOrganizationId],
   )
 
   const loadSizeOptions = useCallback(

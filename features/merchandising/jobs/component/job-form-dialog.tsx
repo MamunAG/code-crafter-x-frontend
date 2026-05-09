@@ -754,6 +754,16 @@ export function JobFormDialog({
       return
     }
 
+    if (!values.buyerId.trim()) {
+      toast.error("Please select a buyer before uploading the PO details template.")
+
+      if (templateUploadInputRef.current) {
+        templateUploadInputRef.current.value = ""
+      }
+
+      return
+    }
+
     setUploadingTemplate(true)
     try {
       const report = await onPoDetailsTemplateUpload(
