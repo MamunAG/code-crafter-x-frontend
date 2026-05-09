@@ -127,6 +127,11 @@ function normalizeJobFormErrors(values: JobFormValues): JobFormError[] {
   return errors
 }
 
+function getSuggestedJobNoFromMessage(message: string) {
+  const match = message.match(/next available job number is\s+([^\s.]+)/i)
+  return match?.[1] ?? ""
+}
+
 function formatStyleLabel(styleNo?: string | null, styleName?: string | null) {
   const normalizedStyleNo = styleNo?.trim() ?? ""
   const normalizedStyleName = styleName?.trim() ?? ""
@@ -251,6 +256,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorErrors, setEditorErrors] = useState<JobFormError[]>([])
   const [editorValues, setEditorValues] = useState<JobFormValues>(DEFAULT_FORM_VALUES)
   const [editorJobNo, setEditorJobNo] = useState("")
+  const [editorSuggestedJobNo, setEditorSuggestedJobNo] = useState("")
   const [selectedFactory, setSelectedFactory] = useState<AppComboboxOption | null>(null)
   const [selectedBuyer, setSelectedBuyer] = useState<AppComboboxOption | null>(null)
   const [selectedMerchandiser, setSelectedMerchandiser] = useState<AppComboboxOption | null>(null)
@@ -511,6 +517,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setSelectedBuyer(null)
     setSelectedMerchandiser(null)
     setEditorJobNo("Loading...")
+    setEditorSuggestedJobNo("")
     setEditorErrors([])
     setEditorLoading(false)
     setEditorOpen(true)
@@ -528,6 +535,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           organizationId: selectedOrganizationId || undefined,
         })
         setEditorJobNo(nextJobNumber.jobNo)
+        setEditorValues((currentValues) => (currentValues.jobNo.trim() ? currentValues : { ...currentValues, jobNo: nextJobNumber.jobNo }))
       } catch (caughtError) {
         const message = caughtError instanceof Error ? caughtError.message : "Unable to load the next job number right now."
         if (!handleAuthFailure(message)) {
@@ -550,6 +558,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     setEditorLoading(true)
     setEditorOpen(true)
     setEditorErrors([])
+    setEditorSuggestedJobNo("")
     setEditorJobNo("")
     setSelectedMerchandiser(null)
     try {
@@ -633,6 +642,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to save purchase order right now."
       if (!handleAuthFailure(message)) {
+        setEditorSuggestedJobNo(getSuggestedJobNoFromMessage(message))
         setEditorErrors([{ section: "basic-info", message }])
         toast.error(message)
       }
@@ -873,6 +883,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         values={editorValues}
         errors={editorErrors}
         jobNo={editorJobNo}
+        suggestedJobNo={editorSuggestedJobNo}
         selectedFactory={selectedFactory}
         selectedBuyer={selectedBuyer}
         selectedMerchandiser={selectedMerchandiser}
@@ -887,10 +898,19 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         onMerchandiserOptionChange={setSelectedMerchandiser}
         onValuesChange={(values) => {
           const totalPoQty = values.jobDetails.reduce((total, detail) => total + (Number(detail.quantity) || 0), 0)
+          if (editorSuggestedJobNo && values.jobNo !== editorValues.jobNo) {
+            setEditorSuggestedJobNo("")
+            setEditorErrors((currentErrors) => currentErrors.filter((error) => !error.message.includes("next available job number")))
+          }
           setEditorValues({ ...values, totalPoQty: String(totalPoQty) })
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
         onAiAssistRowResolve={({ row, buyerId }) => resolveAiAssistRowMasterData({ row, buyerId })}
+        onUseSuggestedJobNo={(nextJobNo) => {
+          setEditorValues((currentValues) => ({ ...currentValues, jobNo: nextJobNo }))
+          setEditorSuggestedJobNo("")
+          setEditorErrors((currentErrors) => currentErrors.filter((error) => !error.message.includes("next available job number")))
+        }}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {
@@ -899,6 +919,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             setSelectedBuyer(null)
             setSelectedMerchandiser(null)
             setEditorJobNo("")
+            setEditorSuggestedJobNo("")
             setEditorErrors([])
             setEditorLoading(false)
             setEditorSubmitting(false)

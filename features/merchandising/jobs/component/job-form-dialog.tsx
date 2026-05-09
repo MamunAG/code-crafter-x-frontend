@@ -32,6 +32,7 @@ type JobFormDialogProps = {
   values: JobFormValues
   errors: JobFormError[]
   jobNo?: string
+  suggestedJobNo?: string
   selectedFactory: SelectOption | null
   selectedBuyer: SelectOption | null
   selectedMerchandiser: SelectOption | null
@@ -47,6 +48,7 @@ type JobFormDialogProps = {
   onValuesChange: (values: JobFormValues) => void
   onAiAssistFileAnalyze: (file: File) => Promise<JobAiAssistRow[]>
   onAiAssistRowResolve: (params: { row: JobAiAssistRow; buyerId?: string }) => Promise<AiAssistMasterDataMatches>
+  onUseSuggestedJobNo?: (jobNo: string) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
 }
@@ -262,6 +264,7 @@ export function JobFormDialog({
   values,
   errors,
   jobNo,
+  suggestedJobNo,
   selectedFactory,
   selectedBuyer,
   selectedMerchandiser,
@@ -277,6 +280,7 @@ export function JobFormDialog({
   onValuesChange,
   onAiAssistFileAnalyze,
   onAiAssistRowResolve,
+  onUseSuggestedJobNo,
   onOpenChange,
   onSubmit,
 }: JobFormDialogProps) {
@@ -633,17 +637,27 @@ export function JobFormDialog({
                       <CardContent className="grid min-w-0 gap-4 px-3 pb-3 sm:px-4 md:grid-cols-2 xl:grid-cols-3">
                         <div className={JOB_DIALOG_FIELD_CLASS}>
                           <FieldLabel>Job No</FieldLabel>
-                          <Input value={jobNo || ""} readOnly placeholder="Auto generated" className="w-full min-w-0 bg-slate-100 dark:bg-white/[0.04]" />
-                        </div>
-                        <div className={JOB_DIALOG_FIELD_CLASS}>
-                          <FieldLabel>Custom Job No</FieldLabel>
                           <Input
                             className={JOB_DIALOG_INPUT_CLASS}
                             value={values.jobNo}
                             onChange={(event) => update("jobNo", event.target.value)}
                             maxLength={50}
-                            placeholder={mode === "create" ? "Optional custom job no" : "Clear to keep current number"}
+                            placeholder={mode === "create" ? jobNo || "Auto generated" : "Clear to keep current number"}
                           />
+                          {suggestedJobNo ? (
+                            <div className="flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+                              <span>Use next available job number {suggestedJobNo}, or enter another job number.</span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 w-full rounded-md px-2 text-xs sm:w-auto"
+                                onClick={() => onUseSuggestedJobNo?.(suggestedJobNo)}
+                              >
+                                Use {suggestedJobNo}
+                              </Button>
+                            </div>
+                          ) : null}
                         </div>
                         <div className={JOB_DIALOG_FIELD_CLASS}>
                           <FieldLabel required>Factory</FieldLabel>
