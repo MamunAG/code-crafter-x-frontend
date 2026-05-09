@@ -116,7 +116,8 @@ type JobFormDialogProps = {
   }) => Promise<AiAssistMasterDataMatches>
   onPoDetailsTemplateDownload: () => Promise<Blob>
   onPoDetailsTemplateUpload: (
-    file: File
+    file: File,
+    buyerId?: string
   ) => Promise<JobPoDetailsUploadReport>
   onPoDetailsMissingSetupSave: (
     item: Pick<MissingPoDetailsSetupItem, "kind" | "value"> & {
@@ -735,7 +736,10 @@ export function JobFormDialog({
 
     setUploadingTemplate(true)
     try {
-      const report = await onPoDetailsTemplateUpload(file)
+      const report = await onPoDetailsTemplateUpload(
+        file,
+        values.buyerId.trim() || undefined
+      )
       const nextDetails: JobDetailFormValues[] = report.rows.map((row) => ({
         ...row,
         id: crypto.randomUUID(),

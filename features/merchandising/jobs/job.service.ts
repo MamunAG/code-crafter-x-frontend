@@ -274,15 +274,18 @@ export async function uploadJobPoDetailsTemplate({
   apiUrl,
   accessToken,
   file,
+  buyerId,
   organizationId,
 }: {
   apiUrl: string
   accessToken: string
   file: File
+  buyerId?: string
   organizationId?: string
 }): Promise<JobPoDetailsUploadReport> {
   const formData = new FormData()
   formData.append("file", file)
+  if (buyerId?.trim()) formData.append("buyerId", buyerId.trim())
 
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/po-details/upload"), {
     method: "POST",

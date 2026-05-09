@@ -544,7 +544,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   }, [accessRules?.canCreate, apiUrl, handleAuthFailure, selectedOrganizationId])
 
   const uploadPoDetailsTemplate = useCallback(
-    async (file: File): Promise<JobPoDetailsUploadReport> => {
+    async (file: File, buyerId?: string): Promise<JobPoDetailsUploadReport> => {
       if (!accessRules?.canCreate) {
         throw new Error("You do not have permission to upload PO details.")
       }
@@ -559,6 +559,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           apiUrl,
           accessToken: token,
           file,
+          buyerId,
           organizationId: selectedOrganizationId || undefined,
         })
       } catch (caughtError) {
