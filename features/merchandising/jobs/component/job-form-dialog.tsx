@@ -299,6 +299,7 @@ export function JobFormDialog({
   const markAiAssistRowAdded = useJobAiAssistStore((state) => state.markRowAdded)
   const resetAiAssistRowsForAnalyze = useJobAiAssistStore((state) => state.resetRowsForAnalyze)
   const completeAiAssistAnalyze = useJobAiAssistStore((state) => state.completeAnalyze)
+  const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -547,7 +548,23 @@ export function JobFormDialog({
   }
 
   function scrollToSection(sectionId: JobDialogSectionId) {
-    sectionRefs.current[sectionId]?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const sectionElement = sectionRefs.current[sectionId]
+    const scrollContainer = contentScrollRef.current
+
+    if (!sectionElement || !scrollContainer) {
+      sectionElement?.scrollIntoView({ behavior: "smooth", block: "start" })
+      setActiveSection(sectionId)
+      return
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const sectionRect = sectionElement.getBoundingClientRect()
+    const topOffset = sectionRect.top - containerRect.top + scrollContainer.scrollTop
+
+    scrollContainer.scrollTo({
+      top: Math.max(0, topOffset - 12),
+      behavior: "smooth",
+    })
     setActiveSection(sectionId)
   }
 
@@ -580,7 +597,7 @@ export function JobFormDialog({
               </nav>
             </aside>
 
-            <div className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+            <div ref={contentScrollRef} className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
               <div className="min-w-0 space-y-2.5 p-2 sm:p-3">
                 <DialogHeader className="rounded-lg border border-slate-200/70 bg-white/90 p-3 dark:border-white/10 dark:bg-[#17131d]/90">
                   <DialogTitle>{mode === "create" ? "Create job entry" : "Edit job entry"}</DialogTitle>
