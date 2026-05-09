@@ -29,7 +29,6 @@ export type PaginatedResponse<T> = {
 export type SupplierRecord = {
   id: string
   name: string
-  displayName?: string | null
   code?: string | null
   contact?: string | null
   email?: string | null
@@ -51,7 +50,6 @@ export type SupplierRecord = {
 
 export type SupplierFilterValues = {
   name: string
-  displayName: string
   code: string
   contact: string
   email: string
@@ -61,7 +59,6 @@ export type SupplierFilterValues = {
 
 export type SupplierFormValues = {
   name: string
-  displayName: string
   code: string
   contact: string
   email: string

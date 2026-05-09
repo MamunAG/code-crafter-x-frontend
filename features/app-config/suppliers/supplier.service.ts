@@ -61,8 +61,6 @@ async function readJsonResponse<T>(response: Response) {
 
 function appendFilterParams(url: URL, filters: Partial<SupplierFilterValues>) {
   if (filters.name?.trim()) url.searchParams.set("name", filters.name.trim())
-  if (filters.displayName?.trim())
-    url.searchParams.set("displayName", filters.displayName.trim())
   if (filters.code?.trim()) url.searchParams.set("code", filters.code.trim())
   if (filters.contact?.trim())
     url.searchParams.set("contact", filters.contact.trim())
@@ -81,7 +79,6 @@ function optionalString(value: string) {
 function buildSupplierPayload(payload: SupplierFormValues) {
   return {
     name: payload.name.trim(),
-    displayName: payload.displayName.trim(),
     code: optionalString(payload.code),
     contact: optionalString(payload.contact),
     email: optionalString(payload.email),

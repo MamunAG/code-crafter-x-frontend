@@ -110,16 +110,6 @@ export function SupplierFormDialog({
                 />
               </div>
 
-              <div className="space-y-2">
-                <FieldLabel required>Display name</FieldLabel>
-                <Input
-                  value={draft.displayName}
-                  onChange={(event) => update("displayName", event.target.value)}
-                  placeholder="Input supplier display name"
-                  disabled={loading || submitting}
-                />
-              </div>
-
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <FieldLabel>Code</FieldLabel>

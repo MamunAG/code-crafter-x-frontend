@@ -65,7 +65,6 @@ const EMPTY_ACCESS_RULES: SupplierAccessRules = {
 
 const DEFAULT_FILTERS: SupplierFilterValues = {
   name: "",
-  displayName: "",
   code: "",
   contact: "",
   email: "",
@@ -75,7 +74,6 @@ const DEFAULT_FILTERS: SupplierFilterValues = {
 
 const DEFAULT_FORM_VALUES: SupplierFormValues = {
   name: "",
-  displayName: "",
   code: "",
   contact: "",
   email: "",
@@ -85,7 +83,7 @@ const DEFAULT_FORM_VALUES: SupplierFormValues = {
 }
 
 function getSupplierLabel(supplier: SupplierRecord) {
-  return supplier.displayName?.trim() || supplier.name
+  return supplier.name
 }
 
 function normalizeAuthFailure(message: string) {
@@ -618,7 +616,6 @@ export function SupplierWorkspace({ apiUrl }: { apiUrl: string }) {
 
         setEditorInitialValues({
           name: supplier.name ?? "",
-          displayName: supplier.displayName ?? "",
           code: supplier.code ?? "",
           contact: supplier.contact ?? "",
           email: supplier.email ?? "",
@@ -647,11 +644,6 @@ export function SupplierWorkspace({ apiUrl }: { apiUrl: string }) {
     async (values: SupplierFormValues) => {
       if (!values.name.trim()) {
         setEditorError("Supplier name is required.")
-        return
-      }
-
-      if (!values.displayName.trim()) {
-        setEditorError("Supplier display name is required.")
         return
       }
 

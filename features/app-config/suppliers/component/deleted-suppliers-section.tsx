@@ -107,7 +107,6 @@ export function DeletedSuppliersSection({
     () =>
       [
         filters.name,
-        filters.displayName,
         filters.code,
         filters.contact,
         filters.email,
@@ -131,7 +130,6 @@ export function DeletedSuppliersSection({
       cell: ({ row }) => (
         <div className="pl-4">
           <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{row.original.name}</p>
-          <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{row.original.displayName}</p>
         </div>
       ),
     },
@@ -199,7 +197,6 @@ export function DeletedSuppliersSection({
   const clearFilters = () => {
     onFilterChange({
       name: "",
-      displayName: "",
       code: "",
       contact: "",
       email: "",
@@ -239,10 +236,6 @@ export function DeletedSuppliersSection({
           <div className="min-w-0 space-y-1">
             <label htmlFor="deletedSupplierName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Supplier name</label>
             <Input id="deletedSupplierName" value={filters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onFilterChange({ ...filters, name: event.target.value })} placeholder="Input supplier name" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="deletedSupplierDisplayName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-            <Input id="deletedSupplierDisplayName" value={filters.displayName} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onFilterChange({ ...filters, displayName: event.target.value })} placeholder="Input display name" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="deletedSupplierCode" className="text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
@@ -308,7 +301,6 @@ export function DeletedSuppliersSection({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{supplier.name}</p>
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{supplier.displayName}</p>
                         </div>
 
                         {canRestore || canPermanentlyDelete ? (
