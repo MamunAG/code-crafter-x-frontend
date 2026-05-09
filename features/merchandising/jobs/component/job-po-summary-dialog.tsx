@@ -1,8 +1,13 @@
 "use client"
 
-import { useState, type FormEvent, type ReactNode } from "react"
+import { useCallback, useState, type FormEvent, type ReactNode } from "react"
 import { Loader2, Search } from "lucide-react"
 
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
@@ -23,6 +27,11 @@ type JobPoSummaryDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSearch: (poNumber: string) => Promise<JobPoSummaryResult>
+}
+
+type PoSummaryOption = AppComboboxOption & {
+  jobCount: number
+  rowCount: number
 }
 
 function formatSummaryNumber(value: number | string | null | undefined) {
@@ -53,15 +62,41 @@ export function JobPoSummaryDialog({
   onOpenChange,
   onSearch,
 }: JobPoSummaryDialogProps) {
-  const [searchText, setSearchText] = useState("")
+  const [selectedPoOption, setSelectedPoOption] = useState<PoSummaryOption | null>(null)
+  const [poComboboxOpen, setPoComboboxOpen] = useState(false)
   const [result, setResult] = useState<JobPoSummaryResult | null>(null)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
 
+  const loadPoOptions = useCallback(
+    async ({
+      query,
+    }: AppComboboxLoadParams): Promise<{ items: PoSummaryOption[]; hasNextPage: boolean }> => {
+      const searchQuery = query.trim()
+
+      if (!searchQuery) {
+        return { items: [], hasNextPage: false }
+      }
+
+      const summary = await onSearch(searchQuery)
+
+      return {
+        items: summary.groups.map((group) => ({
+          label: group.poNumber,
+          value: group.poNumber,
+          jobCount: group.jobCount,
+          rowCount: group.rowCount,
+        })),
+        hasNextPage: false,
+      }
+    },
+    [onSearch]
+  )
+
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const nextSearchText = searchText.trim()
+    const nextSearchText = selectedPoOption?.value.trim() ?? ""
 
     if (!nextSearchText) {
       setError("Please enter a PO number to view the summary.")
@@ -103,21 +138,48 @@ export function JobPoSummaryDialog({
           className="min-w-0 border-b border-slate-200/70 px-4 py-3 dark:border-white/10"
           onSubmit={handleSearch}
         >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <Label htmlFor="job-po-summary-search" className="text-xs">
-                PO Number
-              </Label>
-              <Input
-                id="job-po-summary-search"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
+          <div className="space-y-1.5">
+            <Label htmlFor="job-po-summary-search" className="text-xs">
+              PO Number
+            </Label>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+              <AppCombobox<PoSummaryOption>
+                open={poComboboxOpen}
+                onOpenChange={setPoComboboxOpen}
+                value={selectedPoOption}
+                onValueChange={(option) => {
+                  setSelectedPoOption(option)
+                  setError("")
+                  if (!option) {
+                    setSearched(false)
+                    setResult(null)
+                  }
+                }}
+                loadItems={loadPoOptions}
+                initialLimit={10}
+                searchLimit={10}
                 placeholder="Search PO number"
+                emptyMessage="Type a PO number to search saved entries."
+                loadingMessage="Searching PO numbers..."
+                showClear={Boolean(selectedPoOption)}
+                inputClassName="h-7 rounded-md px-2 text-xs"
+                inputProps={{ id: "job-po-summary-search" }}
+                contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                renderItem={(item) => (
+                  <div className="flex w-full min-w-0 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate">{item.label}</span>
+                    <span className="shrink-0 text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                      {item.jobCount} job{item.jobCount === 1 ? "" : "s"} ·{" "}
+                      {item.rowCount} row{item.rowCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                )}
               />
             </div>
             <Button
               type="submit"
-              className="h-8 rounded-md px-3 text-xs"
+              className="h-7 rounded-md px-3 text-xs"
               disabled={loading}
             >
               {loading ? (
@@ -127,6 +189,7 @@ export function JobPoSummaryDialog({
               )}
               Search
             </Button>
+            </div>
           </div>
           {error ? (
             <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -308,7 +371,7 @@ export function JobPoSummaryDialog({
                 )}
               </>
             ) : searched && !loading && !error ? (
-              <EmptySummary search={searchText} />
+              <EmptySummary search={selectedPoOption?.label ?? ""} />
             ) : (
               <div className="rounded-lg border border-dashed border-slate-200/70 px-4 py-10 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
                 Enter a PO number to review saved entry coverage.

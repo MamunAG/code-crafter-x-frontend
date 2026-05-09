@@ -750,7 +750,7 @@ export function JobFormDialog({
   )
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-0 left-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-slate-200/70 bg-slate-50 p-0 shadow-2xl sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:max-w-7xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg dark:border-white/10 dark:bg-[#080a14]">
+      <DialogContent className="top-0 left-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-slate-200/70 bg-slate-50 p-0 shadow-2xl sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg 2xl:w-[min(1600px,calc(100vw-2rem))] 2xl:max-w-[min(1600px,calc(100vw-2rem))] dark:border-white/10 dark:bg-[#080a14]">
         <form
           className="grid h-full min-h-0 w-full max-w-full min-w-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:min-h-[78vh]"
           onSubmit={(event) => {
