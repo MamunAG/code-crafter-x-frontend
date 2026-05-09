@@ -224,6 +224,16 @@ export type JobPoDetailsUploadReport = {
   rows: JobPoDetailsUploadRow[]
   missing?: {
     styles?: string[]
+    styleRows?: Array<{
+      poNumber: string
+      styleNo: string
+      styleName: string
+      color: string
+      size: string
+      quantity: number
+      deliveryDate: string | null
+      fob: number
+    }>
     colors?: string[]
     sizes?: string[]
   }

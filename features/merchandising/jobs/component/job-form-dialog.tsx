@@ -73,6 +73,16 @@ type MissingPoDetailsSetupItem = {
   label: string
   value: string
   canSave: boolean
+  row?: {
+    poNumber: string
+    styleNo: string
+    styleName: string
+    color: string
+    size: string
+    quantity: number
+    deliveryDate: string | null
+    fob: number
+  }
 }
 
 type JobFormDialogProps = {
@@ -120,9 +130,7 @@ type JobFormDialogProps = {
     buyerId?: string
   ) => Promise<JobPoDetailsUploadReport>
   onPoDetailsMissingSetupSave: (
-    item: Pick<MissingPoDetailsSetupItem, "kind" | "value"> & {
-      kind: "color" | "size"
-    }
+    item: Pick<MissingPoDetailsSetupItem, "kind" | "value" | "row">
   ) => Promise<void>
   loadRecentPoOptions: (
     limit: number
@@ -421,16 +429,15 @@ function MissingPoDetailsSetupList({
                   <p className="truncate text-sm font-medium text-slate-950 dark:text-slate-50">
                     {item.value}
                   </p>
+                  {item.kind === "style" && item.row?.styleName?.trim() ? (
+                    <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                      {item.row.styleName.trim()}
+                    </p>
+                  ) : null}
                   <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px]">
                     {item.label}
                   </Badge>
                 </div>
-                {item.canSave ? null : (
-                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                    Add this from Style setup so buyer, currency, color, and size
-                    mapping stay complete.
-                  </p>
-                )}
                 {errors[`${item.kind}:${item.value}`] ? (
                   <p className="mt-1 text-xs leading-5 text-destructive">
                     {errors[`${item.kind}:${item.value}`]}
@@ -456,7 +463,11 @@ function MissingPoDetailsSetupList({
                   {savedKeys.has(`${item.kind}:${item.value}`) ? (
                     <Check className="size-3.5" />
                   ) : null}
-                  {savedKeys.has(`${item.kind}:${item.value}`) ? "Saved" : "Save"}
+                  {savedKeys.has(`${item.kind}:${item.value}`)
+                    ? "Saved"
+                    : item.kind === "style"
+                      ? "Add"
+                      : "Save"}
                 </Button>
               ) : null}
             </div>
@@ -484,12 +495,21 @@ function JobPoDetailsUploadReportDialog({
   onOpenChange: (open: boolean) => void
   onSaveMissingSetup: (item: MissingPoDetailsSetupItem) => void
 }) {
-  const missingStyles = (report?.missing?.styles ?? []).map((value) => ({
-    kind: "style" as const,
-    label: "Style",
-    value,
-    canSave: false,
-  }))
+  const missingStyleRows = report?.missing?.styleRows ?? []
+  const missingStyles = (report?.missing?.styles ?? []).map((value) => {
+    const row = missingStyleRows.find(
+      (styleRow) =>
+        styleRow.styleNo.trim().toLowerCase() === value.trim().toLowerCase()
+    )
+
+    return {
+      kind: "style" as const,
+      label: "Style",
+      value,
+      canSave: true,
+      row,
+    }
+  })
   const missingColors = (report?.missing?.colors ?? []).map((value) => ({
     kind: "color" as const,
     label: "Color",
@@ -778,7 +798,7 @@ export function JobFormDialog({
   }
 
   async function saveMissingPoDetailsSetup(item: MissingPoDetailsSetupItem) {
-    if (!item.canSave || item.kind === "style") {
+    if (!item.canSave) {
       return
     }
 
@@ -794,6 +814,7 @@ export function JobFormDialog({
       await onPoDetailsMissingSetupSave({
         kind: item.kind,
         value: item.value,
+        row: item.row,
       })
       setSavedMissingSetupKeys((current) => new Set(current).add(key))
       toast.success(`${item.label} "${item.value}" saved successfully.`)

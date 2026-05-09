@@ -574,7 +574,20 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   )
 
   const savePoDetailsMissingSetup = useCallback(
-    async (item: { kind: "color" | "size"; value: string }) => {
+    async (item: {
+      kind: "style" | "color" | "size"
+      value: string
+      row?: {
+        poNumber: string
+        styleNo: string
+        styleName: string
+        color: string
+        size: string
+        quantity: number
+        deliveryDate: string | null
+        fob: number
+      }
+    }) => {
       if (!accessRules?.canCreate) {
         throw new Error("You do not have permission to save setup records.")
       }
@@ -585,6 +598,30 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       try {
+        if (item.kind === "style") {
+          if (!item.row?.styleName?.trim()) {
+            throw new Error(`Unable to add style "${item.value}" because style name was not returned. Please upload the template again.`)
+          }
+
+          await resolveJobAiAssistRow({
+            apiUrl,
+            accessToken: token,
+            organizationId: selectedOrganizationId || undefined,
+            buyerId: editorValues.buyerId.trim() || undefined,
+            row: {
+              poNumber: item.row.poNumber,
+              styleNo: item.row.styleNo,
+              styleName: item.row.styleName,
+              color: item.row.color,
+              size: item.row.size,
+              quantity: item.row.quantity,
+              deliveryDate: item.row.deliveryDate,
+              fob: item.row.fob,
+            },
+          })
+          return
+        }
+
         if (item.kind === "color") {
           await createColor({
             apiUrl,
@@ -618,7 +655,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         throw caughtError
       }
     },
-    [accessRules?.canCreate, apiUrl, handleAuthFailure, selectedOrganizationId],
+    [accessRules?.canCreate, apiUrl, editorValues.buyerId, handleAuthFailure, selectedOrganizationId],
   )
 
   function openCreateDialog() {
