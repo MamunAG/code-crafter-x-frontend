@@ -636,6 +636,16 @@ export function JobFormDialog({
                           <Input value={jobNo || ""} readOnly placeholder="Auto generated" className="w-full min-w-0 bg-slate-100 dark:bg-white/[0.04]" />
                         </div>
                         <div className={JOB_DIALOG_FIELD_CLASS}>
+                          <FieldLabel>Custom Job No</FieldLabel>
+                          <Input
+                            className={JOB_DIALOG_INPUT_CLASS}
+                            value={values.jobNo}
+                            onChange={(event) => update("jobNo", event.target.value)}
+                            maxLength={50}
+                            placeholder={mode === "create" ? "Optional custom job no" : "Clear to keep current number"}
+                          />
+                        </div>
+                        <div className={JOB_DIALOG_FIELD_CLASS}>
                           <FieldLabel required>Factory</FieldLabel>
                           <AppCombobox
                             open={factoryOpen}

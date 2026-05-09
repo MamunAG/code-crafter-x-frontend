@@ -67,6 +67,7 @@ function normalizeNumber(value: string) {
 
 function buildJobPayload(values: JobFormValues) {
   return {
+    jobNo: optionalString(values.jobNo),
     factoryId: values.factoryId.trim(),
     buyerId: values.buyerId.trim(),
     merchandiserId: optionalString(values.merchandiserId),

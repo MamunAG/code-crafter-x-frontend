@@ -140,6 +140,7 @@ export type JobDetailFormValues = {
 }
 
 export type JobFormValues = {
+  jobNo: string
   factoryId: string
   buyerId: string
   merchandiserId: string

@@ -61,6 +61,7 @@ const DEFAULT_FILTERS: JobFilterValues = {
 }
 
 const DEFAULT_FORM_VALUES: JobFormValues = {
+  jobNo: "",
   factoryId: "",
   buyerId: "",
   merchandiserId: "",
@@ -241,6 +242,8 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedError, setDeletedError] = useState("")
   const [draftFilters, setDraftFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
+  const [deletedDraftFilters, setDeletedDraftFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
+  const [deletedActiveFilters, setDeletedActiveFilters] = useState<JobFilterValues>(DEFAULT_FILTERS)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<JobEditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
@@ -375,7 +378,15 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
           handleAuthFailure("Your session expired. Please sign in again.")
           return
         }
-        const response = await fetchJobs({ apiUrl, accessToken: token, page: deletedPage, limit: deletedLimit, filters: {}, deletedOnly: true, organizationId: selectedOrganizationId || undefined })
+        const response = await fetchJobs({
+          apiUrl,
+          accessToken: token,
+          page: deletedPage,
+          limit: deletedLimit,
+          filters: deletedActiveFilters,
+          deletedOnly: true,
+          organizationId: selectedOrganizationId || undefined,
+        })
         if (active) {
           setDeletedJobs(response.items)
           setDeletedMeta(response.meta)
@@ -391,7 +402,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [accessRules?.canView, apiUrl, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
+  }, [accessRules?.canView, apiUrl, deletedActiveFilters, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
 
   const loadFactoryOptions = useCallback(
     async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
@@ -569,6 +580,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         }
       }
       setEditorValues({
+        jobNo: record.jobNo ?? "",
         factoryId: record.factoryId ?? "",
         buyerId: record.buyerId ?? "",
         merchandiserId: record.merchandiserId == null ? "" : String(record.merchandiserId),
@@ -835,6 +847,13 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
               deletedLimit={deletedLimit}
               loadingDeletedJobs={loadingDeletedJobs}
               deletedError={deletedError}
+              deletedDraftFilters={deletedDraftFilters}
+              deletedActiveFilters={deletedActiveFilters}
+              loadFactoryOptions={loadFactoryOptions}
+              loadBuyerOptions={loadBuyerOptions}
+              loadEmployeeOptions={loadEmployeeOptions}
+              onDeletedDraftFiltersChange={setDeletedDraftFilters}
+              onDeletedActiveFiltersChange={setDeletedActiveFilters}
               onDeletedPageChange={setDeletedPage}
               onDeletedLimitChange={setDeletedLimit}
               onOpenAction={openPendingActionDialog}

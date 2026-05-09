@@ -72,6 +72,7 @@ type ActiveJobsSectionProps = {
 }
 
 const ALL_STATUS_VALUE = "__all_statuses__"
+const ALL_ORDER_TYPE_VALUE = "__all_order_types__"
 
 function getFactoryLabel(job: JobRecord) {
   return job.factory?.displayName?.trim() || job.factory?.name?.trim() || "No factory"
@@ -421,12 +422,16 @@ export function ActiveJobsSection({
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterJobOrderType" className="text-xs font-medium text-slate-700 dark:text-slate-300">Order Type</label>
-            <Input
-              id="filterJobOrderType"
-              value={draftFilters.ordertype}
-              className="h-7 rounded-md px-2 text-xs"
-              onChange={(event) => onDraftFiltersChange({ ...draftFilters, ordertype: event.target.value })}
-              placeholder="Retail / Promotional"
+            <AppSelect
+              triggerId="filterJobOrderType"
+              value={draftFilters.ordertype || ALL_ORDER_TYPE_VALUE}
+              onValueChange={(value) => onDraftFiltersChange({ ...draftFilters, ordertype: value === ALL_ORDER_TYPE_VALUE ? "" : value })}
+              placeholder="All order types"
+              options={[
+                { value: ALL_ORDER_TYPE_VALUE, label: "All order types" },
+                { value: "Retail", label: "Retail" },
+                { value: "Promotional", label: "Promotional" },
+              ]}
             />
           </div>
           <div className="min-w-0 space-y-1">
