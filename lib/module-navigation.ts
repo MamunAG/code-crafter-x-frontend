@@ -288,6 +288,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
               },
             ],
           },
+          {
+            label: "TNA",
+            href: "/merchandising/production/tna",
+            permissionMenuName: "TNA Task Setup",
+          },
           //     {
           //       label: "Dummy merchandising",
           //       href: "/merchandising/production/dummy-merchandising",
