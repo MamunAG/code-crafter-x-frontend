@@ -1,14 +1,7 @@
-import { ModuleRoutePage } from "@/components/module-route-page"
+import { TnaWorkspace } from "@/features/merchandising/tna/tna-workspace"
 
 export default function Page() {
-  return (
-    <ModuleRoutePage
-      current="merchandising"
-      eyebrow="Merchandising / Production"
-      title="TNA"
-      description="Manage TNA tasks from this production entry point."
-      pathLabel="/merchandising/production/tna"
-      showModuleNavigation={false}
-    />
-  )
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+
+  return <TnaWorkspace apiUrl={apiUrl} />
 }
