@@ -486,6 +486,13 @@ export function StyleFormDialog({
                   </DialogHeader>
                 </div>
 
+                <DialogHeader className="hidden rounded-lg border border-slate-200/70 bg-white/90 p-3 dark:border-white/10 dark:bg-[#17131d]/90 lg:block">
+                  <DialogTitle>{mode === "create" ? "Create style" : "Edit style"}</DialogTitle>
+                  <DialogDescription>
+                    Manage the parent style information and the color, size, and embellishment mappings.
+                  </DialogDescription>
+                </DialogHeader>
+
                 <div className="sticky top-0 z-20 -mx-2 -mt-2 w-screen max-w-none overflow-hidden rounded-none border-b border-slate-200/70 bg-white/95 p-3 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-white/10 dark:bg-[#17131d]/95 dark:shadow-[0_14px_30px_rgba(0,0,0,0.35)] sm:mx-0 sm:mt-0 sm:w-full sm:max-w-full sm:rounded-lg sm:border lg:hidden">
                   <DialogHeader className="min-w-0">
                     <DialogTitle className="text-base">{mode === "create" ? "Create style" : "Edit style"}</DialogTitle>
