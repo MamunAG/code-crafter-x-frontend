@@ -15,9 +15,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { fetchFactories } from "@/features/app-config/factory/factory.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
-import { fetchColors } from "@/features/merchandising/colors/color.service"
+import { createColor, fetchColors } from "@/features/merchandising/colors/color.service"
 import { fetchEmployee, fetchEmployees } from "@/features/hr-payroll/employee/employee.service"
-import { fetchSizes } from "@/features/merchandising/sizes/size.service"
+import { createSize, fetchSizes } from "@/features/merchandising/sizes/size.service"
 import { fetchStyles } from "@/features/merchandising/styles/style.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
@@ -29,6 +29,7 @@ import { JobFormDialog } from "./component/job-form-dialog"
 import {
   analyzeJobAiAssistFile,
   createJob,
+  downloadJobPoDetailsUploadTemplate,
   fetchJob,
   fetchJobPoSummary,
   fetchJobs,
@@ -37,9 +38,10 @@ import {
   restoreJob,
   softDeleteJob,
   resolveJobAiAssistRow,
+  uploadJobPoDetailsTemplate,
   updateJob,
 } from "./job.service"
-import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobPoSummaryResult, JobRecord, PaginationMeta } from "./job.types"
+import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobPoDetailsUploadReport, JobPoSummaryResult, JobRecord, PaginationMeta } from "./job.types"
 
 type JobEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -514,6 +516,108 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
       }
     },
     [apiUrl, selectedOrganizationId],
+  )
+
+  const downloadPoDetailsTemplate = useCallback(async () => {
+    if (!accessRules?.canCreate) {
+      throw new Error("You do not have permission to download the PO details template.")
+    }
+
+    const token = window.localStorage.getItem("access_token")
+    if (!token) {
+      throw new Error("Your session expired. Please sign in again.")
+    }
+
+    try {
+      return await downloadJobPoDetailsUploadTemplate({
+        apiUrl,
+        accessToken: token,
+        organizationId: selectedOrganizationId || undefined,
+      })
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the PO details template right now."
+      if (handleAuthFailure(message)) {
+        throw new Error("Your session expired. Please sign in again.")
+      }
+      throw caughtError
+    }
+  }, [accessRules?.canCreate, apiUrl, handleAuthFailure, selectedOrganizationId])
+
+  const uploadPoDetailsTemplate = useCallback(
+    async (file: File): Promise<JobPoDetailsUploadReport> => {
+      if (!accessRules?.canCreate) {
+        throw new Error("You do not have permission to upload PO details.")
+      }
+
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      try {
+        return await uploadJobPoDetailsTemplate({
+          apiUrl,
+          accessToken: token,
+          file,
+          organizationId: selectedOrganizationId || undefined,
+        })
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to upload the PO details template right now."
+        if (handleAuthFailure(message)) {
+          throw new Error("Your session expired. Please sign in again.")
+        }
+        throw caughtError
+      }
+    },
+    [accessRules?.canCreate, apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const savePoDetailsMissingSetup = useCallback(
+    async (item: { kind: "color" | "size"; value: string }) => {
+      if (!accessRules?.canCreate) {
+        throw new Error("You do not have permission to save setup records.")
+      }
+
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        throw new Error("Your session expired. Please sign in again.")
+      }
+
+      try {
+        if (item.kind === "color") {
+          await createColor({
+            apiUrl,
+            accessToken: token,
+            organizationId: selectedOrganizationId || undefined,
+            payload: {
+              colorName: item.value,
+              colorDisplayName: item.value,
+              colorDescription: "",
+              colorHexCode: "",
+              isActive: true,
+            },
+          })
+          return
+        }
+
+        await createSize({
+          apiUrl,
+          accessToken: token,
+          organizationId: selectedOrganizationId || undefined,
+          payload: {
+            sizeName: item.value,
+            isActive: true,
+          },
+        })
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : `Unable to save ${item.kind} "${item.value}" right now.`
+        if (handleAuthFailure(message)) {
+          throw new Error("Your session expired. Please sign in again.")
+        }
+        throw caughtError
+      }
+    },
+    [accessRules?.canCreate, apiUrl, handleAuthFailure, selectedOrganizationId],
   )
 
   function openCreateDialog() {
@@ -1002,6 +1106,9 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
         onAiAssistRowResolve={({ row, buyerId }) => resolveAiAssistRowMasterData({ row, buyerId })}
+        onPoDetailsTemplateDownload={downloadPoDetailsTemplate}
+        onPoDetailsTemplateUpload={uploadPoDetailsTemplate}
+        onPoDetailsMissingSetupSave={savePoDetailsMissingSetup}
         loadRecentPoOptions={loadRecentPoSummaryOptions}
         onPoSummarySearch={searchPoSummary}
         onUseSuggestedJobNo={(nextJobNo) => {

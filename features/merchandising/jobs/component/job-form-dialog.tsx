@@ -2,15 +2,19 @@
 
 import { useRef, useState, type DragEvent } from "react"
 import {
+  Check,
+  Download,
   GripVertical,
   Info,
   Loader2,
+  MoreHorizontal,
   PackageCheck,
   Plus,
   Search,
   Settings,
   Sparkles,
   Trash2,
+  Upload,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,6 +35,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -45,8 +55,10 @@ import type {
   JobDialogSectionId,
   JobFormError,
   JobFormValues,
+  JobPoDetailsUploadReport,
   JobPoSummaryResult,
 } from "../job.types"
+import { JobPoDetailsUploadReportError } from "../job.service"
 import { JobAiAssistDialog } from "./job-ai-assist-dialog"
 import {
   type AiAssistFocusColumn,
@@ -56,6 +68,12 @@ import {
 import { JobPoSummaryDialog } from "./job-po-summary-dialog"
 
 type SelectOption = AppComboboxOption
+type MissingPoDetailsSetupItem = {
+  kind: "style" | "color" | "size"
+  label: string
+  value: string
+  canSave: boolean
+}
 
 type JobFormDialogProps = {
   open: boolean
@@ -96,6 +114,15 @@ type JobFormDialogProps = {
     row: JobAiAssistRow
     buyerId?: string
   }) => Promise<AiAssistMasterDataMatches>
+  onPoDetailsTemplateDownload: () => Promise<Blob>
+  onPoDetailsTemplateUpload: (
+    file: File
+  ) => Promise<JobPoDetailsUploadReport>
+  onPoDetailsMissingSetupSave: (
+    item: Pick<MissingPoDetailsSetupItem, "kind" | "value"> & {
+      kind: "color" | "size"
+    }
+  ) => Promise<void>
   loadRecentPoOptions: (
     limit: number
   ) => Promise<Array<AppComboboxOption & { jobCount: number; rowCount: number }>>
@@ -352,6 +379,205 @@ function RailItem({
   )
 }
 
+function MissingPoDetailsSetupList({
+  title,
+  items,
+  savingKeys,
+  savedKeys,
+  errors,
+  onSave,
+}: {
+  title: string
+  items: MissingPoDetailsSetupItem[]
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onSave: (item: MissingPoDetailsSetupItem) => void
+}) {
+  if (!items.length) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+          {title}
+        </p>
+        <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
+          {items.length} missing
+        </Badge>
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => (
+          <div
+            key={`${item.kind}:${item.value}`}
+            className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-950/40"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-medium text-slate-950 dark:text-slate-50">
+                    {item.value}
+                  </p>
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px]">
+                    {item.label}
+                  </Badge>
+                </div>
+                {item.canSave ? null : (
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    Add this from Style setup so buyer, currency, color, and size
+                    mapping stay complete.
+                  </p>
+                )}
+                {errors[`${item.kind}:${item.value}`] ? (
+                  <p className="mt-1 text-xs leading-5 text-destructive">
+                    {errors[`${item.kind}:${item.value}`]}
+                  </p>
+                ) : null}
+              </div>
+
+              {item.canSave ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={savedKeys.has(`${item.kind}:${item.value}`) ? "outline" : "default"}
+                  className="h-8 rounded-xl"
+                  disabled={
+                    savingKeys.has(`${item.kind}:${item.value}`) ||
+                    savedKeys.has(`${item.kind}:${item.value}`)
+                  }
+                  onClick={() => onSave(item)}
+                >
+                  {savingKeys.has(`${item.kind}:${item.value}`) ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : null}
+                  {savedKeys.has(`${item.kind}:${item.value}`) ? (
+                    <Check className="size-3.5" />
+                  ) : null}
+                  {savedKeys.has(`${item.kind}:${item.value}`) ? "Saved" : "Save"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function JobPoDetailsUploadReportDialog({
+  open,
+  report,
+  savingKeys,
+  savedKeys,
+  errors,
+  onOpenChange,
+  onSaveMissingSetup,
+}: {
+  open: boolean
+  report: JobPoDetailsUploadReport | null
+  savingKeys: Set<string>
+  savedKeys: Set<string>
+  errors: Record<string, string>
+  onOpenChange: (open: boolean) => void
+  onSaveMissingSetup: (item: MissingPoDetailsSetupItem) => void
+}) {
+  const missingStyles = (report?.missing?.styles ?? []).map((value) => ({
+    kind: "style" as const,
+    label: "Style",
+    value,
+    canSave: false,
+  }))
+  const missingColors = (report?.missing?.colors ?? []).map((value) => ({
+    kind: "color" as const,
+    label: "Color",
+    value,
+    canSave: true,
+  }))
+  const missingSizes = (report?.missing?.sizes ?? []).map((value) => ({
+    kind: "size" as const,
+    label: "Size",
+    value,
+    canSave: true,
+  }))
+  const missingCount =
+    missingStyles.length + missingColors.length + missingSizes.length
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>PO details upload report</DialogTitle>
+          <DialogDescription>
+            The upload was stopped because setup data is missing. Add these
+            styles, colors, or sizes from their setup pages, then upload the
+            template again.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Ready rows
+              </p>
+              <p className="mt-1 text-xl font-semibold">
+                {report?.inserted ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Skipped
+              </p>
+              <p className="mt-1 text-xl font-semibold">
+                {report?.skipped ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Missing setup
+              </p>
+              <p className="mt-1 text-xl font-semibold">{missingCount}</p>
+            </div>
+          </div>
+
+          <MissingPoDetailsSetupList
+            title="Styles to add first"
+            items={missingStyles}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+          <MissingPoDetailsSetupList
+            title="Colors to add first"
+            items={missingColors}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+          <MissingPoDetailsSetupList
+            title="Sizes to add first"
+            items={missingSizes}
+            savingKeys={savingKeys}
+            savedKeys={savedKeys}
+            errors={errors}
+            onSave={onSaveMissingSetup}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" className="rounded-xl" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function JobFormDialog({
   open,
   mode,
@@ -376,6 +602,9 @@ export function JobFormDialog({
   onValuesChange,
   onAiAssistFileAnalyze,
   onAiAssistRowResolve,
+  onPoDetailsTemplateDownload,
+  onPoDetailsTemplateUpload,
+  onPoDetailsMissingSetupSave,
   loadRecentPoOptions,
   onPoSummarySearch,
   onUseSuggestedJobNo,
@@ -389,6 +618,20 @@ export function JobFormDialog({
     useState<JobDialogSectionId>("basic-info")
   const [poSummaryOpen, setPoSummaryOpen] = useState(false)
   const [openRowControl, setOpenRowControl] = useState("")
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+  const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [uploadReport, setUploadReport] =
+    useState<JobPoDetailsUploadReport | null>(null)
+  const [uploadReportOpen, setUploadReportOpen] = useState(false)
+  const [savingMissingSetupKeys, setSavingMissingSetupKeys] = useState<
+    Set<string>
+  >(() => new Set())
+  const [savedMissingSetupKeys, setSavedMissingSetupKeys] = useState<
+    Set<string>
+  >(() => new Set())
+  const [missingSetupErrors, setMissingSetupErrors] = useState<
+    Record<string, string>
+  >({})
   const [draggingDetailId, setDraggingDetailId] = useState("")
   const aiAssistFile = useJobAiAssistStore((state) => state.file)
   const aiAssistRows = useJobAiAssistStore((state) => state.rows)
@@ -417,6 +660,7 @@ export function JobFormDialog({
     (state) => state.completeAnalyze
   )
   const contentViewportRef = useRef<HTMLDivElement | null>(null)
+  const templateUploadInputRef = useRef<HTMLInputElement | null>(null)
   const sectionRefs = useRef<Record<JobDialogSectionId, HTMLElement | null>>({
     "basic-info": null,
     details: null,
@@ -455,6 +699,114 @@ export function JobFormDialog({
   function addDetail() {
     const previousDetail = values.jobDetails[values.jobDetails.length - 1]
     update("jobDetails", [...values.jobDetails, newDetailRow(previousDetail)])
+  }
+
+  async function downloadPoDetailsTemplate() {
+    if (downloadingTemplate) {
+      return
+    }
+
+    setDownloadingTemplate(true)
+    try {
+      const blob = await onPoDetailsTemplateDownload()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "job-po-details-template.csv"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to download the PO details template right now."
+      toast.error(message)
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
+
+  async function uploadPoDetailsTemplate(file: File | null | undefined) {
+    if (!file || uploadingTemplate) {
+      return
+    }
+
+    setUploadingTemplate(true)
+    try {
+      const report = await onPoDetailsTemplateUpload(file)
+      const nextDetails: JobDetailFormValues[] = report.rows.map((row) => ({
+        ...row,
+        id: crypto.randomUUID(),
+      }))
+
+      if (nextDetails.length) {
+        update("jobDetails", [...values.jobDetails, ...nextDetails])
+      }
+
+      toast.success(
+        `PO details template loaded. ${nextDetails.length} rows added to the table.`
+      )
+    } catch (caughtError) {
+      if (caughtError instanceof JobPoDetailsUploadReportError) {
+        setSavingMissingSetupKeys(new Set())
+        setSavedMissingSetupKeys(new Set())
+        setMissingSetupErrors({})
+        setUploadReport(caughtError.report)
+        setUploadReportOpen(true)
+        toast.error(caughtError.message)
+        return
+      }
+
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to upload the PO details template right now."
+      toast.error(message)
+    } finally {
+      setUploadingTemplate(false)
+
+      if (templateUploadInputRef.current) {
+        templateUploadInputRef.current.value = ""
+      }
+    }
+  }
+
+  async function saveMissingPoDetailsSetup(item: MissingPoDetailsSetupItem) {
+    if (!item.canSave || item.kind === "style") {
+      return
+    }
+
+    const key = `${item.kind}:${item.value}`
+    setSavingMissingSetupKeys((current) => new Set(current).add(key))
+    setMissingSetupErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+
+    try {
+      await onPoDetailsMissingSetupSave({
+        kind: item.kind,
+        value: item.value,
+      })
+      setSavedMissingSetupKeys((current) => new Set(current).add(key))
+      toast.success(`${item.label} "${item.value}" saved successfully.`)
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : `Unable to save ${item.label.toLowerCase()} "${item.value}" right now.`
+      setMissingSetupErrors((current) => ({ ...current, [key]: message }))
+      toast.error(message)
+    } finally {
+      setSavingMissingSetupKeys((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+    }
   }
 
   function openAiAssistDialog() {
@@ -977,6 +1329,63 @@ export function JobFormDialog({
                               PO Details
                             </CardTitle>
                             <div className="flex flex-col gap-2 sm:flex-row">
+                              <input
+                                ref={templateUploadInputRef}
+                                type="file"
+                                accept=".csv,.xls,.xlsx"
+                                className="hidden"
+                                onChange={(event) =>
+                                  void uploadPoDetailsTemplate(
+                                    event.target.files?.[0]
+                                  )
+                                }
+                              />
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 sm:h-7 sm:w-auto dark:text-blue-300"
+                                    disabled={
+                                      downloadingTemplate || uploadingTemplate
+                                    }
+                                  >
+                                    {downloadingTemplate || uploadingTemplate ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <MoreHorizontal className="size-3.5" />
+                                    )}
+                                    Template
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuItem
+                                    onSelect={(event) => {
+                                      event.preventDefault()
+                                      void downloadPoDetailsTemplate()
+                                    }}
+                                    disabled={downloadingTemplate}
+                                  >
+                                    <Download className="size-3.5" />
+                                    {downloadingTemplate
+                                      ? "Downloading template..."
+                                      : "Download template"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={(event) => {
+                                      event.preventDefault()
+                                      templateUploadInputRef.current?.click()
+                                    }}
+                                    disabled={uploadingTemplate}
+                                  >
+                                    <Upload className="size-3.5" />
+                                    {uploadingTemplate
+                                      ? "Uploading PO details..."
+                                      : "Upload PO details"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1816,6 +2225,23 @@ export function JobFormDialog({
         onOpenChange={setPoSummaryOpen}
         loadRecentPoOptions={loadRecentPoOptions}
         onSearch={onPoSummarySearch}
+      />
+      <JobPoDetailsUploadReportDialog
+        open={uploadReportOpen}
+        report={uploadReport}
+        savingKeys={savingMissingSetupKeys}
+        savedKeys={savedMissingSetupKeys}
+        errors={missingSetupErrors}
+        onSaveMissingSetup={(item) => void saveMissingPoDetailsSetup(item)}
+        onOpenChange={(nextOpen) => {
+          setUploadReportOpen(nextOpen)
+          if (!nextOpen) {
+            setUploadReport(null)
+            setSavingMissingSetupKeys(new Set())
+            setSavedMissingSetupKeys(new Set())
+            setMissingSetupErrors({})
+          }
+        }}
       />
     </Dialog>
   )

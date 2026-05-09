@@ -1,4 +1,4 @@
-import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobPoSummaryResult, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
+import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobPoDetailsUploadReport, JobPoSummaryResult, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
 import type { AiAssistMasterDataMatches } from "./component/job-ai-assist.store"
 
 function buildApiUrl(apiUrl: string, path: string) {
@@ -23,6 +23,64 @@ function buildRequestHeaders({
   if (organizationId) headers["x-organization-id"] = organizationId
 
   return headers
+}
+
+export class JobPoDetailsUploadReportError extends Error {
+  report: JobPoDetailsUploadReport
+
+  constructor(message: string, report: JobPoDetailsUploadReport) {
+    super(message)
+    this.name = "JobPoDetailsUploadReportError"
+    this.report = report
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value != null
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+}
+
+function isJobPoDetailsUploadReport(value: unknown): value is JobPoDetailsUploadReport {
+  if (!isRecord(value)) return false
+  const missing = value.missing
+  return (
+    typeof value.inserted === "number" &&
+    typeof value.skipped === "number" &&
+    Array.isArray(value.rows) &&
+    (!isRecord(missing) ||
+      ((!missing.styles || isStringArray(missing.styles)) &&
+        (!missing.colors || isStringArray(missing.colors)) &&
+        (!missing.sizes || isStringArray(missing.sizes))))
+  )
+}
+
+function extractJobPoDetailsUploadReport(payload: unknown, depth = 0): JobPoDetailsUploadReport | null {
+  if (depth > 3) return null
+  if (isJobPoDetailsUploadReport(payload)) return payload
+  if (!isRecord(payload)) return null
+  return (
+    extractJobPoDetailsUploadReport(payload.uploadReport, depth + 1) ||
+    extractJobPoDetailsUploadReport(payload.data, depth + 1) ||
+    extractJobPoDetailsUploadReport(payload.response, depth + 1) ||
+    extractJobPoDetailsUploadReport(payload.message, depth + 1)
+  )
+}
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (typeof payload === "string" && payload.trim()) return payload
+  if (Array.isArray(payload)) {
+    const messages = payload.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    return messages.length ? messages.join(" ") : fallback
+  }
+  if (!isRecord(payload)) return fallback
+  if (typeof payload.message === "string" && payload.message.trim()) return payload.message
+  if (Array.isArray(payload.message) || isRecord(payload.message)) return extractErrorMessage(payload.message, fallback)
+  if (isRecord(payload.response)) return extractErrorMessage(payload.response, fallback)
+  if (typeof payload.error === "string" && payload.error.trim()) return payload.error
+  return fallback
 }
 
 async function readJsonResponse<T>(response: Response) {
@@ -189,6 +247,74 @@ export async function fetchJobPoSummary({
   const payload = await readJsonResponse<JobPoSummaryResult>(response)
   if (!payload.data) throw new Error("No PO summary was returned for this request.")
   return payload.data
+}
+
+export async function downloadJobPoDetailsUploadTemplate({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/po-details/template/upload"), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+  })
+
+  if (response.status === 401) throw new Error("Your session expired. Please sign in again.")
+  if (response.status === 403) throw new Error("You do not have permission to download the PO details template.")
+  if (!response.ok) throw new Error("Unable to download the PO details upload template right now.")
+
+  return response.blob()
+}
+
+export async function uploadJobPoDetailsTemplate({
+  apiUrl,
+  accessToken,
+  file,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+  organizationId?: string
+}): Promise<JobPoDetailsUploadReport> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/job/po-details/upload"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    body: formData,
+  })
+
+  let payload: unknown = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401) throw new Error("Your session expired. Please sign in again.")
+  if (response.status === 403) throw new Error(extractErrorMessage(payload, "You do not have permission to upload PO details."))
+
+  if (!response.ok) {
+    const uploadReport = extractJobPoDetailsUploadReport(payload)
+    const message = extractErrorMessage(payload, "PO details upload could not be completed.")
+    if (uploadReport) throw new JobPoDetailsUploadReportError(message, uploadReport)
+    throw new Error(message)
+  }
+
+  if (!isRecord(payload) || payload.success !== true) {
+    throw new Error(extractErrorMessage(payload, "Unable to upload the PO details template right now."))
+  }
+
+  const uploadReport = extractJobPoDetailsUploadReport(payload.data)
+  if (!uploadReport) throw new Error("The PO details upload completed without a summary.")
+
+  return uploadReport
 }
 
 export async function createJob({

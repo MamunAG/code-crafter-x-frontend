@@ -216,6 +216,19 @@ export type JobPoSummaryResult = {
   groups: JobPoSummaryGroup[]
 }
 
+export type JobPoDetailsUploadRow = Omit<JobDetailFormValues, "id">
+
+export type JobPoDetailsUploadReport = {
+  inserted: number
+  skipped: number
+  rows: JobPoDetailsUploadRow[]
+  missing?: {
+    styles?: string[]
+    colors?: string[]
+    sizes?: string[]
+  }
+}
+
 export type NextJobNumber = {
   jobNo: string
   jobSerial: number
