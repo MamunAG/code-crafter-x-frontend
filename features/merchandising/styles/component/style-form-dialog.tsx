@@ -413,12 +413,21 @@ export function StyleFormDialog({
 
   function scrollToSection(sectionId: StyleDialogSectionId) {
     const element = sectionRefs.current[sectionId]
+    const viewport = scrollViewportRef.current
 
-    if (!element) {
+    if (!element || !viewport) {
+      element?.scrollIntoView({ behavior: "smooth", block: "start" })
       return
     }
 
-    element.scrollIntoView({ behavior: "smooth", block: "start" })
+    const viewportRect = viewport.getBoundingClientRect()
+    const elementRect = element.getBoundingClientRect()
+    const topOffset = elementRect.top - viewportRect.top + viewport.scrollTop
+
+    viewport.scrollTo({
+      top: Math.max(0, topOffset - 12),
+      behavior: "smooth",
+    })
     setActiveSection(sectionId)
   }
 
@@ -466,7 +475,7 @@ export function StyleFormDialog({
               </nav>
             </aside>
 
-            <ScrollArea className="min-h-0" viewportRef={scrollViewportRef} onScrollCapture={handleScroll}>
+            <ScrollArea className="h-full min-h-0 min-w-0" viewportRef={scrollViewportRef} onScrollCapture={handleScroll}>
               <div className="space-y-2.5 p-2 sm:p-3">
                 <div className="sr-only">
                   <DialogHeader>
