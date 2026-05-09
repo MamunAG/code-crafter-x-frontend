@@ -76,7 +76,8 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           {
             label: "Menu",
             href: "/app-config/core/menu",
-            description: "Create and manage organization-specific menu entries.",
+            description:
+              "Create and manage organization-specific menu entries.",
           },
         ],
       },
@@ -98,6 +99,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Unit Setup",
             href: "/app-config/data/units",
             permissionMenuName: "Unit Setup",
+          },
+          {
+            label: "Supplier Entry",
+            href: "/app-config/data/suppliers",
+            permissionMenuName: "Supplier Entry",
           },
         ],
       },
@@ -144,7 +150,8 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
     key: "hr-payroll",
     label: "Hr-Payroll",
     href: "/hr-payroll",
-    description: "Employee records, organizational setup, and payroll operations.",
+    description:
+      "Employee records, organizational setup, and payroll operations.",
     groups: [
       {
         label: "Masters",
@@ -271,8 +278,14 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 href: "/merchandising/production/orders/purchase-order",
                 permissionMenuName: "Job Entry",
               },
-              { label: "Work orders", href: "/merchandising/production/orders/work-orders" },
-              { label: "Status", href: "/merchandising/production/orders/status" },
+              {
+                label: "Work orders",
+                href: "/merchandising/production/orders/work-orders",
+              },
+              {
+                label: "Status",
+                href: "/merchandising/production/orders/status",
+              },
             ],
           },
           //     {
@@ -345,12 +358,14 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           {
             label: "User menu access",
             href: "/iam/access/menu-permissions",
-            description: "Grant view, create, update, and delete menu access to users.",
+            description:
+              "Grant view, create, update, and delete menu access to users.",
           },
           {
             label: "Organization access",
             href: "/iam/access/organization-requests",
-            description: "Review membership requests and assign users to organizations.",
+            description:
+              "Review membership requests and assign users to organizations.",
           },
         ],
       },
@@ -362,7 +377,10 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Sessions",
             href: "/iam/security/sessions",
             children: [
-              { label: "Active sessions", href: "/iam/security/sessions/active" },
+              {
+                label: "Active sessions",
+                href: "/iam/security/sessions/active",
+              },
               { label: "Devices", href: "/iam/security/sessions/devices" },
             ],
           },
@@ -377,7 +395,8 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           {
             label: "Dummy IAM",
             href: "/iam/security/dummy-iam",
-            description: "Temporary placeholder submenu for nested navigation testing.",
+            description:
+              "Temporary placeholder submenu for nested navigation testing.",
             children: [
               {
                 label: "Dummy child A",
@@ -412,7 +431,7 @@ function normalizeNavigationKey(value?: string | null) {
 export function filterModuleNavigationByPermissions(
   modules: ModuleNavigationItem[],
   permissions: NavigationPermissionRecord[],
-  isAdmin: boolean,
+  isAdmin: boolean
 ) {
   if (isAdmin) {
     return modules
@@ -425,7 +444,9 @@ export function filterModuleNavigationByPermissions(
       return
     }
 
-    const moduleName = normalizeNavigationKey(permission.menu?.moduleEntry?.moduleName)
+    const moduleName = normalizeNavigationKey(
+      permission.menu?.moduleEntry?.moduleName
+    )
 
     if (moduleName) {
       visibleModuleSet.add(moduleName)
@@ -462,7 +483,7 @@ function buildVisibleMenuNameSet(permissions: NavigationPermissionRecord[]) {
 
 function filterSidebarItemsByPermissions(
   items: ModuleNavItem[],
-  visibleMenuNameSet: Set<string>,
+  visibleMenuNameSet: Set<string>
 ): ModuleNavItem[] {
   return items.flatMap((item) => {
     const children = item.children?.length
@@ -489,7 +510,7 @@ function filterSidebarItemsByPermissions(
 export function filterModuleSidebarGroupsByPermissions(
   groups: ModuleGroup[],
   permissions: NavigationPermissionRecord[],
-  isAdmin: boolean,
+  isAdmin: boolean
 ) {
   if (isAdmin) {
     return groups
@@ -498,15 +519,18 @@ export function filterModuleSidebarGroupsByPermissions(
   const visibleMenuNameSet = buildVisibleMenuNameSet(permissions)
 
   return groups.flatMap((group) => {
-    const items = filterSidebarItemsByPermissions(group.items, visibleMenuNameSet)
+    const items = filterSidebarItemsByPermissions(
+      group.items,
+      visibleMenuNameSet
+    )
 
     return items.length
       ? [
-        {
-          ...group,
-          items,
-        },
-      ]
+          {
+            ...group,
+            items,
+          },
+        ]
       : []
   })
 }
