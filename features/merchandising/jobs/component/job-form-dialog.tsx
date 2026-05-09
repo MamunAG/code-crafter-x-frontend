@@ -7,6 +7,7 @@ import {
   Loader2,
   PackageCheck,
   Plus,
+  Search,
   Settings,
   Sparkles,
   Trash2,
@@ -44,6 +45,7 @@ import type {
   JobDialogSectionId,
   JobFormError,
   JobFormValues,
+  JobPoSummaryResult,
 } from "../job.types"
 import { JobAiAssistDialog } from "./job-ai-assist-dialog"
 import {
@@ -51,6 +53,7 @@ import {
   type AiAssistMasterDataMatches,
   useJobAiAssistStore,
 } from "./job-ai-assist.store"
+import { JobPoSummaryDialog } from "./job-po-summary-dialog"
 
 type SelectOption = AppComboboxOption
 
@@ -93,6 +96,7 @@ type JobFormDialogProps = {
     row: JobAiAssistRow
     buyerId?: string
   }) => Promise<AiAssistMasterDataMatches>
+  onPoSummarySearch: (poNumber: string) => Promise<JobPoSummaryResult>
   onUseSuggestedJobNo?: (jobNo: string) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
@@ -369,6 +373,7 @@ export function JobFormDialog({
   onValuesChange,
   onAiAssistFileAnalyze,
   onAiAssistRowResolve,
+  onPoSummarySearch,
   onUseSuggestedJobNo,
   onOpenChange,
   onSubmit,
@@ -378,6 +383,7 @@ export function JobFormDialog({
   const [employeeOpen, setEmployeeOpen] = useState(false)
   const [activeSection, setActiveSection] =
     useState<JobDialogSectionId>("basic-info")
+  const [poSummaryOpen, setPoSummaryOpen] = useState(false)
   const [openRowControl, setOpenRowControl] = useState("")
   const [draggingDetailId, setDraggingDetailId] = useState("")
   const aiAssistFile = useJobAiAssistStore((state) => state.file)
@@ -967,6 +973,16 @@ export function JobFormDialog({
                               PO Details
                             </CardTitle>
                             <div className="flex flex-col gap-2 sm:flex-row">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-full rounded-md border-blue-500/60 px-2 text-xs text-blue-600 sm:h-7 sm:w-auto dark:text-blue-300"
+                                onClick={() => setPoSummaryOpen(true)}
+                              >
+                                <Search className="size-3.5" />
+                                PO Summary
+                              </Button>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1790,6 +1806,11 @@ export function JobFormDialog({
         onFieldKeyDown={handleAiAssistFieldKeyDown}
         onFillDown={() => fillAiAssistColumnDown()}
         onFormatDateForInput={formatAiAssistDateForInput}
+      />
+      <JobPoSummaryDialog
+        open={poSummaryOpen}
+        onOpenChange={setPoSummaryOpen}
+        onSearch={onPoSummarySearch}
       />
     </Dialog>
   )

@@ -1,4 +1,4 @@
-import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
+import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobPoSummaryResult, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
 import type { AiAssistMasterDataMatches } from "./component/job-ai-assist.store"
 
 function buildApiUrl(apiUrl: string, path: string) {
@@ -163,6 +163,31 @@ export async function fetchNextJobNumber({
 
   const payload = await readJsonResponse<NextJobNumber>(response)
   if (!payload.data) throw new Error("The next job number was not returned.")
+  return payload.data
+}
+
+export async function fetchJobPoSummary({
+  apiUrl,
+  accessToken,
+  pono,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  pono: string
+  organizationId?: string
+}): Promise<JobPoSummaryResult> {
+  const url = buildApiUrl(apiUrl, "/api/v1/job/po-summary")
+  url.searchParams.set("pono", pono.trim())
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<JobPoSummaryResult>(response)
+  if (!payload.data) throw new Error("No PO summary was returned for this request.")
   return payload.data
 }
 

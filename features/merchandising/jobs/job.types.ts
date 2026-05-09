@@ -173,6 +173,49 @@ export type JobAiAssistResult = {
   rows: JobAiAssistRow[]
 }
 
+export type JobPoSummaryRow = {
+  id: string
+  jobId: string
+  jobNo: string
+  poNumber: string
+  styleNo: string
+  styleName: string | null
+  sizeName: string
+  colorName: string
+  quantity: number
+  fob: number
+  totalFob: number
+  cmPerDzn: number
+  totalCm: number
+  deliveryDate: string | null
+  cuttingLimitPercentage: number
+  remarks: string | null
+  factoryName: string
+  buyerName: string
+  isActive: boolean
+}
+
+export type JobPoSummaryGroup = {
+  poNumber: string
+  jobCount: number
+  rowCount: number
+  totalQuantity: number
+  totalFob: number
+  totalCm: number
+  rows: JobPoSummaryRow[]
+}
+
+export type JobPoSummaryResult = {
+  search: string
+  totalPoCount: number
+  totalJobCount: number
+  totalRowCount: number
+  totalQuantity: number
+  totalFob: number
+  totalCm: number
+  groups: JobPoSummaryGroup[]
+}
+
 export type NextJobNumber = {
   jobNo: string
   jobSerial: number

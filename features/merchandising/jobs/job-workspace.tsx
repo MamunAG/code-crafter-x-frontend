@@ -29,6 +29,7 @@ import {
   analyzeJobAiAssistFile,
   createJob,
   fetchJob,
+  fetchJobPoSummary,
   fetchJobs,
   fetchNextJobNumber,
   permanentlyDeleteJob,
@@ -37,7 +38,7 @@ import {
   resolveJobAiAssistRow,
   updateJob,
 } from "./job.service"
-import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobRecord, PaginationMeta } from "./job.types"
+import type { JobAiAssistRow, JobDetailFormValues, JobDetailRecord, JobFilterValues, JobFormError, JobFormValues, JobPoSummaryResult, JobRecord, PaginationMeta } from "./job.types"
 
 type JobEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -707,6 +708,27 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }
 
+  async function searchPoSummary(poNumber: string): Promise<JobPoSummaryResult> {
+    const token = window.localStorage.getItem("access_token")
+    if (!token) {
+      handleAuthFailure("Your session expired. Please sign in again.")
+      throw new Error("Your session expired. Please sign in again.")
+    }
+
+    try {
+      return await fetchJobPoSummary({
+        apiUrl,
+        accessToken: token,
+        pono: poNumber,
+        organizationId: selectedOrganizationId || undefined,
+      })
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load PO summary right now."
+      handleAuthFailure(message)
+      throw caughtError
+    }
+  }
+
   function requestSoftDelete(job: JobRecord) {
     if (!accessRules?.canDelete) {
       toast.error("You do not have permission to delete purchase orders.")
@@ -906,6 +928,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         }}
         onAiAssistFileAnalyze={analyzeAiAssistFile}
         onAiAssistRowResolve={({ row, buyerId }) => resolveAiAssistRowMasterData({ row, buyerId })}
+        onPoSummarySearch={searchPoSummary}
         onUseSuggestedJobNo={(nextJobNo) => {
           setEditorValues((currentValues) => ({ ...currentValues, jobNo: nextJobNo }))
           setEditorSuggestedJobNo("")
