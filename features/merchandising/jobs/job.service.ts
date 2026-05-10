@@ -1,4 +1,4 @@
-import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobPoDetailsUploadReport, JobPoSummaryResult, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
+import type { ApiResponse, JobAiAssistResult, JobFilterValues, JobFormValues, JobNumberSummary, JobPoDetailsUploadReport, JobPoSummaryResult, JobRecord, NextJobNumber, PaginatedResponse } from "./job.types"
 import type { AiAssistMasterDataMatches } from "./component/job-ai-assist.store"
 
 function buildApiUrl(apiUrl: string, path: string) {
@@ -113,11 +113,6 @@ function optionalString(value: string) {
   return trimmedValue || undefined
 }
 
-function optionalNumber(value: string) {
-  const trimmedValue = value.trim()
-  return trimmedValue ? Number(trimmedValue) : undefined
-}
-
 function normalizeNumber(value: string) {
   const trimmedValue = value.trim()
   return trimmedValue ? Number(trimmedValue) : 0
@@ -201,6 +196,31 @@ export async function fetchJob({
 
   const payload = await readJsonResponse<JobRecord>(response)
   if (!payload.data) throw new Error("The purchase order record was returned without data.")
+  return payload.data
+}
+
+export async function fetchJobNumbersByBuyer({
+  apiUrl,
+  accessToken,
+  buyerId,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  buyerId: string
+  organizationId?: string
+}): Promise<JobNumberSummary[]> {
+  const url = buildApiUrl(apiUrl, "/api/v1/job/numbers-by-buyer")
+  url.searchParams.set("buyerId", buyerId.trim())
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<JobNumberSummary[]>(response)
+  if (!Array.isArray(payload.data)) throw new Error("The job number list was returned without data.")
   return payload.data
 }
 

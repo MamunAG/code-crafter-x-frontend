@@ -30,10 +30,6 @@ function buildRequestHeaders({
   return headers
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value != null
-}
-
 async function readJsonResponse<T>(response: Response) {
   let payload: ApiResponse<T> | null = null
 
@@ -255,6 +251,7 @@ export async function fetchTnaTasks({
   page,
   limit,
   query,
+  includeInactive = false,
   organizationId,
 }: {
   apiUrl: string
@@ -262,12 +259,13 @@ export async function fetchTnaTasks({
   page: number
   limit: number
   query?: string
+  includeInactive?: boolean
   organizationId?: string
 }): Promise<PaginatedResponse<TnaTaskRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/tna-task")
   url.searchParams.set("page", String(page))
   url.searchParams.set("limit", String(limit))
-  url.searchParams.set("isActive", "true")
+  if (!includeInactive) url.searchParams.set("isActive", "true")
   if (query?.trim()) {
     url.searchParams.set("name", query.trim())
   }
@@ -284,5 +282,77 @@ export async function fetchTnaTasks({
   }
 
   return payload.data
+}
+
+function buildTnaTaskPayload(values: { name: string; isActive: boolean }) {
+  return {
+    name: values.name.trim(),
+    isActive: values.isActive,
+  }
+}
+
+export async function createTnaTask({
+  apiUrl,
+  accessToken,
+  payload,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  payload: { name: string; isActive: boolean }
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/tna-task"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
+    body: JSON.stringify(buildTnaTaskPayload(payload)),
+  })
+
+  const payloadData = await readJsonResponse<TnaTaskRecord>(response)
+  if (!payloadData.data) throw new Error("The TNA task was saved, but the created task was not returned.")
+  return payloadData.data
+}
+
+export async function updateTnaTask({
+  apiUrl,
+  accessToken,
+  id,
+  payload,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  payload: { name: string; isActive: boolean }
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/tna-task/${id}`), {
+    method: "PATCH",
+    headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
+    body: JSON.stringify(buildTnaTaskPayload(payload)),
+  })
+
+  const payloadData = await readJsonResponse<TnaTaskRecord>(response)
+  if (!payloadData.data) throw new Error("The TNA task was updated, but the updated task was not returned.")
+  return payloadData.data
+}
+
+export async function deleteTnaTask({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/tna-task/${id}`), {
+    method: "DELETE",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+  })
+
+  await readJsonResponse(response)
 }
 

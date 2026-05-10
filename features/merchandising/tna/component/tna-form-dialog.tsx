@@ -3,18 +3,18 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
+import type { DragEvent } from "react"
 import { z } from "zod"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, type AppComboboxOption } from "@/components/app-combobox"
-import { AppSelect } from "@/components/app-select"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import type { TnaDetailFormValues, TnaFormValues, TnaTaskRecord } from "../tna.types"
@@ -23,6 +23,8 @@ type TnaEditorMode = "create" | "edit"
 
 type BuyerOption = AppComboboxOption
 type JobOption = AppComboboxOption
+type TaskOption = AppComboboxOption
+type TnaDetailTableRow = TnaDetailFormValues
 
 type TnaFormDialogProps = {
   open: boolean
@@ -38,11 +40,42 @@ type TnaFormDialogProps = {
   loadBuyerOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<BuyerOption>>
   loadJobOptions: (params: AppComboboxLoadParams, buyerId?: string) => Promise<AppComboboxLoadResult<JobOption>>
   onOpenChange: (open: boolean) => void
+  onNewTask?: () => void
   onSubmit: (values: TnaFormValues) => void | Promise<void>
 }
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_ROW_LIMIT = 12
+const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
+
+function DetailTableError({ message }: { message: string }) {
+  if (!message) return null
+  return <p className="pt-1 text-[10px] leading-3 text-red-600 dark:text-red-300">{message}</p>
+}
+
+function getDetailHeaderClass(columnId: string) {
+  const baseClass = "px-1.5 py-2 text-left font-medium whitespace-nowrap text-foreground"
+
+  if (columnId === "position") return `w-12 ${baseClass}`
+  if (columnId === "taskId") return `min-w-56 ${baseClass}`
+  if (columnId === "executionDate") return `min-w-40 ${baseClass}`
+  if (columnId === "days") return `w-28 ${baseClass}`
+  if (columnId === "relationFormula") return `min-w-64 ${baseClass}`
+  if (columnId === "actions") return `w-16 ${baseClass} text-right`
+
+  return baseClass
+}
+
+function getDetailCellClass(columnId: string) {
+  if (columnId === "position") return "px-1.5 py-1 align-middle text-xs whitespace-nowrap"
+  if (columnId === "taskId") return "min-w-56 px-1.5 py-1 align-top"
+  if (columnId === "executionDate") return "min-w-40 px-1.5 py-1 align-top"
+  if (columnId === "days") return "w-28 px-1.5 py-1 align-top"
+  if (columnId === "relationFormula") return "min-w-64 px-1.5 py-1 align-top"
+  if (columnId === "actions") return "px-1.5 py-1 text-right align-middle"
+
+  return "px-1.5 py-1 align-top"
+}
 
 const tnaFormSchema = z.object({
   buyerId: z.string().trim().min(1, "Buyer is required."),
@@ -126,11 +159,16 @@ export function TnaFormDialog({
   loadBuyerOptions,
   loadJobOptions,
   onOpenChange,
+  onNewTask,
   onSubmit,
 }: TnaFormDialogProps) {
   const isMobile = useIsMobile()
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(initialBuyer)
   const [selectedJob, setSelectedJob] = useState<JobOption | null>(initialJob)
+  const [jobOptions, setJobOptions] = useState<JobOption[]>(initialJob ? [initialJob] : [])
+  const [jobOptionsLoading, setJobOptionsLoading] = useState(false)
+  const [jobOptionsError, setJobOptionsError] = useState("")
+  const [jobOpen, setJobOpen] = useState(false)
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
@@ -151,7 +189,9 @@ export function TnaFormDialog({
     shouldFocusError: true,
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const [draggingDetailId, setDraggingDetailId] = useState("")
+
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: "tnaDetails",
   })
@@ -161,24 +201,62 @@ export function TnaFormDialog({
       reset(initialValues)
       setSelectedBuyer(initialBuyer)
       setSelectedJob(initialJob)
+      setJobOptions(initialJob ? [initialJob] : [])
+      setJobOpen(false)
       return
     }
 
     reset(initialValues)
     setSelectedBuyer(initialBuyer)
     setSelectedJob(initialJob)
+    setJobOptions(initialJob ? [initialJob] : [])
+    setJobOpen(false)
   }, [initialBuyer, initialJob, initialValues, open, reset])
 
   useEffect(() => {
     if (!selectedBuyerId) {
       setSelectedJob(null)
+      setJobOptions([])
+      setJobOpen(false)
     }
   }, [selectedBuyerId])
 
-  const loadBuyerScopedJobOptions = useMemo(
-    () => (params: AppComboboxLoadParams) => loadJobOptions(params, selectedBuyerId || undefined),
-    [loadJobOptions, selectedBuyerId],
-  )
+  useEffect(() => {
+    if (!open || !selectedBuyerId) {
+      return
+    }
+
+    let active = true
+
+    async function loadBuyerJobs() {
+      setJobOptionsLoading(true)
+      setJobOptionsError("")
+
+      try {
+        const result = await loadJobOptions({ query: "", page: 1, limit: 100 }, selectedBuyerId)
+        const nextItems = Array.isArray(result) ? result : result.items
+
+        if (active) {
+          setJobOptions(nextItems)
+        }
+      } catch (caughtError) {
+        if (active) {
+          setJobOptions([])
+          setJobOptionsError(caughtError instanceof Error ? caughtError.message : "Unable to load jobs for the selected buyer.")
+        }
+      } finally {
+        if (active) {
+          setJobOptionsLoading(false)
+        }
+      }
+    }
+
+    void loadBuyerJobs()
+
+    return () => {
+      active = false
+    }
+  }, [loadJobOptions, open, selectedBuyerId])
 
   const summary = useMemo(() => buildSummary(errors as Record<string, unknown>), [errors])
   const visibleSummary = isMobile ? summary.slice(0, MOBILE_MAX_SUMMARY_ERRORS) : summary
@@ -187,23 +265,182 @@ export function TnaFormDialog({
   function handleInvalid() {
     const firstErrorField =
       errors.buyerId ? "buyerId" :
-      errors.jobId ? "jobId" :
-      errors.leadTime ? "leadTime" :
-      null
+        errors.jobId ? "jobId" :
+          errors.leadTime ? "leadTime" :
+            null
 
     if (firstErrorField) {
       setFocus(firstErrorField as keyof TnaFormValues)
     }
   }
 
+  function reorderDetail(sourceId: string, targetId: string) {
+    if (!sourceId || sourceId === targetId) {
+      return
+    }
+
+    const sourceIndex = fields.findIndex((field) => field.id === sourceId)
+    const targetIndex = fields.findIndex((field) => field.id === targetId)
+
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return
+    }
+
+    move(sourceIndex, targetIndex)
+  }
+
+  function handleDetailDragStart(event: DragEvent<HTMLElement>, detailId: string) {
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", detailId)
+    setDraggingDetailId(detailId)
+  }
+
+  function handleDetailDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+  }
+
+  function handleDetailDrop(event: DragEvent<HTMLElement>, targetId: string) {
+    event.preventDefault()
+    reorderDetail(event.dataTransfer.getData("text/plain") || draggingDetailId, targetId)
+    setDraggingDetailId("")
+  }
+
+  const taskComboboxOptions = useMemo<TaskOption[]>(
+    () => taskOptions.map((task) => ({ value: task.id, label: task.name })),
+    [taskOptions],
+  )
+
+  const detailColumns = useMemo<ColumnDef<TnaDetailTableRow>[]>(
+    () => [
+      {
+        id: "position",
+        header: "#",
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              draggable
+              onDragStart={(event) => handleDetailDragStart(event, row.original.id)}
+              onDragEnd={() => setDraggingDetailId("")}
+              className="flex size-6 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
+              aria-label={`Drag row ${row.index + 1}`}
+            >
+              <GripVertical className="size-3.5" />
+            </button>
+            <span>{row.index + 1}</span>
+          </div>
+        ),
+      },
+      {
+        id: "taskId",
+        header: () => <>Task <span className="text-destructive">*</span></>,
+        cell: ({ row }) => (
+          <Controller
+            name={`tnaDetails.${row.index}.taskId`}
+            control={control}
+            render={({ field: taskField }) => (
+              <div className="space-y-1">
+                <AppCombobox
+                  value={taskComboboxOptions.find((task) => task.value === taskField.value) ?? null}
+                  onValueChange={(task) => taskField.onChange(task?.value ?? "")}
+                  items={taskComboboxOptions}
+                  placeholder="Select task"
+                  loadingMessage="Loading tasks..."
+                  emptyMessage="No tasks match your search."
+                  disabled={taskOptionsLoading}
+                  showClear={Boolean(taskField.value)}
+                  inputClassName={DETAIL_TABLE_INPUT_CLASS}
+                  contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                />
+                <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "taskId")} />
+              </div>
+            )}
+          />
+        ),
+      },
+      {
+        id: "executionDate",
+        header: () => <>Execution date <span className="text-destructive">*</span></>,
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <Input
+              type="date"
+              className={DETAIL_TABLE_INPUT_CLASS}
+              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "executionDate"))}
+              {...register(`tnaDetails.${row.index}.executionDate`)}
+            />
+            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "executionDate")} />
+          </div>
+        ),
+      },
+      {
+        id: "days",
+        header: () => <>Days <span className="text-destructive">*</span></>,
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <Input
+              type="number"
+              min={0}
+              step="1"
+              className={DETAIL_TABLE_INPUT_CLASS}
+              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "days"))}
+              {...register(`tnaDetails.${row.index}.days`)}
+            />
+            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "days")} />
+          </div>
+        ),
+      },
+      {
+        id: "relationFormula",
+        header: () => <>Relation formula <span className="text-destructive">*</span></>,
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <Input
+              className={DETAIL_TABLE_INPUT_CLASS}
+              placeholder="lead_time - 7"
+              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "relationFormula"))}
+              {...register(`tnaDetails.${row.index}.relationFormula`)}
+            />
+            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "relationFormula")} />
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Action",
+        cell: ({ row }) => (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 rounded-md text-destructive hover:text-destructive"
+            onClick={() => remove(row.index)}
+            disabled={fields.length <= 1}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        ),
+      },
+    ],
+    [control, errors, fields.length, register, remove, taskComboboxOptions, taskOptionsLoading],
+  )
+
+  const detailTable = useReactTable({
+    data: fields,
+    columns: detailColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+  })
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 overflow-hidden rounded-none p-0 sm:left-1/2 sm:top-1/2 sm:h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
         <form
-          className="flex max-h-[calc(100vh-2rem)] flex-col"
+          className="flex h-full max-h-[100dvh] flex-col sm:max-h-[calc(100vh-2rem)]"
           onSubmit={handleSubmit(onSubmit, handleInvalid)}
         >
-          <div className="border-b border-slate-200/70 px-6 pb-4 pt-6 dark:border-white/10">
+          <div className="border-b border-slate-200/70 px-4 pb-4 pt-5 sm:px-6 sm:pt-6 dark:border-white/10">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>{description}</DialogDescription>
@@ -232,17 +469,16 @@ export function TnaFormDialog({
           </div>
 
           <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-5 px-6 py-5">
+            <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-5">
               {loading ? (
                 <div className="space-y-4 py-2">
                   <Skeleton className="h-11 w-full rounded-xl" />
                   <Skeleton className="h-11 w-full rounded-xl" />
                   <Skeleton className="h-11 w-full rounded-xl" />
-                  <Skeleton className="h-56 w-full rounded-2xl" />
                 </div>
               ) : (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 md:grid-cols-3">
                     <Controller
                       name="buyerId"
                       control={control}
@@ -285,7 +521,10 @@ export function TnaFormDialog({
                           <AppCombobox
                             value={selectedJob}
                             key={selectedBuyerId || "buyer-empty"}
+                            open={jobOpen}
+                            items={jobOptions}
                             onOpenChange={(open) => {
+                              setJobOpen(open)
                               if (!open && !field.value) {
                                 setSelectedJob(null)
                               }
@@ -293,14 +532,13 @@ export function TnaFormDialog({
                             onValueChange={(job) => {
                               setSelectedJob(job)
                               field.onChange(job?.value ?? "")
+                              setJobOpen(false)
                             }}
-                            loadItems={loadBuyerScopedJobOptions}
-                            initialLimit={10}
-                            searchLimit={10}
                             inputProps={{ id: "tna-job", "aria-invalid": Boolean(errors.jobId) }}
                             placeholder={selectedBuyerId ? "Search job" : "Select buyer first"}
+                            loading={jobOptionsLoading}
                             loadingMessage="Loading jobs..."
-                            emptyMessage={selectedBuyerId ? "No jobs match your search." : "Select a buyer to load matching jobs."}
+                            emptyMessage={jobOptionsError || (selectedBuyerId ? "No jobs match your search." : "Select a buyer to load matching jobs.")}
                             showClear={Boolean(field.value)}
                             disabled={!selectedBuyerId}
                             contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
@@ -309,148 +547,205 @@ export function TnaFormDialog({
                         </div>
                       )}
                     />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label htmlFor="tna-leadTime" className="text-sm font-medium">
-                        Lead time <span className="text-destructive">*</span>
-                      </label>
-                      <Input
-                        id="tna-leadTime"
-                        type="number"
-                        min={0}
-                        step="1"
-                        placeholder="Input lead time"
-                        aria-invalid={Boolean(errors.leadTime)}
-                        {...register("leadTime")}
-                      />
-                      <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">{getErrorMessage(errors.leadTime?.message)}</p>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Details</p>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Add timeline rows for the selected TNA task sequence.
-                      </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label htmlFor="tna-leadTime" className="text-sm font-medium">
+                          Lead time <span className="text-destructive">*</span>
+                        </label>
+                        <Input
+                          id="tna-leadTime"
+                          type="number"
+                          min={0}
+                          step="1"
+                          placeholder="Input lead time"
+                          aria-invalid={Boolean(errors.leadTime)}
+                          {...register("leadTime")}
+                        />
+                        <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">{getErrorMessage(errors.leadTime?.message)}</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                    <div className="flex items-center justify-between gap-3">
+
+
+                  <div className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">TNA detail rows</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           Each row links a task to an execution date and formula.
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={() => append(emptyDetailRow())}
-                        disabled={fields.length >= DETAIL_ROW_LIMIT}
-                      >
-                        <Plus className="size-3.5" />
-                        Add row
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        {onNewTask ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full rounded-xl sm:w-auto"
+                            onClick={onNewTask}
+                          >
+                            <Plus className="size-3.5" />
+                            New Task
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl sm:w-auto"
+                          onClick={() => append(emptyDetailRow())}
+                          disabled={fields.length >= DETAIL_ROW_LIMIT}
+                        >
+                          <Plus className="size-3.5" />
+                          Add row
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="space-y-4">
-                      {fields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/40"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl text-destructive hover:text-destructive"
-                              onClick={() => remove(index)}
-                              disabled={fields.length <= 1}
-                            >
-                              <Trash2 className="size-3.5" />
-                              Remove
-                            </Button>
-                          </div>
+                    <div className="space-y-3 lg:hidden">
+                        {fields.map((field, index) => (
+                          <div
+                            key={field.id}
+                            onDragOver={handleDetailDragOver}
+                            onDrop={(event) => handleDetailDrop(event, field.id)}
+                            className={`rounded-lg border border-slate-200 bg-white p-3 transition-opacity dark:border-white/10 dark:bg-slate-950/40 ${draggingDetailId === field.id ? "opacity-60" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  draggable
+                                  onDragStart={(event) => handleDetailDragStart(event, field.id)}
+                                  onDragEnd={() => setDraggingDetailId("")}
+                                  className="flex size-7 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
+                                  aria-label={`Drag row ${index + 1}`}
+                                >
+                                  <GripVertical className="size-3.5" />
+                                </button>
+                                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 rounded-md text-destructive hover:text-destructive"
+                                onClick={() => remove(index)}
+                                disabled={fields.length <= 1}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
 
-                          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <Controller
-                              name={`tnaDetails.${index}.taskId`}
-                              control={control}
-                              render={({ field: taskField }) => (
-                                <div className="space-y-2">
+                            <div className="mt-3 space-y-3">
+                              <Controller
+                                name={`tnaDetails.${index}.taskId`}
+                                control={control}
+                                render={({ field: taskField }) => (
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                      Task <span className="text-destructive">*</span>
+                                    </label>
+                                    <AppCombobox
+                                      value={taskComboboxOptions.find((task) => task.value === taskField.value) ?? null}
+                                      onValueChange={(task) => taskField.onChange(task?.value ?? "")}
+                                      items={taskComboboxOptions}
+                                      placeholder="Select task"
+                                      loadingMessage="Loading tasks..."
+                                      emptyMessage="No tasks match your search."
+                                      disabled={taskOptionsLoading}
+                                      showClear={Boolean(taskField.value)}
+                                      inputClassName="h-9 rounded-md px-2 text-xs"
+                                      contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                                    />
+                                    <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                      {detailErrorAt(errors as Record<string, unknown>, index, "taskId")}
+                                    </p>
+                                  </div>
+                                )}
+                              />
+
+                              <div className="grid gap-3 min-[420px]:grid-cols-2">
+                                <div className="space-y-1.5">
                                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    Task <span className="text-destructive">*</span>
+                                    Execution date <span className="text-destructive">*</span>
                                   </label>
-                                  <AppSelect
-                                    value={taskField.value}
-                                    onValueChange={taskField.onChange}
-                                    options={taskOptions.map((task) => ({ value: task.id, label: task.name }))}
-                                    placeholder="Select task"
-                                    disabled={taskOptionsLoading}
-                                    triggerClassName="h-10 rounded-xl px-3 text-sm"
+                                  <Input
+                                    type="date"
+                                    className="h-9 rounded-md px-2 text-xs"
+                                    aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
+                                    {...register(`tnaDetails.${index}.executionDate`)}
                                   />
-                                  <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">
-                                    {detailErrorAt(errors as Record<string, unknown>, index, "taskId")}
+                                  <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                    {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
                                   </p>
                                 </div>
-                              )}
-                            />
 
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                Execution date <span className="text-destructive">*</span>
-                              </label>
-                              <Input
-                                type="date"
-                                className="h-10 rounded-xl"
-                                aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
-                                {...register(`tnaDetails.${index}.executionDate`)}
-                              />
-                              <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">
-                                {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
-                              </p>
-                            </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                    Days <span className="text-destructive">*</span>
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    className="h-9 rounded-md px-2 text-xs"
+                                    aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
+                                    {...register(`tnaDetails.${index}.days`)}
+                                  />
+                                  <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                    {detailErrorAt(errors as Record<string, unknown>, index, "days")}
+                                  </p>
+                                </div>
+                              </div>
 
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                Days <span className="text-destructive">*</span>
-                              </label>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="1"
-                                className="h-10 rounded-xl"
-                                aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
-                                {...register(`tnaDetails.${index}.days`)}
-                              />
-                              <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">
-                                {detailErrorAt(errors as Record<string, unknown>, index, "days")}
-                              </p>
-                            </div>
-
-                            <div className="space-y-2 xl:col-span-2">
-                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                Relation formula <span className="text-destructive">*</span>
-                              </label>
-                              <Textarea
-                                rows={2}
-                                className="min-h-10 rounded-xl"
-                                placeholder="lead_time - 7"
-                                aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "relationFormula"))}
-                                {...register(`tnaDetails.${index}.relationFormula`)}
-                              />
-                              <p className="text-[11px] leading-5 text-red-600 dark:text-red-300">
-                                {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
-                              </p>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                  Relation formula <span className="text-destructive">*</span>
+                                </label>
+                                <Input
+                                  className="h-9 rounded-md px-2 text-xs"
+                                  placeholder="lead_time - 7"
+                                  aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "relationFormula"))}
+                                  {...register(`tnaDetails.${index}.relationFormula`)}
+                                />
+                                <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                  {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+
+                    <div className="hidden w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-md border border-slate-200/70 bg-white pb-2 [scrollbar-gutter:stable] lg:block dark:border-white/10 dark:bg-slate-950/40">
+                      <table className="w-full min-w-[920px] border-collapse text-xs">
+                        <thead>
+                          {detailTable.getHeaderGroups().map((headerGroup) => (
+                            <tr key={headerGroup.id} className="h-9 border-b hover:bg-transparent">
+                              {headerGroup.headers.map((header) => (
+                                <th key={header.id} className={getDetailHeaderClass(header.column.id)}>
+                                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                </th>
+                              ))}
+                            </tr>
+                          ))}
+                        </thead>
+                        <tbody>
+                          {detailTable.getRowModel().rows.map((row) => (
+                            <tr
+                              key={row.id}
+                              onDragOver={handleDetailDragOver}
+                              onDrop={(event) => handleDetailDrop(event, row.original.id)}
+                              className={`h-10 border-b align-top transition-colors hover:bg-muted/50 ${draggingDetailId === row.original.id ? "opacity-60" : ""}`}
+                            >
+                              {row.getVisibleCells().map((cell) => (
+                                <td key={cell.id} className={getDetailCellClass(cell.column.id)}>
+                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </>
@@ -458,7 +753,7 @@ export function TnaFormDialog({
             </div>
           </ScrollArea>
 
-          <div className="border-t border-slate-200/70 px-6 py-4 dark:border-white/10">
+          <div className="border-t border-slate-200/70 px-4 py-4 sm:px-6 dark:border-white/10">
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
                 Cancel

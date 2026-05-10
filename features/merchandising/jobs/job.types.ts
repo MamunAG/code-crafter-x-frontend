@@ -113,6 +113,11 @@ export type JobRecord = {
   deleted_at?: string | null
 }
 
+export type JobNumberSummary = {
+  id: string
+  jobNo?: string | null
+}
+
 export type JobFilterValues = {
   factoryId: string
   buyerId: string

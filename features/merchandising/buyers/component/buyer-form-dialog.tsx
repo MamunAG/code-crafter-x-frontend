@@ -228,9 +228,9 @@ export function BuyerFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 overflow-hidden rounded-none p-0 sm:left-1/2 sm:top-1/2 sm:h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
         <form
-          className="flex max-h-[calc(100vh-2rem)] flex-col"
+          className="flex h-full max-h-[100dvh] flex-col sm:max-h-[calc(100vh-2rem)]"
           onSubmit={handleSubmit(handleValidSubmit, handleInvalidSubmit)}
         >
           <div className="border-b border-slate-200/70 px-6 pb-4 pt-6 dark:border-white/10">

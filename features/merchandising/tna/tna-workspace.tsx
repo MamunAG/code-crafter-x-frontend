@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
@@ -14,13 +14,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
-import { fetchJobs } from "@/features/merchandising/jobs/job.service"
+import { fetchJobNumbersByBuyer } from "@/features/merchandising/jobs/job.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
 import { ActiveTnaSection } from "./component/active-tna-section"
 import { DeletedTnaSection } from "./component/deleted-tna-section"
 import { TnaFormDialog } from "./component/tna-form-dialog"
+import { TnaTaskFromDialog } from "./component/tna-task-from-dialog"
 import { createTna, fetchTnaRecord, fetchTnaRecords, fetchTnaTasks, permanentlyDeleteTna, restoreTna, softDeleteTna, updateTna } from "./tna.service"
 import type { PaginationMeta, TnaFilterValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "./tna.types"
 
@@ -186,6 +187,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
   const [pendingActionWorking, setPendingActionWorking] = useState(false)
   const [taskOptions, setTaskOptions] = useState<TnaTaskRecord[]>([])
   const [taskOptionsLoading, setTaskOptionsLoading] = useState(true)
+  const [taskManagerOpen, setTaskManagerOpen] = useState(false)
 
   const handleAuthFailure = useCallback(
     (message: string) => {
@@ -200,6 +202,27 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
   )
 
   const triggerRefresh = useCallback(() => setRefreshVersion((current) => current + 1), [])
+
+  const loadTaskOptions = useCallback(async () => {
+    setTaskOptionsLoading(true)
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      const response = await fetchTnaTasks({ apiUrl, accessToken: token, page: 1, limit: 100, organizationId: selectedOrganizationId || undefined })
+      setTaskOptions(response.items)
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load TNA tasks right now."
+      if (!handleAuthFailure(message)) {
+        setTaskOptions([])
+      }
+    } finally {
+      setTaskOptionsLoading(false)
+    }
+  }, [apiUrl, handleAuthFailure, selectedOrganizationId])
 
   useEffect(() => {
     function handleOrganizationChange(event: Event) {
@@ -267,7 +290,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const response = await fetchTnaTasks({ apiUrl, accessToken: token, page: 1, limit: 1000, organizationId: selectedOrganizationId || undefined })
+        const response = await fetchTnaTasks({ apiUrl, accessToken: token, page: 1, limit: 100, organizationId: selectedOrganizationId || undefined })
         if (active) {
           setTaskOptions(response.items)
         }
@@ -409,7 +432,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
 
   const loadJobOptions = useCallback(
     async (
-      { query, page: _pageNumber, limit: pageLimit }: AppComboboxLoadParams,
+      { query }: AppComboboxLoadParams,
       buyerId?: string,
     ): Promise<AppComboboxLoadResult<AppComboboxOption>> => {
       const token = window.localStorage.getItem("access_token")
@@ -422,30 +445,23 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
         }
       }
 
-      const response = await fetchJobs({
+      const jobs = await fetchJobNumbersByBuyer({
         apiUrl,
         accessToken: token,
-        page: 1,
-        limit: Math.max(pageLimit * 20, 200),
-        filters: { buyerId: buyerId.trim(), isActive: "true", pono: "" },
+        buyerId: buyerId.trim(),
         organizationId: selectedOrganizationId || undefined,
       })
 
       const normalizedQuery = query.trim().toLowerCase()
-      const items = response.items
+      const items = jobs
         .filter((job) => {
           if (!normalizedQuery) return true
-          const buyerLabel = job.buyer?.displayName?.trim() || job.buyer?.name?.trim() || ""
           const jobLabel = job.jobNo?.trim() || ""
-          const poLabels = (job.jobDetails ?? [])
-            .map((detail) => detail.purchaseOrder?.pono?.trim())
-            .filter((value): value is string => Boolean(value))
-            .join(" ")
-          return [buyerLabel, jobLabel, poLabels].join(" ").toLowerCase().includes(normalizedQuery)
+          return jobLabel.toLowerCase().includes(normalizedQuery)
         })
         .map((job) => ({
           value: job.id,
-          label: [job.jobNo?.trim() || job.id, job.buyer?.displayName?.trim() || job.buyer?.name?.trim() || ""].filter(Boolean).join(" - "),
+          label: job.jobNo?.trim() || job.id,
         }))
 
       return {
@@ -880,6 +896,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
         taskOptionsLoading={taskOptionsLoading}
         loadBuyerOptions={loadBuyerOptions}
         loadJobOptions={loadJobOptions}
+        onNewTask={() => setTaskManagerOpen(true)}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {
@@ -893,6 +910,14 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
           }
         }}
         onSubmit={submitEditor}
+      />
+
+      <TnaTaskFromDialog
+        open={taskManagerOpen}
+        apiUrl={apiUrl}
+        organizationId={selectedOrganizationId || undefined}
+        onOpenChange={setTaskManagerOpen}
+        onTasksChanged={loadTaskOptions}
       />
 
       <DeleteConfirmDialog
