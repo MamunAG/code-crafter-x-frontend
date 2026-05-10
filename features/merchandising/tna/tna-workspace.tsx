@@ -883,7 +883,6 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
       </ScrollArea>
 
       <TnaFormDialog
-        key={`${editorOpen ? "open" : "closed"}-${editorMode}-${editingId ?? "new"}`}
         open={editorOpen}
         mode={editorMode}
         loading={editorLoading}

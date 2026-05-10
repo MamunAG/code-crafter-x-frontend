@@ -13,7 +13,6 @@ import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, ty
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
@@ -45,7 +44,6 @@ type TnaFormDialogProps = {
 }
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
-const DETAIL_ROW_LIMIT = 12
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
 
 function DetailTableError({ message }: { message: string }) {
@@ -87,7 +85,7 @@ const tnaFormSchema = z.object({
       taskId: z.string().trim().min(1, "Task is required."),
       executionDate: z.string().trim().min(1, "Execution date is required."),
       days: z.string().trim().min(1, "Days are required.").refine((value) => Number.isFinite(Number(value)) && Number(value) >= 0, "Days must be a number greater than or equal to zero."),
-      relationFormula: z.string().trim().min(1, "Relation formula is required."),
+      relationFormula: z.string().trim(),
     }),
   ).min(1, "At least one task row is required."),
 })
@@ -393,7 +391,7 @@ export function TnaFormDialog({
       },
       {
         id: "relationFormula",
-        header: () => <>Relation formula <span className="text-destructive">*</span></>,
+        header: "Relation formula",
         cell: ({ row }) => (
           <div className="space-y-1">
             <Input
@@ -468,8 +466,8 @@ export function TnaFormDialog({
             ) : null}
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+            <div className="flex min-h-full flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5 lg:h-full lg:min-h-0">
               {loading ? (
                 <div className="space-y-4 py-2">
                   <Skeleton className="h-11 w-full rounded-xl" />
@@ -477,7 +475,7 @@ export function TnaFormDialog({
                   <Skeleton className="h-11 w-full rounded-xl" />
                 </div>
               ) : (
-                <>
+                <div className="flex min-h-0 flex-1 flex-col gap-5">
                   <div className="grid gap-4 md:grid-cols-3">
                     <Controller
                       name="buyerId"
@@ -568,8 +566,8 @@ export function TnaFormDialog({
 
 
 
-                  <div className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden dark:border-white/10 dark:bg-white/[0.03]">
+                    <div className="sticky top-0 z-30 -mx-3 -mt-3 flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-white/10 dark:bg-slate-950/95">
                       <div>
                         <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">TNA detail rows</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -593,7 +591,6 @@ export function TnaFormDialog({
                           variant="outline"
                           className="w-full rounded-xl sm:w-auto"
                           onClick={() => append(emptyDetailRow())}
-                          disabled={fields.length >= DETAIL_ROW_LIMIT}
                         >
                           <Plus className="size-3.5" />
                           Add row
@@ -699,7 +696,7 @@ export function TnaFormDialog({
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Relation formula <span className="text-destructive">*</span>
+                                  Relation formula
                                 </label>
                                 <Input
                                   className="h-9 rounded-md px-2 text-xs"
@@ -716,13 +713,13 @@ export function TnaFormDialog({
                         ))}
                       </div>
 
-                    <div className="hidden w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-md border border-slate-200/70 bg-white pb-2 [scrollbar-gutter:stable] lg:block dark:border-white/10 dark:bg-slate-950/40">
+                    <div className="hidden w-full max-w-full min-w-0 overflow-auto overscroll-contain rounded-md border border-slate-200/70 bg-white pb-2 [scrollbar-gutter:stable] lg:block lg:min-h-0 lg:flex-1 dark:border-white/10 dark:bg-slate-950/40">
                       <table className="w-full min-w-[920px] border-collapse text-xs">
                         <thead>
                           {detailTable.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id} className="h-9 border-b hover:bg-transparent">
                               {headerGroup.headers.map((header) => (
-                                <th key={header.id} className={getDetailHeaderClass(header.column.id)}>
+                                <th key={header.id} className={`${getDetailHeaderClass(header.column.id)} sticky top-0 z-20 bg-white shadow-[inset_0_-1px_0_rgba(226,232,240,0.9)] dark:bg-slate-950`}>
                                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                                 </th>
                               ))}
@@ -748,10 +745,10 @@ export function TnaFormDialog({
                       </table>
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="border-t border-slate-200/70 px-4 py-4 sm:px-6 dark:border-white/10">
             <DialogFooter>

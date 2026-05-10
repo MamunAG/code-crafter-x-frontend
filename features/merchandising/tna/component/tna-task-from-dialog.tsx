@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 
 import { createTnaTask, deleteTnaTask, fetchTnaTasks, updateTnaTask } from "../tna.service"
@@ -252,8 +251,8 @@ export function TnaTaskFromDialog({
               </DialogHeader>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+              <div className="grid min-h-full gap-4 px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
                 <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-slate-200/80 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                   <div>
                     <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">{editingId ? "Edit task" : "New task"}</p>
@@ -303,7 +302,7 @@ export function TnaTaskFromDialog({
                   </div>
                 </form>
 
-                <div className="min-w-0 rounded-lg border border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-950/40">
+                <div className="flex min-h-0 min-w-0 flex-col rounded-lg border border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-950/40">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 px-4 py-3 dark:border-white/10">
                     <div>
                       <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Saved tasks</p>
@@ -314,7 +313,7 @@ export function TnaTaskFromDialog({
                     </Button>
                   </div>
 
-                  <div className="w-full overflow-x-auto">
+                  <div className="min-h-0 w-full flex-1 overflow-auto">
                     <table className="w-full min-w-[560px] border-collapse text-xs">
                       <thead>
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -322,7 +321,7 @@ export function TnaTaskFromDialog({
                             {headerGroup.headers.map((header) => (
                               <th
                                 key={header.id}
-                                className={`px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300 ${header.column.id === "actions" ? "text-right" : ""}`}
+                                className={`sticky top-0 z-10 bg-white px-3 py-2 text-left font-medium text-slate-600 shadow-[inset_0_-1px_0_rgba(226,232,240,0.9)] dark:bg-slate-950 dark:text-slate-300 ${header.column.id === "actions" ? "text-right" : ""}`}
                               >
                                 {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                               </th>
@@ -359,7 +358,7 @@ export function TnaTaskFromDialog({
                   </div>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
