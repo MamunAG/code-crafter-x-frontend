@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 
 import { createTnaTask, deleteTnaTask, fetchTnaTasks, updateTnaTask } from "../tna.service"
@@ -313,7 +314,7 @@ export function TnaTaskFromDialog({
                     </Button>
                   </div>
 
-                  <div className="min-h-0 w-full flex-1 overflow-auto">
+                  <ScrollArea className="min-h-0 w-full flex-1" viewportClassName="overflow-auto">
                     <table className="w-full min-w-[560px] border-collapse text-xs">
                       <thead>
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -355,7 +356,7 @@ export function TnaTaskFromDialog({
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </ScrollArea>
                 </div>
               </div>
             </div>
