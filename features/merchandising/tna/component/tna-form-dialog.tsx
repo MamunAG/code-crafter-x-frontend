@@ -59,9 +59,24 @@ type DetailTableFieldErrorProps = {
   field: keyof TnaDetailFormValues
 }
 
+type DaysInputCellProps = {
+  ariaInvalid?: boolean
+  className: string
+  control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  index: number
+  register: ReturnType<typeof useForm<TnaFormValues>>["register"]
+}
+
+type LeadTimeWarning = {
+  leadTime: number
+  overBy: number
+  planDays: number
+}
+
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
 const CALCULATED_DAYS_INPUT_CLASS = "bg-slate-50 text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"
+const EXCEEDING_DAYS_INPUT_CLASS = "border-amber-400 bg-amber-50 font-semibold text-amber-900 shadow-[0_0_0_1px_rgba(245,158,11,0.18)] dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100"
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onOpenFormula }: FormulaButtonCellProps) {
@@ -82,6 +97,28 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
         {renderFormulaLabel(formula)}
       </span>
     </Button>
+  )
+}
+
+function DaysInputCell({ ariaInvalid = false, className, control, index, register }: DaysInputCellProps) {
+  const days = useWatch({ control, name: `tnaDetails.${index}.days` }) ?? ""
+  const leadTime = useWatch({ control, name: "leadTime" }) ?? ""
+  const daysNumber = getFiniteNumber(days)
+  const leadTimeNumber = getFiniteNumber(leadTime)
+  const exceedsLeadTime = daysNumber !== null && leadTimeNumber !== null && daysNumber > leadTimeNumber
+  const overBy = daysNumber !== null && leadTimeNumber !== null ? daysNumber - leadTimeNumber : 0
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      step="1"
+      readOnly
+      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Calculated from the first execution date"}
+      className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : CALCULATED_DAYS_INPUT_CLASS}`}
+      aria-invalid={ariaInvalid}
+      {...register(`tnaDetails.${index}.days`)}
+    />
   )
 }
 
@@ -164,13 +201,53 @@ function parseDateOnly(value: string) {
   return date
 }
 
-function getExecutionDateDayDifference(currentDateValue: string, previousDateValue: string) {
+function getFiniteNumber(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) return null
+
+  const numberValue = Number(trimmedValue)
+  return Number.isFinite(numberValue) ? numberValue : null
+}
+
+function getInclusivePlanDay(startDateValue: string, currentDateValue: string) {
   const currentDate = parseDateOnly(currentDateValue)
-  const previousDate = parseDateOnly(previousDateValue)
+  const startDate = parseDateOnly(startDateValue)
 
-  if (!currentDate || !previousDate) return null
+  if (!currentDate || !startDate) return null
 
-  return Math.abs(Math.round((currentDate.getTime() - previousDate.getTime()) / MS_PER_DAY))
+  return Math.abs(Math.round((currentDate.getTime() - startDate.getTime()) / MS_PER_DAY)) + 1
+}
+
+function getCalculatedDetailDays(details: TnaDetailFormValues[], index: number) {
+  if (index === 0) return "1"
+
+  const planDay = getInclusivePlanDay(details[0]?.executionDate ?? "", details[index]?.executionDate ?? "")
+  return planDay === null ? null : String(planDay)
+}
+
+function getDetailsWithCalculatedDays(details: TnaDetailFormValues[]) {
+  return details.map((detail, index) => {
+    const nextDays = getCalculatedDetailDays(details, index)
+    return nextDays && nextDays !== detail.days ? { ...detail, days: nextDays } : detail
+  })
+}
+
+function getLeadTimeWarning(details: TnaDetailFormValues[], leadTimeValue: string): LeadTimeWarning | null {
+  const leadTime = getFiniteNumber(leadTimeValue)
+  if (leadTime === null || leadTime < 0) return null
+
+  const planDays = details.reduce((maxDays, detail) => {
+    const days = getFiniteNumber(detail.days)
+    return days === null ? maxDays : Math.max(maxDays, days)
+  }, 0)
+
+  if (planDays <= leadTime) return null
+
+  return {
+    leadTime,
+    overBy: planDays - leadTime,
+    planDays,
+  }
 }
 
 function getErrorMessage(error: unknown) {
@@ -339,6 +416,15 @@ export function TnaFormDialog({
   const hiddenSummaryCount = summary.length - visibleSummary.length
   const watchedTnaDetails = useWatch({ control, name: "tnaDetails" })
   const watchedDetails = useMemo(() => watchedTnaDetails ?? [], [watchedTnaDetails])
+  const watchedLeadTime = useWatch({ control, name: "leadTime" }) ?? ""
+  const leadTimeWarning = useMemo(() => getLeadTimeWarning(watchedDetails, watchedLeadTime), [watchedDetails, watchedLeadTime])
+
+  const handleValidSubmit = useCallback((values: TnaFormValues) => {
+    return onSubmit({
+      ...values,
+      tnaDetails: getDetailsWithCalculatedDays(values.tnaDetails),
+    })
+  }, [onSubmit])
 
   function handleInvalid() {
     const firstErrorField =
@@ -427,9 +513,14 @@ export function TnaFormDialog({
     [watchedDetails],
   )
 
+  const detailOrderKey = useMemo(
+    () => fields.map((field) => field.id).join("||"),
+    [fields],
+  )
+
   const daysRecalculationKey = useMemo(
-    () => watchedDetails.map((detail) => detail.executionDate).join("||"),
-    [watchedDetails],
+    () => `${detailOrderKey}::${watchedDetails.map((detail) => detail.executionDate).join("||")}`,
+    [detailOrderKey, watchedDetails],
   )
 
   const formulaTaskButtons = watchedDetails.map((detail, index) => {
@@ -467,9 +558,7 @@ export function TnaFormDialog({
 
   const recalculateDetailDays = useCallback((details: TnaDetailFormValues[]) => {
     details.forEach((detail, index) => {
-      const nextDays = index === 0
-        ? "1"
-        : getExecutionDateDayDifference(detail.executionDate, details[index - 1]?.executionDate ?? "")?.toString()
+      const nextDays = getCalculatedDetailDays(details, index)
 
       if (!nextDays || nextDays === detail.days) {
         return
@@ -570,14 +659,11 @@ export function TnaFormDialog({
         header: () => <>Days <span className="text-destructive">*</span></>,
         cell: ({ row }) => (
           <div className="space-y-1">
-            <Input
-              type="number"
-              min={0}
-              step="1"
-              readOnly
-              title="Calculated from the execution date sequence"
-              className={`${DETAIL_TABLE_INPUT_CLASS} ${CALCULATED_DAYS_INPUT_CLASS}`}
-              {...register(`tnaDetails.${row.index}.days`)}
+            <DaysInputCell
+              className={DETAIL_TABLE_INPUT_CLASS}
+              control={control}
+              index={row.index}
+              register={register}
             />
             <DetailTableFieldError control={control} index={row.index} field="days" />
           </div>
@@ -630,7 +716,7 @@ export function TnaFormDialog({
       <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 overflow-hidden rounded-none p-0 sm:left-1/2 sm:top-1/2 sm:h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg">
         <form
           className="flex h-full max-h-[100dvh] flex-col sm:max-h-[calc(100vh-2rem)]"
-          onSubmit={handleSubmit(onSubmit, handleInvalid)}
+          onSubmit={handleSubmit(handleValidSubmit, handleInvalid)}
         >
           <div className="border-b border-slate-200/70 px-4 pb-4 pt-5 sm:px-6 sm:pt-6 dark:border-white/10">
             <DialogHeader>
@@ -792,6 +878,12 @@ export function TnaFormDialog({
                       </div>
                     </div>
 
+                    {leadTimeWarning ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+                        Plan uses <span className="font-semibold">{leadTimeWarning.planDays}</span> days, which is <span className="font-semibold">{leadTimeWarning.overBy}</span> day(s) over the <span className="font-semibold">{leadTimeWarning.leadTime}</span>-day lead time. Saving is allowed, but this plan is outside the target window.
+                      </div>
+                    ) : null}
+
                     <div className="space-y-3 lg:hidden">
                         {fields.map((field, index) => (
                           <div
@@ -874,15 +966,12 @@ export function TnaFormDialog({
                                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                                     Days <span className="text-destructive">*</span>
                                   </label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    step="1"
-                                    readOnly
-                                    title="Calculated from the execution date sequence"
-                                    className={`h-9 rounded-md px-2 text-xs ${CALCULATED_DAYS_INPUT_CLASS}`}
-                                    aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
-                                    {...register(`tnaDetails.${index}.days`)}
+                                  <DaysInputCell
+                                    className="h-9 rounded-md px-2 text-xs"
+                                    control={control}
+                                    index={index}
+                                    register={register}
+                                    ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
                                   />
                                   <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                     {detailErrorAt(errors as Record<string, unknown>, index, "days")}
@@ -985,6 +1074,7 @@ export function TnaFormDialog({
           if (formula.trim()) {
             recalculateFormulaDate(formulaDetailIndex, details)
           }
+          recalculateDetailDays(details)
           setFormulaDialogOpen(false)
           setFormulaDetailIndex(null)
           setFormulaInitialValue("")
