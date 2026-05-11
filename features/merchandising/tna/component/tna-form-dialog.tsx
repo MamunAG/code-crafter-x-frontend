@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
+import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
-import type { DragEvent } from "react"
+import type { DragEvent, FocusEvent } from "react"
 import { z } from "zod"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, type AppComboboxOption } from "@/components/app-combobox"
@@ -45,12 +45,52 @@ type TnaFormDialogProps = {
   onSubmit: (values: TnaFormValues) => void | Promise<void>
 }
 
+type FormulaButtonCellProps = {
+  className?: string
+  control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  index: number
+  renderFormulaLabel: (formula: string) => string
+  onOpenFormula: (index: number) => void
+}
+
+type DetailTableFieldErrorProps = {
+  control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  index: number
+  field: keyof TnaDetailFormValues
+}
+
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
+
+function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onOpenFormula }: FormulaButtonCellProps) {
+  const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={`${className} w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50`}
+      onClick={() => onOpenFormula(index)}
+    >
+      <span className="truncate">
+        {renderFormulaLabel(formula)}
+      </span>
+    </Button>
+  )
+}
 
 function DetailTableError({ message }: { message: string }) {
   if (!message) return null
   return <p className="pt-1 text-[10px] leading-3 text-red-600 dark:text-red-300">{message}</p>
+}
+
+function DetailTableFieldError({ control, index, field }: DetailTableFieldErrorProps) {
+  const { errors } = useFormState({
+    control,
+    name: `tnaDetails.${index}.${field}`,
+  })
+
+  return <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, index, field)} />
 }
 
 function getDetailHeaderClass(columnId: string) {
@@ -172,6 +212,7 @@ export function TnaFormDialog({
   const [formulaDialogOpen, setFormulaDialogOpen] = useState(false)
   const [formulaDetailIndex, setFormulaDetailIndex] = useState<number | null>(null)
   const [formulaInitialValue, setFormulaInitialValue] = useState("")
+  const focusedExecutionDateIndexRef = useRef<number | null>(null)
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
@@ -319,6 +360,23 @@ export function TnaFormDialog({
     setFormulaDialogOpen(true)
   }, [getValues])
 
+  const getExecutionDateInputProps = useCallback((index: number) => {
+    const registration = register(`tnaDetails.${index}.executionDate`)
+
+    return {
+      ...registration,
+      onFocus: () => {
+        focusedExecutionDateIndexRef.current = index
+      },
+      onBlur: (event: FocusEvent<HTMLInputElement>) => {
+        if (focusedExecutionDateIndexRef.current === index) {
+          focusedExecutionDateIndexRef.current = null
+        }
+        void registration.onBlur(event)
+      },
+    }
+  }, [register])
+
   const taskComboboxOptions = useMemo<TaskOption[]>(
     () => taskOptions.map((task) => ({ value: task.id, label: task.name })),
     [taskOptions],
@@ -376,7 +434,7 @@ export function TnaFormDialog({
 
     const details = getValues("tnaDetails")
     details.forEach((detail, index) => {
-      if (detail.relationFormula.trim()) {
+      if (detail.relationFormula.trim() && focusedExecutionDateIndexRef.current !== index) {
         recalculateFormulaDate(index, details)
       }
     })
@@ -424,7 +482,7 @@ export function TnaFormDialog({
                   inputClassName={DETAIL_TABLE_INPUT_CLASS}
                   contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
                 />
-                <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "taskId")} />
+                <DetailTableFieldError control={control} index={row.index} field="taskId" />
               </div>
             )}
           />
@@ -438,10 +496,9 @@ export function TnaFormDialog({
             <Input
               type="date"
               className={DETAIL_TABLE_INPUT_CLASS}
-              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "executionDate"))}
-              {...register(`tnaDetails.${row.index}.executionDate`)}
+              {...getExecutionDateInputProps(row.index)}
             />
-            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "executionDate")} />
+            <DetailTableFieldError control={control} index={row.index} field="executionDate" />
           </div>
         ),
       },
@@ -455,10 +512,9 @@ export function TnaFormDialog({
               min={0}
               step="1"
               className={DETAIL_TABLE_INPUT_CLASS}
-              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "days"))}
               {...register(`tnaDetails.${row.index}.days`)}
             />
-            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "days")} />
+            <DetailTableFieldError control={control} index={row.index} field="days" />
           </div>
         ),
       },
@@ -467,17 +523,13 @@ export function TnaFormDialog({
         header: "Formula",
         cell: ({ row }) => (
           <div className="space-y-1">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
-              onClick={() => handleRelationFormulaButtonClick(row.index)}
-            >
-              <span className="truncate">
-                {getRenderedFormulaLabel(watchedDetails[row.index]?.relationFormula ?? "")}
-              </span>
-            </Button>
-            <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "relationFormula")} />
+            <FormulaButtonCell
+              control={control}
+              index={row.index}
+              renderFormulaLabel={getRenderedFormulaLabel}
+              onOpenFormula={handleRelationFormulaButtonClick}
+            />
+            <DetailTableFieldError control={control} index={row.index} field="relationFormula" />
           </div>
         ),
       },
@@ -498,7 +550,7 @@ export function TnaFormDialog({
         ),
       },
     ],
-    [control, errors, fields.length, getRenderedFormulaLabel, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading, watchedDetails],
+    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
   )
 
   const detailTable = useReactTable({
@@ -746,7 +798,7 @@ export function TnaFormDialog({
                                     type="date"
                                     className="h-9 rounded-md px-2 text-xs"
                                     aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
-                                    {...register(`tnaDetails.${index}.executionDate`)}
+                                    {...getExecutionDateInputProps(index)}
                                   />
                                   <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                     {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
@@ -775,16 +827,13 @@ export function TnaFormDialog({
                                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                                   Formula
                                 </label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-9 w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
-                                  onClick={() => handleRelationFormulaButtonClick(index)}
-                                >
-                                  <span className="truncate">
-                                    {getRenderedFormulaLabel(watchedDetails[index]?.relationFormula ?? "")}
-                                  </span>
-                                </Button>
+                                <FormulaButtonCell
+                                  className="h-9"
+                                  control={control}
+                                  index={index}
+                                  renderFormulaLabel={getRenderedFormulaLabel}
+                                  onOpenFormula={handleRelationFormulaButtonClick}
+                                />
                                 <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
                                 </p>
