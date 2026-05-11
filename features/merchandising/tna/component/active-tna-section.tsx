@@ -11,9 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { renderTnaRelationFormula } from "../tna-formula.utils"
 import type { BuyerSummary, JobSummary, PaginationMeta, TnaFilterValues, TnaRecord } from "../tna.types"
 
 type ActiveTnaSectionProps = {
@@ -49,6 +49,18 @@ function getJobLabel(job?: JobSummary | null) {
 
 function getTaskCount(record: TnaRecord) {
   return record.tnaDetails?.length ?? 0
+}
+
+function getFirstFormulaLabel(record: TnaRecord) {
+  const formula = record.tnaDetails?.[0]?.relationFormula?.trim()
+  if (!formula) return "No formula"
+
+  const taskLabelsById = (record.tnaDetails ?? []).reduce<Record<string, string>>((labels, detail) => {
+    labels[detail.taskId] = detail.task?.name?.trim() || detail.taskId
+    return labels
+  }, {})
+
+  return renderTnaRelationFormula(formula, taskLabelsById)
 }
 
 function formatDate(value?: string | null) {
@@ -135,7 +147,7 @@ export function ActiveTnaSection({
       cell: ({ row }) => (
         <div className="space-y-1">
           <p className="text-xs text-slate-700 dark:text-slate-200">{getTaskCount(row.original)} task row{getTaskCount(row.original) === 1 ? "" : "s"}</p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{row.original.tnaDetails?.[0]?.relationFormula ?? "No formula"}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{getFirstFormulaLabel(row.original)}</p>
         </div>
       ),
     },
@@ -314,7 +326,7 @@ export function ActiveTnaSection({
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge variant="secondary" className="rounded-full px-3 py-1">{getTaskCount(record)} task row{getTaskCount(record) === 1 ? "" : "s"}</Badge>
-                  <Badge variant="outline" className="rounded-full px-3 py-1">{record.tnaDetails?.[0]?.relationFormula ?? "No formula"}</Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1">{getFirstFormulaLabel(record)}</Badge>
                 </div>
               </article>
             ))
@@ -331,4 +343,3 @@ export function ActiveTnaSection({
     </Card>
   )
 }
-

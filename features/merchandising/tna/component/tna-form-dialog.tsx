@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
-import { Controller, useFieldArray, useForm } from "react-hook-form"
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
 import type { DragEvent } from "react"
 import { z } from "zod"
@@ -16,7 +16,9 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
+import { createTaskFormulaToken, evaluateTnaRelationFormula, renderTnaRelationFormula } from "../tna-formula.utils"
 import type { TnaDetailFormValues, TnaFormValues, TnaTaskRecord } from "../tna.types"
+import { TnaFormulaDialog } from "./tna-formula-dialog"
 
 type TnaEditorMode = "create" | "edit"
 
@@ -167,6 +169,9 @@ export function TnaFormDialog({
   const [jobOptionsLoading, setJobOptionsLoading] = useState(false)
   const [jobOptionsError, setJobOptionsError] = useState("")
   const [jobOpen, setJobOpen] = useState(false)
+  const [formulaDialogOpen, setFormulaDialogOpen] = useState(false)
+  const [formulaDetailIndex, setFormulaDetailIndex] = useState<number | null>(null)
+  const [formulaInitialValue, setFormulaInitialValue] = useState("")
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
@@ -174,6 +179,7 @@ export function TnaFormDialog({
   const {
     control,
     handleSubmit,
+    getValues,
     register,
     reset,
     setValue,
@@ -259,6 +265,8 @@ export function TnaFormDialog({
   const summary = useMemo(() => buildSummary(errors as Record<string, unknown>), [errors])
   const visibleSummary = isMobile ? summary.slice(0, MOBILE_MAX_SUMMARY_ERRORS) : summary
   const hiddenSummaryCount = summary.length - visibleSummary.length
+  const watchedTnaDetails = useWatch({ control, name: "tnaDetails" })
+  const watchedDetails = useMemo(() => watchedTnaDetails ?? [], [watchedTnaDetails])
 
   function handleInvalid() {
     const firstErrorField =
@@ -304,10 +312,75 @@ export function TnaFormDialog({
     setDraggingDetailId("")
   }
 
+  const handleRelationFormulaButtonClick = useCallback((index: number) => {
+    const currentValue = (getValues(`tnaDetails.${index}.relationFormula`) ?? "").trim()
+    setFormulaDetailIndex(index)
+    setFormulaInitialValue(currentValue)
+    setFormulaDialogOpen(true)
+  }, [getValues])
+
   const taskComboboxOptions = useMemo<TaskOption[]>(
     () => taskOptions.map((task) => ({ value: task.id, label: task.name })),
     [taskOptions],
   )
+
+  const taskLabelsById = useMemo(
+    () =>
+      taskComboboxOptions.reduce<Record<string, string>>((labels, task) => {
+        labels[task.value] = task.label
+        return labels
+      }, {}),
+    [taskComboboxOptions],
+  )
+
+  const recalculationKey = useMemo(
+    () => watchedDetails.map((detail) => `${detail.taskId}|${detail.executionDate}|${detail.relationFormula}`).join("||"),
+    [watchedDetails],
+  )
+
+  const formulaTaskButtons = watchedDetails.map((detail, index) => {
+    const taskLabel = taskComboboxOptions.find((task) => task.value === detail.taskId)?.label || `Task ${index + 1}`
+
+    return {
+      id: detail.id || `row-${index}`,
+      label: `${index + 1}. ${taskLabel}`,
+      taskId: detail.taskId,
+      token: detail.taskId ? createTaskFormulaToken(detail.taskId) : "",
+      formulaLabel: taskLabel,
+    }
+  })
+
+  const getRenderedFormulaLabel = useCallback((formula: string) => {
+    const renderedFormula = renderTnaRelationFormula(formula, taskLabelsById).trim()
+    return renderedFormula || "Add formula"
+  }, [taskLabelsById])
+
+  const recalculateFormulaDate = useCallback((index: number, details: TnaDetailFormValues[]) => {
+    const nextDate = evaluateTnaRelationFormula({ details, targetIndex: index })
+    if (!nextDate || nextDate === details[index]?.executionDate) {
+      return
+    }
+
+    setValue(`tnaDetails.${index}.executionDate`, nextDate, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+    details[index] = {
+      ...details[index],
+      executionDate: nextDate,
+    }
+  }, [setValue])
+
+  useEffect(() => {
+    if (!open) return
+
+    const details = getValues("tnaDetails")
+    details.forEach((detail, index) => {
+      if (detail.relationFormula.trim()) {
+        recalculateFormulaDate(index, details)
+      }
+    })
+  }, [getValues, open, recalculationKey, recalculateFormulaDate])
 
   const detailColumns = useMemo<ColumnDef<TnaDetailTableRow>[]>(
     () => [
@@ -391,15 +464,19 @@ export function TnaFormDialog({
       },
       {
         id: "relationFormula",
-        header: "Relation formula",
+        header: "Formula",
         cell: ({ row }) => (
           <div className="space-y-1">
-            <Input
-              className={DETAIL_TABLE_INPUT_CLASS}
-              placeholder="lead_time - 7"
-              aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, row.index, "relationFormula"))}
-              {...register(`tnaDetails.${row.index}.relationFormula`)}
-            />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
+              onClick={() => handleRelationFormulaButtonClick(row.index)}
+            >
+              <span className="truncate">
+                {getRenderedFormulaLabel(watchedDetails[row.index]?.relationFormula ?? "")}
+              </span>
+            </Button>
             <DetailTableError message={detailErrorAt(errors as Record<string, unknown>, row.index, "relationFormula")} />
           </div>
         ),
@@ -421,7 +498,7 @@ export function TnaFormDialog({
         ),
       },
     ],
-    [control, errors, fields.length, register, remove, taskComboboxOptions, taskOptionsLoading],
+    [control, errors, fields.length, getRenderedFormulaLabel, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading, watchedDetails],
   )
 
   const detailTable = useReactTable({
@@ -696,14 +773,18 @@ export function TnaFormDialog({
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Relation formula
+                                  Formula
                                 </label>
-                                <Input
-                                  className="h-9 rounded-md px-2 text-xs"
-                                  placeholder="lead_time - 7"
-                                  aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "relationFormula"))}
-                                  {...register(`tnaDetails.${index}.relationFormula`)}
-                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-9 w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
+                                  onClick={() => handleRelationFormulaButtonClick(index)}
+                                >
+                                  <span className="truncate">
+                                    {getRenderedFormulaLabel(watchedDetails[index]?.relationFormula ?? "")}
+                                  </span>
+                                </Button>
                                 <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
                                 </p>
@@ -763,6 +844,36 @@ export function TnaFormDialog({
           </div>
         </form>
       </DialogContent>
+      <TnaFormulaDialog
+        open={formulaDialogOpen}
+        initialFormula={formulaInitialValue}
+        taskButtons={formulaTaskButtons}
+        onOpenChange={(nextOpen) => {
+          setFormulaDialogOpen(nextOpen)
+          if (!nextOpen) {
+            setFormulaDetailIndex(null)
+            setFormulaInitialValue("")
+          }
+        }}
+        onSave={(formula) => {
+          if (formulaDetailIndex === null) return
+
+          const details = getValues("tnaDetails").map((detail, index) => (
+            index === formulaDetailIndex ? { ...detail, relationFormula: formula } : detail
+          ))
+
+          setValue(`tnaDetails.${formulaDetailIndex}.relationFormula`, formula, {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
+          if (formula.trim()) {
+            recalculateFormulaDate(formulaDetailIndex, details)
+          }
+          setFormulaDialogOpen(false)
+          setFormulaDetailIndex(null)
+          setFormulaInitialValue("")
+        }}
+      />
     </Dialog>
   )
 }
