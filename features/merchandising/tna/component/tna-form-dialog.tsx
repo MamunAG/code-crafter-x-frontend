@@ -61,15 +61,21 @@ type DetailTableFieldErrorProps = {
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
+const CALCULATED_DAYS_INPUT_CLASS = "bg-slate-50 text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onOpenFormula }: FormulaButtonCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
+  const hasFormula = Boolean(formula.trim())
+  const stateClassName = hasFormula
+    ? "border-emerald-200 bg-emerald-50 font-medium text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-100"
+    : "border-dashed border-slate-300 bg-transparent text-slate-400 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:border-white/15 dark:text-slate-500 dark:hover:border-white/25 dark:hover:bg-white/[0.04] dark:hover:text-slate-300"
 
   return (
     <Button
       type="button"
       variant="outline"
-      className={`${className} w-full justify-start rounded-md px-2 text-left text-xs font-normal text-slate-600 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50`}
+      className={`${className} w-full justify-start rounded-md px-2 text-left text-xs ${stateClassName}`}
       onClick={() => onOpenFormula(index)}
     >
       <span className="truncate">
@@ -140,6 +146,31 @@ function emptyDetailRow(): TnaDetailFormValues {
     days: "0",
     relationFormula: "",
   }
+}
+
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null
+  }
+
+  return date
+}
+
+function getExecutionDateDayDifference(currentDateValue: string, previousDateValue: string) {
+  const currentDate = parseDateOnly(currentDateValue)
+  const previousDate = parseDateOnly(previousDateValue)
+
+  if (!currentDate || !previousDate) return null
+
+  return Math.abs(Math.round((currentDate.getTime() - previousDate.getTime()) / MS_PER_DAY))
 }
 
 function getErrorMessage(error: unknown) {
@@ -396,6 +427,11 @@ export function TnaFormDialog({
     [watchedDetails],
   )
 
+  const daysRecalculationKey = useMemo(
+    () => watchedDetails.map((detail) => detail.executionDate).join("||"),
+    [watchedDetails],
+  )
+
   const formulaTaskButtons = watchedDetails.map((detail, index) => {
     const taskLabel = taskComboboxOptions.find((task) => task.value === detail.taskId)?.label || `Task ${index + 1}`
 
@@ -429,6 +465,27 @@ export function TnaFormDialog({
     }
   }, [setValue])
 
+  const recalculateDetailDays = useCallback((details: TnaDetailFormValues[]) => {
+    details.forEach((detail, index) => {
+      const nextDays = index === 0
+        ? "1"
+        : getExecutionDateDayDifference(detail.executionDate, details[index - 1]?.executionDate ?? "")?.toString()
+
+      if (!nextDays || nextDays === detail.days) {
+        return
+      }
+
+      setValue(`tnaDetails.${index}.days`, nextDays, {
+        shouldDirty: false,
+        shouldValidate: false,
+      })
+      details[index] = {
+        ...detail,
+        days: nextDays,
+      }
+    })
+  }, [setValue])
+
   useEffect(() => {
     if (!open) return
 
@@ -439,6 +496,12 @@ export function TnaFormDialog({
       }
     })
   }, [getValues, open, recalculationKey, recalculateFormulaDate])
+
+  useEffect(() => {
+    if (!open) return
+
+    recalculateDetailDays(getValues("tnaDetails"))
+  }, [daysRecalculationKey, getValues, open, recalculateDetailDays])
 
   const detailColumns = useMemo<ColumnDef<TnaDetailTableRow>[]>(
     () => [
@@ -511,7 +574,9 @@ export function TnaFormDialog({
               type="number"
               min={0}
               step="1"
-              className={DETAIL_TABLE_INPUT_CLASS}
+              readOnly
+              title="Calculated from the execution date sequence"
+              className={`${DETAIL_TABLE_INPUT_CLASS} ${CALCULATED_DAYS_INPUT_CLASS}`}
               {...register(`tnaDetails.${row.index}.days`)}
             />
             <DetailTableFieldError control={control} index={row.index} field="days" />
@@ -813,7 +878,9 @@ export function TnaFormDialog({
                                     type="number"
                                     min={0}
                                     step="1"
-                                    className="h-9 rounded-md px-2 text-xs"
+                                    readOnly
+                                    title="Calculated from the execution date sequence"
+                                    className={`h-9 rounded-md px-2 text-xs ${CALCULATED_DAYS_INPUT_CLASS}`}
                                     aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
                                     {...register(`tnaDetails.${index}.days`)}
                                   />
