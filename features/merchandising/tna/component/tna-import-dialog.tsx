@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type UIEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react"
 
 import { Download, Loader2 } from "lucide-react"
 
@@ -8,7 +8,9 @@ import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, ty
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
+import { renderTnaRelationFormula } from "../tna-formula.utils"
 import type { TnaDetailFormValues, TnaRecord } from "../tna.types"
 
 type BuyerOption = AppComboboxOption
@@ -76,7 +78,11 @@ function formatDate(value?: string | null) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return "-"
 
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(parsed)
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(parsed)
 }
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
@@ -86,6 +92,34 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate text-sm font-medium text-slate-950 dark:text-slate-50">{value || "-"}</p>
     </div>
   )
+}
+
+function ListCellTooltip({ children, value, className }: { children: ReactNode; value: string; className: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={className}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        {value}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function getTaskLabelsById(record: TnaRecord | null) {
+  return (record?.tnaDetails ?? []).reduce<Record<string, string>>((labels, detail) => {
+    const taskId = detail.taskId?.trim()
+    if (taskId) {
+      labels[taskId] = detail.task?.name?.trim() || taskId
+    }
+    return labels
+  }, {})
+}
+
+function renderImportFormula(formula: string | null | undefined, taskLabelsById: Record<string, string>) {
+  const renderedFormula = renderTnaRelationFormula(formula?.trim() ?? "", taskLabelsById).trim()
+  return renderedFormula || "-"
 }
 
 export function TnaImportDialog({
@@ -117,6 +151,7 @@ export function TnaImportDialog({
   const previewRequestIdRef = useRef(0)
   const importBuyerId = importBuyer?.value?.trim() ?? ""
   const importJobId = importJob?.value?.trim() ?? ""
+  const selectedTaskLabelsById = useMemo(() => getTaskLabelsById(selectedRecord), [selectedRecord])
 
   const resetImportState = useCallback(() => {
     setImportBuyer(null)
@@ -281,8 +316,8 @@ export function TnaImportDialog({
           </DialogHeader>
 
           <div className="grid min-h-0 gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="w-full space-y-1.5 sm:max-w-72">
                 <label className="text-sm font-medium">Buyer</label>
                 <AppCombobox
                   value={importBuyer}
@@ -304,7 +339,7 @@ export function TnaImportDialog({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="w-full space-y-1.5 sm:max-w-72">
                 <label className="text-sm font-medium">Job</label>
                 <AppCombobox
                   key={importBuyerId || "import-buyer-empty"}
@@ -334,11 +369,11 @@ export function TnaImportDialog({
                   <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Recent TNA</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Latest records load first. Scroll for more.</p>
                 </div>
-                <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1fr] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
-                  <span>Buyer</span>
-                  <span>Job</span>
-                  <span>Date</span>
-                  <span>Prepared By</span>
+                <div className="grid grid-cols-[1fr_0.8fr_7.5rem_0.9fr] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                  <span className="whitespace-nowrap">Buyer</span>
+                  <span className="whitespace-nowrap">Job</span>
+                  <span className="whitespace-nowrap">Date</span>
+                  <span className="whitespace-nowrap">Prepared By</span>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto" onScroll={handleTnaListScroll}>
                   {tnaListLoading ? (
@@ -347,22 +382,27 @@ export function TnaImportDialog({
                       Loading TNA records...
                     </div>
                   ) : tnaItems.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-white/10">
+                    <TooltipProvider delayDuration={250}>
+                      <div className="divide-y divide-slate-100 dark:divide-white/10">
                       {tnaItems.map((item) => {
                         const record = item.record
                         const selected = selectedTna?.value === item.value
+                        const buyerLabel = getImportBuyerLabel(record)
+                        const jobLabel = getImportJobLabel(record)
+                        const dateLabel = formatDate(record.created_at)
+                        const preparedByLabel = getPreparedByLabel(record)
 
                         return (
                           <button
                             key={item.value}
                             type="button"
-                            className={`grid w-full cursor-pointer grid-cols-[1.2fr_1fr_0.8fr_1fr] gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04] ${selected ? "bg-slate-100 ring-1 ring-inset ring-slate-300 dark:bg-white/[0.06] dark:ring-white/15" : ""}`}
+                            className={`grid w-full cursor-pointer grid-cols-[1fr_0.8fr_7.5rem_0.9fr] gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04] ${selected ? "bg-slate-100 ring-1 ring-inset ring-slate-300 dark:bg-white/[0.06] dark:ring-white/15" : ""}`}
                             onClick={() => void handleSelectTna(item)}
                           >
-                            <span className="truncate font-medium text-slate-900 dark:text-slate-100">{getImportBuyerLabel(record)}</span>
-                            <span className="truncate text-slate-700 dark:text-slate-200">{getImportJobLabel(record)}</span>
-                            <span className="truncate text-slate-600 dark:text-slate-300">{formatDate(record.created_at)}</span>
-                            <span className="truncate text-slate-600 dark:text-slate-300">{getPreparedByLabel(record)}</span>
+                            <ListCellTooltip className="truncate font-medium text-slate-900 dark:text-slate-100" value={buyerLabel}>{buyerLabel}</ListCellTooltip>
+                            <ListCellTooltip className="truncate text-slate-700 dark:text-slate-200" value={jobLabel}>{jobLabel}</ListCellTooltip>
+                            <ListCellTooltip className="whitespace-nowrap text-slate-600 dark:text-slate-300" value={dateLabel}>{dateLabel}</ListCellTooltip>
+                            <ListCellTooltip className="truncate text-slate-600 dark:text-slate-300" value={preparedByLabel}>{preparedByLabel}</ListCellTooltip>
                           </button>
                         )
                       })}
@@ -372,7 +412,8 @@ export function TnaImportDialog({
                           Loading more...
                         </div>
                       ) : null}
-                    </div>
+                      </div>
+                    </TooltipProvider>
                   ) : (
                     <div className="flex h-40 items-center justify-center px-6 text-center text-xs text-slate-500 dark:text-slate-400">
                       No TNA records found for the selected filters.
@@ -419,7 +460,7 @@ export function TnaImportDialog({
                               <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-100">{detail.task?.name?.trim() || detail.taskId}</td>
                               <td className="px-2 py-2 text-slate-700 dark:text-slate-200">{formatDate(detail.executionDate)}</td>
                               <td className="px-2 py-2 text-slate-700 dark:text-slate-200">{Number(detail.days ?? 0)}</td>
-                              <td className="px-2 py-2 text-slate-600 dark:text-slate-300">{detail.relationFormula?.trim() || "-"}</td>
+                              <td className="px-2 py-2 text-slate-600 dark:text-slate-300">{renderImportFormula(detail.relationFormula, selectedTaskLabelsById)}</td>
                             </tr>
                           ))}
                         </tbody>
