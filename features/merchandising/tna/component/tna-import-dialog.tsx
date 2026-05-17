@@ -95,10 +95,24 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 }
 
 function ListCellTooltip({ children, value, className }: { children: ReactNode; value: string; className: string }) {
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const [open, setOpen] = useState(false)
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setOpen(false)
+      return
+    }
+
+    const trigger = triggerRef.current
+    const hasOverflow = Boolean(trigger && trigger.scrollWidth > trigger.clientWidth)
+    setOpen(hasOverflow)
+  }
+
   return (
-    <Tooltip>
+    <Tooltip open={open} onOpenChange={handleOpenChange}>
       <TooltipTrigger asChild>
-        <span className={className}>{children}</span>
+        <span ref={triggerRef} className={`block min-w-0 ${className}`}>{children}</span>
       </TooltipTrigger>
       <TooltipContent side="top" align="start">
         {value}
@@ -401,7 +415,7 @@ export function TnaImportDialog({
                           >
                             <ListCellTooltip className="truncate font-medium text-slate-900 dark:text-slate-100" value={buyerLabel}>{buyerLabel}</ListCellTooltip>
                             <ListCellTooltip className="truncate text-slate-700 dark:text-slate-200" value={jobLabel}>{jobLabel}</ListCellTooltip>
-                            <ListCellTooltip className="whitespace-nowrap text-slate-600 dark:text-slate-300" value={dateLabel}>{dateLabel}</ListCellTooltip>
+                            <ListCellTooltip className="truncate text-slate-600 dark:text-slate-300" value={dateLabel}>{dateLabel}</ListCellTooltip>
                             <ListCellTooltip className="truncate text-slate-600 dark:text-slate-300" value={preparedByLabel}>{preparedByLabel}</ListCellTooltip>
                           </button>
                         )
