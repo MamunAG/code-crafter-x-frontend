@@ -472,6 +472,80 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
     [apiUrl, selectedOrganizationId],
   )
 
+  const loadImportTnaOptions = useCallback(
+    async ({
+      buyerId,
+      jobId,
+      query,
+      page: pageNumber,
+      limit: pageLimit,
+    }: AppComboboxLoadParams & { buyerId: string; jobId: string }) => {
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) throw new Error("Your session expired. Please sign in again.")
+
+        const normalizedQuery = query.trim().toLowerCase()
+        const response = await fetchTnaRecords({
+          apiUrl,
+          accessToken: token,
+          page: normalizedQuery ? 1 : pageNumber,
+          limit: normalizedQuery ? 100 : pageLimit,
+          filters: { buyerId, jobId },
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        const items = response.items
+          .filter((record) => record.id !== editingId)
+          .filter((record) => {
+            if (!normalizedQuery) return true
+            const createdAt = record.created_at ? String(record.created_at).slice(0, 10) : ""
+            return `${record.id} ${createdAt} ${getBuyerLabel(record)} ${getJobLabel(record)}`.toLowerCase().includes(normalizedQuery)
+          })
+          .map((record) => {
+            const createdAt = record.created_at ? String(record.created_at).slice(0, 10) : "saved TNA"
+            const rowCount = record.tnaDetails?.length ?? 0
+
+            return {
+              value: record.id,
+              label: `${createdAt} / ${rowCount} row${rowCount === 1 ? "" : "s"}`,
+              record,
+            }
+          })
+
+        return {
+          items,
+          hasNextPage: normalizedQuery ? false : response.meta.hasNextPage,
+        }
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load source TNA records right now."
+        handleAuthFailure(message)
+        throw caughtError
+      }
+    },
+    [apiUrl, editingId, handleAuthFailure, selectedOrganizationId],
+  )
+
+  const loadImportTnaRecord = useCallback(
+    async (id: string) => {
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) throw new Error("Your session expired. Please sign in again.")
+
+        return await fetchTnaRecord({
+          apiUrl,
+          accessToken: token,
+          id,
+          organizationId: selectedOrganizationId || undefined,
+        })
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load the source TNA record right now."
+        handleAuthFailure(message)
+        throw caughtError
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
   const openCreateDialog = useCallback(() => {
     if (!accessRules?.canCreate) {
       toast.error("You do not have permission to create TNA records.")
@@ -894,8 +968,11 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
         initialValues={editorValues}
         taskOptions={taskOptions}
         taskOptionsLoading={taskOptionsLoading}
+        currentTnaId={editingId}
         loadBuyerOptions={loadBuyerOptions}
         loadJobOptions={loadJobOptions}
+        loadImportTnaOptions={loadImportTnaOptions}
+        loadImportTnaRecord={loadImportTnaRecord}
         onNewTask={() => setTaskManagerOpen(true)}
         onOpenChange={(open) => {
           setEditorOpen(open)

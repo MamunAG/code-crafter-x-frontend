@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
-import { ArrowDownNarrowWide, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
+import { ArrowDownNarrowWide, Download, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
 import type { DragEvent, FocusEvent } from "react"
 import { z } from "zod"
 
@@ -17,8 +17,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import { createTaskFormulaToken, evaluateTnaRelationFormula, renderTnaRelationFormula } from "../tna-formula.utils"
-import type { TnaDetailFormValues, TnaFormValues, TnaTaskRecord } from "../tna.types"
+import type { TnaDetailFormValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "../tna.types"
 import { TnaFormulaDialog } from "./tna-formula-dialog"
+import { TnaImportDialog, type ImportTnaOption, type LoadImportTnaOptionsParams } from "./tna-import-dialog"
 
 type TnaEditorMode = "create" | "edit"
 
@@ -38,8 +39,11 @@ type TnaFormDialogProps = {
   initialValues: TnaFormValues
   taskOptions: TnaTaskRecord[]
   taskOptionsLoading: boolean
+  currentTnaId?: string | null
   loadBuyerOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<BuyerOption>>
   loadJobOptions: (params: AppComboboxLoadParams, buyerId?: string) => Promise<AppComboboxLoadResult<JobOption>>
+  loadImportTnaOptions: (params: LoadImportTnaOptionsParams) => Promise<AppComboboxLoadResult<ImportTnaOption>>
+  loadImportTnaRecord: (id: string) => Promise<TnaRecord>
   onOpenChange: (open: boolean) => void
   onNewTask?: () => void
   onSubmit: (values: TnaFormValues) => void | Promise<void>
@@ -308,8 +312,11 @@ export function TnaFormDialog({
   initialValues,
   taskOptions,
   taskOptionsLoading,
+  currentTnaId,
   loadBuyerOptions,
   loadJobOptions,
+  loadImportTnaOptions,
+  loadImportTnaRecord,
   onOpenChange,
   onNewTask,
   onSubmit,
@@ -324,6 +331,7 @@ export function TnaFormDialog({
   const [formulaDialogOpen, setFormulaDialogOpen] = useState(false)
   const [formulaDetailIndex, setFormulaDetailIndex] = useState<number | null>(null)
   const [formulaInitialValue, setFormulaInitialValue] = useState("")
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const focusedExecutionDateIndexRef = useRef<number | null>(null)
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
@@ -360,6 +368,7 @@ export function TnaFormDialog({
       setSelectedJob(initialJob)
       setJobOptions(initialJob ? [initialJob] : [])
       setJobOpen(false)
+      setImportDialogOpen(false)
       return
     }
 
@@ -368,6 +377,7 @@ export function TnaFormDialog({
     setSelectedJob(initialJob)
     setJobOptions(initialJob ? [initialJob] : [])
     setJobOpen(false)
+    setImportDialogOpen(false)
   }, [initialBuyer, initialJob, initialValues, open, reset])
 
   useEffect(() => {
@@ -472,6 +482,12 @@ export function TnaFormDialog({
     event.preventDefault()
     reorderDetail(event.dataTransfer.getData("text/plain") || draggingDetailId, targetId)
     setDraggingDetailId("")
+  }
+
+  function applyImportedRows(rows: TnaDetailFormValues[]) {
+    replace(rows.length > 0 ? rows : [emptyDetailRow()])
+    setImportDialogOpen(false)
+    recalculateDetailDays(rows)
   }
 
   const handleExecutionDateSort = useCallback(() => {
@@ -896,6 +912,15 @@ export function TnaFormDialog({
                         </p>
                       </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl sm:w-auto"
+                          onClick={() => setImportDialogOpen(true)}
+                        >
+                          <Download className="size-3.5" />
+                          Import
+                        </Button>
                         {onNewTask ? (
                           <Button
                             type="button"
@@ -1090,6 +1115,19 @@ export function TnaFormDialog({
           </div>
         </form>
       </DialogContent>
+      {importDialogOpen ? (
+        <TnaImportDialog
+          open={importDialogOpen}
+          currentDetails={watchedDetails}
+          currentTnaId={currentTnaId}
+          loadBuyerOptions={loadBuyerOptions}
+          loadJobOptions={loadJobOptions}
+          loadImportTnaOptions={loadImportTnaOptions}
+          loadImportTnaRecord={loadImportTnaRecord}
+          onImportRows={applyImportedRows}
+          onOpenChange={setImportDialogOpen}
+        />
+      ) : null}
       <TnaFormulaDialog
         open={formulaDialogOpen}
         initialFormula={formulaInitialValue}
