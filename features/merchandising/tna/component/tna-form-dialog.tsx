@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
-import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
+import { ArrowDownNarrowWide, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
 import type { DragEvent, FocusEvent } from "react"
 import { z } from "zod"
 
@@ -232,6 +232,10 @@ function getDetailsWithCalculatedDays(details: TnaDetailFormValues[]) {
   })
 }
 
+function getDateSortValue(value: string) {
+  return parseDateOnly(value)?.getTime() ?? null
+}
+
 function getLeadTimeWarning(details: TnaDetailFormValues[], leadTimeValue: string): LeadTimeWarning | null {
   const leadTime = getFiniteNumber(leadTimeValue)
   if (leadTime === null || leadTime < 0) return null
@@ -344,7 +348,7 @@ export function TnaFormDialog({
 
   const [draggingDetailId, setDraggingDetailId] = useState("")
 
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove, move, replace } = useFieldArray({
     control,
     name: "tnaDetails",
   })
@@ -469,6 +473,33 @@ export function TnaFormDialog({
     reorderDetail(event.dataTransfer.getData("text/plain") || draggingDetailId, targetId)
     setDraggingDetailId("")
   }
+
+  const handleExecutionDateSort = useCallback(() => {
+    const sortedDetails = getValues("tnaDetails")
+      .map((detail, index) => ({ detail, index }))
+      .sort((left, right) => {
+        const leftDate = getDateSortValue(left.detail.executionDate)
+        const rightDate = getDateSortValue(right.detail.executionDate)
+
+        if (leftDate === null && rightDate === null) {
+          return left.index - right.index
+        }
+
+        if (leftDate === null) return 1
+        if (rightDate === null) return -1
+
+        const dateDifference = leftDate - rightDate
+
+        if (dateDifference !== 0) {
+          return dateDifference
+        }
+
+        return left.index - right.index
+      })
+      .map(({ detail }) => detail)
+
+    replace(sortedDetails)
+  }, [getValues, replace])
 
   const handleRelationFormulaButtonClick = useCallback((index: number) => {
     const currentValue = (getValues(`tnaDetails.${index}.relationFormula`) ?? "").trim()
@@ -642,7 +673,17 @@ export function TnaFormDialog({
       },
       {
         id: "executionDate",
-        header: () => <>Execution date <span className="text-destructive">*</span></>,
+        header: () => (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-md text-left font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={handleExecutionDateSort}
+            aria-label="Sort execution date ascending"
+          >
+            <span>Execution date <span className="text-destructive">*</span></span>
+            <ArrowDownNarrowWide className="size-3.5" aria-hidden="true" />
+          </button>
+        ),
         cell: ({ row }) => (
           <div className="space-y-1">
             <Input
@@ -701,7 +742,7 @@ export function TnaFormDialog({
         ),
       },
     ],
-    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
+    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
   )
 
   const detailTable = useReactTable({

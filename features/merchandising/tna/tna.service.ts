@@ -74,10 +74,11 @@ function buildTnaPayload(values: TnaFormValues) {
     buyerId: values.buyerId.trim(),
     jobId: values.jobId.trim(),
     leadTime: normalizeNumber(values.leadTime),
-    tnaDetails: values.tnaDetails.map((detail) => ({
+    tnaDetails: values.tnaDetails.map((detail, index) => ({
       taskId: detail.taskId.trim(),
       executionDate: detail.executionDate.trim(),
       days: normalizeNumber(detail.days),
+      sortOrder: index + 1,
       relationFormula: optionalString(detail.relationFormula),
     })),
   }

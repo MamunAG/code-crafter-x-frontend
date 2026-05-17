@@ -51,6 +51,7 @@ export type TnaDetailRecord = {
   task?: TnaTaskSummary | null
   executionDate?: string | null
   days?: number | null
+  sortOrder?: number | null
   relationFormula?: string | null
   created_by_id?: string | null
   updated_by_id?: string | null
@@ -92,6 +93,7 @@ export type TnaDetailFormValues = {
   taskId: string
   executionDate: string
   days: string
+  sortOrder?: number
   relationFormula: string
 }
 

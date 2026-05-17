@@ -520,6 +520,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
           taskId: detail.taskId ?? "",
           executionDate: detail.executionDate ? String(detail.executionDate).slice(0, 10) : "",
           days: String(detail.days ?? 0),
+          sortOrder: detail.sortOrder ?? undefined,
           relationFormula: detail.relationFormula ?? "",
         })),
       })
