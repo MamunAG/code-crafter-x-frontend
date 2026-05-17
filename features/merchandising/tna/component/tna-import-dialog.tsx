@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type UIEvent } from "react"
 
 import { Download, Loader2 } from "lucide-react"
 
@@ -17,8 +17,8 @@ type JobOption = AppComboboxOption
 export type ImportTnaOption = AppComboboxOption & { record: TnaRecord }
 
 export type LoadImportTnaOptionsParams = AppComboboxLoadParams & {
-  buyerId: string
-  jobId: string
+  buyerId?: string
+  jobId?: string
 }
 
 type TnaImportDialogProps = {
@@ -66,6 +66,28 @@ function getImportJobLabel(record: TnaRecord | null) {
   return record?.job?.jobNo?.trim() || record?.jobId || "Selected job"
 }
 
+function getPreparedByLabel(record: TnaRecord | null) {
+  return record?.created_by_user?.name?.trim() || record?.created_by_id || "No creator metadata"
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "-"
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "-"
+
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(parsed)
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+      <p className="text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium text-slate-950 dark:text-slate-50">{value || "-"}</p>
+    </div>
+  )
+}
+
 export function TnaImportDialog({
   open,
   currentDetails,
@@ -79,18 +101,35 @@ export function TnaImportDialog({
 }: TnaImportDialogProps) {
   const [importBuyer, setImportBuyer] = useState<BuyerOption | null>(null)
   const [importJob, setImportJob] = useState<JobOption | null>(null)
-  const [importTna, setImportTna] = useState<ImportTnaOption | null>(null)
+  const [tnaItems, setTnaItems] = useState<ImportTnaOption[]>([])
+  const [selectedTna, setSelectedTna] = useState<ImportTnaOption | null>(null)
+  const [selectedRecord, setSelectedRecord] = useState<TnaRecord | null>(null)
+  const [tnaPage, setTnaPage] = useState(1)
+  const [tnaHasNextPage, setTnaHasNextPage] = useState(false)
+  const [tnaListLoading, setTnaListLoading] = useState(false)
+  const [tnaListLoadingMore, setTnaListLoadingMore] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [importError, setImportError] = useState("")
   const [importingDetails, setImportingDetails] = useState(false)
   const [pendingImportRows, setPendingImportRows] = useState<TnaDetailFormValues[] | null>(null)
   const [replaceImportConfirmOpen, setReplaceImportConfirmOpen] = useState(false)
+  const listRequestIdRef = useRef(0)
+  const previewRequestIdRef = useRef(0)
   const importBuyerId = importBuyer?.value?.trim() ?? ""
   const importJobId = importJob?.value?.trim() ?? ""
 
   const resetImportState = useCallback(() => {
     setImportBuyer(null)
     setImportJob(null)
-    setImportTna(null)
+    setTnaItems([])
+    setSelectedTna(null)
+    setSelectedRecord(null)
+    setTnaPage(1)
+    setTnaHasNextPage(false)
+    setTnaListLoading(false)
+    setTnaListLoadingMore(false)
+    setPreviewLoading(false)
+    setImportingDetails(false)
     setImportError("")
     setPendingImportRows(null)
     setReplaceImportConfirmOpen(false)
@@ -109,14 +148,104 @@ export function TnaImportDialog({
     onOpenChange(false)
   }
 
+  const loadTnaList = useCallback(async (page: number, limit: number, mode: "replace" | "append") => {
+    const requestId = listRequestIdRef.current + 1
+    listRequestIdRef.current = requestId
+    setImportError("")
+    if (mode === "replace") {
+      setTnaListLoading(true)
+    } else {
+      setTnaListLoadingMore(true)
+    }
+
+    try {
+      const result = await loadImportTnaOptions({
+        query: "",
+        page,
+        limit,
+        buyerId: importBuyerId || undefined,
+        jobId: importJobId || undefined,
+      })
+
+      if (requestId !== listRequestIdRef.current) return
+
+      const nextItems = Array.isArray(result) ? result : result.items
+      const filteredItems = currentTnaId ? nextItems.filter((item) => item.value !== currentTnaId) : nextItems
+
+      setTnaItems((currentItems) => mode === "replace" ? filteredItems : [...currentItems, ...filteredItems])
+      setTnaPage(page)
+      setTnaHasNextPage(Array.isArray(result) ? false : Boolean(result.hasNextPage))
+
+      if (mode === "replace") {
+        setSelectedTna(null)
+        setSelectedRecord(null)
+      }
+    } catch (caughtError) {
+      if (requestId === listRequestIdRef.current) {
+        setImportError(caughtError instanceof Error ? caughtError.message : "Unable to load TNA records right now.")
+      }
+    } finally {
+      if (requestId === listRequestIdRef.current) {
+        setTnaListLoading(false)
+        setTnaListLoadingMore(false)
+      }
+    }
+  }, [currentTnaId, importBuyerId, importJobId, loadImportTnaOptions])
+
+  useEffect(() => {
+    if (!open) return
+
+    const timeout = window.setTimeout(() => {
+      void loadTnaList(1, 20, "replace")
+    }, 0)
+
+    return () => window.clearTimeout(timeout)
+  }, [importBuyerId, importJobId, loadTnaList, open])
+
+  async function handleSelectTna(item: ImportTnaOption) {
+    setSelectedTna(item)
+    setSelectedRecord(item.record)
+    setImportError("")
+    setPreviewLoading(true)
+
+    const requestId = previewRequestIdRef.current + 1
+    previewRequestIdRef.current = requestId
+
+    try {
+      const record = await loadImportTnaRecord(item.value)
+      if (requestId === previewRequestIdRef.current) {
+        setSelectedRecord(record)
+      }
+    } catch (caughtError) {
+      if (requestId === previewRequestIdRef.current) {
+        setImportError(caughtError instanceof Error ? caughtError.message : "Unable to load the source TNA record right now.")
+      }
+    } finally {
+      if (requestId === previewRequestIdRef.current) {
+        setPreviewLoading(false)
+      }
+    }
+  }
+
+  function handleTnaListScroll(event: UIEvent<HTMLDivElement>) {
+    const target = event.currentTarget
+    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight
+
+    if (distanceFromBottom > 80 || !tnaHasNextPage || tnaListLoadingMore || tnaListLoading) {
+      return
+    }
+
+    void loadTnaList(tnaPage + 1, 10, "append")
+  }
+
   async function handleImportDetails() {
-    if (!importTna?.value || importingDetails) return
+    if (!selectedTna?.value || importingDetails) return
 
     setImportingDetails(true)
     setImportError("")
 
     try {
-      const record = await loadImportTnaRecord(importTna.value)
+      const record = selectedRecord?.id === selectedTna.value ? selectedRecord : await loadImportTnaRecord(selectedTna.value)
       const rows = importedDetailRows(record)
 
       if (rows.length === 0) {
@@ -142,39 +271,16 @@ export function TnaImportDialog({
     return loadJobOptions(params, importBuyerId)
   }, [importBuyerId, loadJobOptions])
 
-  const loadImportTnas = useCallback((params: AppComboboxLoadParams) => {
-    if (!importBuyerId || !importJobId) {
-      return Promise.resolve({ items: [], hasNextPage: false })
-    }
-
-    return loadImportTnaOptions({
-      ...params,
-      buyerId: importBuyerId,
-      jobId: importJobId,
-    }).then((result) => {
-      if (!currentTnaId) return result
-
-      if (Array.isArray(result)) {
-        return result.filter((item) => item.value !== currentTnaId)
-      }
-
-      return {
-        ...result,
-        items: result.items.filter((item) => item.value !== currentTnaId),
-      }
-    })
-  }, [currentTnaId, importBuyerId, importJobId, loadImportTnaOptions])
-
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Import TNA Details</DialogTitle>
             <DialogDescription>Select a source TNA and import its detail rows into this form.</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4">
+          <div className="grid min-h-0 gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Buyer</label>
@@ -183,7 +289,8 @@ export function TnaImportDialog({
                   onValueChange={(buyer) => {
                     setImportBuyer(buyer)
                     setImportJob(null)
-                    setImportTna(null)
+                    setSelectedTna(null)
+                    setSelectedRecord(null)
                     setImportError("")
                   }}
                   loadItems={loadBuyerOptions}
@@ -204,7 +311,8 @@ export function TnaImportDialog({
                   value={importJob}
                   onValueChange={(job) => {
                     setImportJob(job)
-                    setImportTna(null)
+                    setSelectedTna(null)
+                    setSelectedRecord(null)
                     setImportError("")
                   }}
                   loadItems={loadImportJobs}
@@ -220,43 +328,111 @@ export function TnaImportDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Source TNA</label>
-              <AppCombobox
-                key={`${importBuyerId || "buyer-empty"}-${importJobId || "job-empty"}`}
-                value={importTna}
-                onValueChange={(tna) => {
-                  setImportTna(tna)
-                  setImportError("")
-                }}
-                loadItems={loadImportTnas}
-                initialLimit={10}
-                searchLimit={10}
-                placeholder={importJobId ? "Select source TNA" : "Select buyer and job first"}
-                loadingMessage="Loading TNA records..."
-                emptyMessage={importJobId ? "No TNA records found for this buyer and job." : "Select a buyer and job to load TNA records."}
-                showClear={Boolean(importTna)}
-                disabled={!importBuyerId || !importJobId}
-                contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
-                renderItem={(item) => (
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{item.label}</p>
-                    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                      {getImportBuyerLabel(item.record)} / {getImportJobLabel(item.record)} / {item.record.tnaDetails?.length ?? 0} row{(item.record.tnaDetails?.length ?? 0) === 1 ? "" : "s"}
-                    </p>
+            <div className="grid h-[min(34rem,calc(100vh-17rem))] min-h-[28rem] overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40 lg:grid-cols-[22rem_minmax(0,1fr)]">
+              <div className="flex min-h-0 flex-col border-b border-slate-200 dark:border-white/10 lg:border-b-0 lg:border-r">
+                <div className="border-b border-slate-200 px-3 py-2 dark:border-white/10">
+                  <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Recent TNA</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Latest records load first. Scroll for more.</p>
+                </div>
+                <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1fr] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                  <span>Buyer</span>
+                  <span>Job</span>
+                  <span>Date</span>
+                  <span>Prepared By</span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto" onScroll={handleTnaListScroll}>
+                  {tnaListLoading ? (
+                    <div className="flex h-40 items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Loading TNA records...
+                    </div>
+                  ) : tnaItems.length > 0 ? (
+                    <div className="divide-y divide-slate-100 dark:divide-white/10">
+                      {tnaItems.map((item) => {
+                        const record = item.record
+                        const selected = selectedTna?.value === item.value
+
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            className={`grid w-full cursor-pointer grid-cols-[1.2fr_1fr_0.8fr_1fr] gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04] ${selected ? "bg-slate-100 ring-1 ring-inset ring-slate-300 dark:bg-white/[0.06] dark:ring-white/15" : ""}`}
+                            onClick={() => void handleSelectTna(item)}
+                          >
+                            <span className="truncate font-medium text-slate-900 dark:text-slate-100">{getImportBuyerLabel(record)}</span>
+                            <span className="truncate text-slate-700 dark:text-slate-200">{getImportJobLabel(record)}</span>
+                            <span className="truncate text-slate-600 dark:text-slate-300">{formatDate(record.created_at)}</span>
+                            <span className="truncate text-slate-600 dark:text-slate-300">{getPreparedByLabel(record)}</span>
+                          </button>
+                        )
+                      })}
+                      {tnaListLoadingMore ? (
+                        <div className="flex items-center justify-center gap-2 px-3 py-3 text-xs text-slate-500 dark:text-slate-400">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Loading more...
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="flex h-40 items-center justify-center px-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                      No TNA records found for the selected filters.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-0 overflow-auto p-4">
+                {selectedRecord ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 dark:border-white/10">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">TNA Preview</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Read-only source record</p>
+                      </div>
+                      {previewLoading ? <Loader2 className="size-4 animate-spin text-slate-400" /> : null}
+                    </div>
+
+                    <div className="grid gap-3 text-xs sm:grid-cols-2">
+                      <ReadOnlyField label="Buyer" value={getImportBuyerLabel(selectedRecord)} />
+                      <ReadOnlyField label="Job" value={getImportJobLabel(selectedRecord)} />
+                      <ReadOnlyField label="Date" value={formatDate(selectedRecord.created_at)} />
+                      <ReadOnlyField label="Prepared By" value={getPreparedByLabel(selectedRecord)} />
+                      <ReadOnlyField label="Lead time" value={String(Number(selectedRecord.leadTime ?? 0))} />
+                      <ReadOnlyField label="Task rows" value={String(selectedRecord.tnaDetails?.length ?? 0)} />
+                    </div>
+
+                    <div className="overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
+                      <table className="w-full min-w-[680px] border-collapse text-xs">
+                        <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-500 dark:bg-white/[0.03] dark:text-slate-400">
+                          <tr>
+                            <th className="w-12 px-2 py-2 font-semibold">#</th>
+                            <th className="px-2 py-2 font-semibold">Task</th>
+                            <th className="px-2 py-2 font-semibold">Execution date</th>
+                            <th className="px-2 py-2 font-semibold">Days</th>
+                            <th className="px-2 py-2 font-semibold">Formula</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                          {(selectedRecord.tnaDetails ?? []).map((detail, index) => (
+                            <tr key={detail.id}>
+                              <td className="px-2 py-2 text-slate-500 dark:text-slate-400">{index + 1}</td>
+                              <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-100">{detail.task?.name?.trim() || detail.taskId}</td>
+                              <td className="px-2 py-2 text-slate-700 dark:text-slate-200">{formatDate(detail.executionDate)}</td>
+                              <td className="px-2 py-2 text-slate-700 dark:text-slate-200">{Number(detail.days ?? 0)}</td>
+                              <td className="px-2 py-2 text-slate-600 dark:text-slate-300">{detail.relationFormula?.trim() || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full min-h-64 items-center justify-center rounded-md border border-dashed border-slate-200 px-6 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                    Select a TNA record from the left list to preview master information and detail rows.
                   </div>
                 )}
-              />
-            </div>
-
-            {importTna ? (
-              <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 sm:grid-cols-2">
-                <p><span className="font-medium">Buyer:</span> {getImportBuyerLabel(importTna.record)}</p>
-                <p><span className="font-medium">Job:</span> {getImportJobLabel(importTna.record)}</p>
-                <p><span className="font-medium">Lead time:</span> {Number(importTna.record.leadTime ?? 0)}</p>
-                <p><span className="font-medium">Task rows:</span> {importTna.record.tnaDetails?.length ?? 0}</p>
               </div>
-            ) : null}
+            </div>
 
             {importError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
@@ -269,7 +445,7 @@ export function TnaImportDialog({
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} className="rounded-xl">
               Cancel
             </Button>
-            <Button type="button" onClick={handleImportDetails} disabled={!importTna || importingDetails} className="rounded-xl">
+            <Button type="button" onClick={handleImportDetails} disabled={!selectedTna || importingDetails} className="rounded-xl">
               {importingDetails ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
               Import details
             </Button>
