@@ -17,6 +17,7 @@ type FormulaTaskButton = {
 
 type TnaFormulaDialogProps = {
   open: boolean
+  activeTaskButtonId: string
   initialFormula: string
   taskButtons: FormulaTaskButton[]
   onOpenChange: (open: boolean) => void
@@ -88,7 +89,7 @@ function FormulaSection({ formula, taskLabelsById }: { formula: string; taskLabe
   )
 }
 
-function TnaFormulaDialogContent({ initialFormula, taskButtons, onOpenChange, onSave }: TnaFormulaDialogContentProps) {
+function TnaFormulaDialogContent({ activeTaskButtonId, initialFormula, taskButtons, onOpenChange, onSave }: TnaFormulaDialogContentProps) {
   const [formula, setFormula] = useState(initialFormula.trim())
   const taskLabelsById = useMemo(
     () =>
@@ -172,18 +173,23 @@ function TnaFormulaDialogContent({ initialFormula, taskButtons, onOpenChange, on
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="flex flex-wrap gap-2 pr-2">
                     {taskButtons.length > 0 ? (
-                      taskButtons.map((task) => (
-                        <Button
-                          key={task.id}
-                          type="button"
-                          variant="outline"
-                          className="h-9 rounded-full px-3 text-xs font-medium"
-                          disabled={!task.token}
-                          onClick={() => appendToken(task.token)}
-                        >
-                          {task.label}
-                        </Button>
-                      ))
+                      taskButtons.map((task) => {
+                        const isActiveTask = task.id === activeTaskButtonId
+
+                        return (
+                          <Button
+                            key={task.id}
+                            type="button"
+                            variant={isActiveTask ? "default" : "outline"}
+                            className={`h-9 rounded-full px-3 text-xs font-medium ${isActiveTask ? "border-primary bg-primary text-primary-foreground shadow-sm" : ""}`}
+                            disabled={isActiveTask || !task.token}
+                            title={isActiveTask ? "Current row task cannot be used in its own formula" : undefined}
+                            onClick={() => appendToken(task.token)}
+                          >
+                            {task.label}
+                          </Button>
+                        )
+                      })
                     ) : (
                       <p className="text-xs text-slate-500 dark:text-slate-400">Add TNA detail rows first.</p>
                     )}
@@ -208,11 +214,12 @@ function TnaFormulaDialogContent({ initialFormula, taskButtons, onOpenChange, on
   )
 }
 
-export function TnaFormulaDialog({ open, initialFormula, taskButtons, onOpenChange, onSave }: TnaFormulaDialogProps) {
+export function TnaFormulaDialog({ open, activeTaskButtonId, initialFormula, taskButtons, onOpenChange, onSave }: TnaFormulaDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open ? (
         <TnaFormulaDialogContent
+          activeTaskButtonId={activeTaskButtonId}
           initialFormula={initialFormula}
           taskButtons={taskButtons}
           onOpenChange={onOpenChange}

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import { createTaskFormulaToken, renderTnaRelationFormula } from "../tna-formula.utils"
+import { createTaskFormulaToken, evaluateTnaRelationFormula, renderTnaRelationFormula } from "../tna-formula.utils"
 import type { TnaDetailFormValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "../tna.types"
 import { TnaFormulaDialog } from "./tna-formula-dialog"
 import { TnaImportDialog, type ImportTnaOption, type LoadImportTnaOptionsParams } from "./tna-import-dialog"
@@ -91,11 +91,11 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
     : "border-dashed border-slate-300 bg-transparent text-slate-400 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:border-white/15 dark:text-slate-500 dark:hover:border-white/25 dark:hover:bg-white/[0.04] dark:hover:text-slate-300"
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="relative">
       <Button
         type="button"
         variant="outline"
-        className={`${className} min-w-0 flex-1 justify-start rounded-md px-2 text-left text-xs ${stateClassName}`}
+        className={`${className} w-full justify-start rounded-md py-0 pl-2 pr-8 text-left text-xs ${stateClassName}`}
         onClick={() => onOpenFormula(index)}
       >
         <span className="truncate">
@@ -106,7 +106,7 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
         type="button"
         variant="ghost"
         size="icon"
-        className={`${className} shrink-0 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-red-500/10 dark:hover:text-red-300`}
+        className="absolute right-1 top-1/2 size-6 -translate-y-1/2 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-0 dark:hover:bg-red-500/10 dark:hover:text-red-300"
         disabled={!hasFormula}
         onClick={() => onClearFormula(index)}
         aria-label={`Clear formula for row ${index + 1}`}
@@ -131,7 +131,7 @@ function DaysInputCell({ ariaInvalid = false, className, control, index, registe
       type="number"
       min={0}
       step="1"
-      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used to calculate the execution date from the start date"}
+      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used when applying Set start date"}
       className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : ""}`}
       aria-invalid={ariaInvalid}
       {...register(`tnaDetails.${index}.days`)}
@@ -531,7 +531,6 @@ export function TnaFormDialog({
   function applyImportedRows(rows: TnaDetailFormValues[]) {
     replace(rows.length > 0 ? rows : [emptyDetailRow()])
     setImportDialogOpen(false)
-    recalculateDetailDates(rows)
   }
 
   const handleExecutionDateSort = useCallback(() => {
@@ -593,14 +592,9 @@ export function TnaFormDialog({
     [taskComboboxOptions],
   )
 
-  const detailOrderKey = useMemo(
-    () => fields.map((field) => field.id).join("||"),
-    [fields],
-  )
-
-  const dateRecalculationKey = useMemo(
-    () => `${detailOrderKey}::${watchedDetails[0]?.executionDate ?? ""}::${watchedDetails.map((detail) => detail.days).join("||")}`,
-    [detailOrderKey, watchedDetails],
+  const formulaRecalculationKey = useMemo(
+    () => watchedDetails.map((detail) => `${detail.taskId}|${detail.executionDate}|${detail.relationFormula}`).join("||"),
+    [watchedDetails],
   )
 
   const formulaTaskButtons = watchedDetails.map((detail, index) => {
@@ -619,6 +613,22 @@ export function TnaFormDialog({
     const renderedFormula = renderTnaRelationFormula(formula, taskLabelsById).trim()
     return renderedFormula || "Add formula"
   }, [taskLabelsById])
+
+  const recalculateFormulaDate = useCallback((index: number, details: TnaDetailFormValues[]) => {
+    const nextDate = evaluateTnaRelationFormula({ details, targetIndex: index })
+    if (!nextDate || nextDate === details[index]?.executionDate) {
+      return
+    }
+
+    setValue(`tnaDetails.${index}.executionDate`, nextDate, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+    details[index] = {
+      ...details[index],
+      executionDate: nextDate,
+    }
+  }, [setValue])
 
   const recalculateDetailDates = useCallback((details: TnaDetailFormValues[]) => {
     const startDateValue = details[0]?.executionDate ?? ""
@@ -648,8 +658,13 @@ export function TnaFormDialog({
   useEffect(() => {
     if (!open) return
 
-    recalculateDetailDates(getValues("tnaDetails"))
-  }, [dateRecalculationKey, getValues, open, recalculateDetailDates])
+    const details = getValues("tnaDetails")
+    details.forEach((detail, index) => {
+      if (detail.relationFormula.trim()) {
+        recalculateFormulaDate(index, details)
+      }
+    })
+  }, [formulaRecalculationKey, getValues, open, recalculateFormulaDate])
 
   function handleStartDateButtonClick() {
     setPendingStartDate(parseCalendarDate(getValues("tnaDetails.0.executionDate")) ?? new Date())
@@ -1254,6 +1269,7 @@ export function TnaFormDialog({
       </Dialog>
       <TnaFormulaDialog
         open={formulaDialogOpen}
+        activeTaskButtonId={formulaDetailIndex === null ? "" : (watchedDetails[formulaDetailIndex]?.id || `row-${formulaDetailIndex}`)}
         initialFormula={formulaInitialValue}
         taskButtons={formulaTaskButtons}
         onOpenChange={(nextOpen) => {
@@ -1274,7 +1290,9 @@ export function TnaFormDialog({
             shouldDirty: true,
             shouldValidate: true,
           })
-          recalculateDetailDates(details)
+          if (formula.trim()) {
+            recalculateFormulaDate(formulaDetailIndex, details)
+          }
           setFormulaDialogOpen(false)
           setFormulaDetailIndex(null)
           setFormulaInitialValue("")
