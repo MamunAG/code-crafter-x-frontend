@@ -90,10 +90,10 @@ type LeadTimeWarning = {
 }
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
-const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
+const DETAIL_TABLE_INPUT_CLASS = "h-7 rounded-md px-1.5 text-[11px]"
 const EXCEEDING_DAYS_INPUT_CLASS = "border-amber-400 bg-amber-50 font-semibold text-amber-900 shadow-[0_0_0_1px_rgba(245,158,11,0.18)] dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100"
 
-function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onClearFormula, onOpenFormula }: FormulaButtonCellProps) {
+function FormulaButtonCell({ className = "h-7", control, index, renderFormulaLabel, onClearFormula, onOpenFormula }: FormulaButtonCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
   const hasFormula = Boolean(formula.trim())
   const stateClassName = hasFormula
@@ -105,7 +105,7 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
       <Button
         type="button"
         variant="outline"
-        className={`${className} w-full justify-start rounded-md py-0 pl-2 pr-8 text-left text-xs ${stateClassName}`}
+        className={`${className} w-full justify-start rounded-md py-0 pl-2 pr-8 text-left text-[11px] ${stateClassName}`}
         onClick={() => onOpenFormula(index)}
       >
         <span className="truncate">
@@ -116,7 +116,7 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute right-1 top-1/2 size-6 -translate-y-1/2 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-0 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+        className="absolute right-1 top-1/2 size-5 -translate-y-1/2 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-0 dark:hover:bg-red-500/10 dark:hover:text-red-300"
         disabled={!hasFormula}
         onClick={() => onClearFormula(index)}
         aria-label={`Clear formula for row ${index + 1}`}
@@ -193,7 +193,7 @@ function DetailTableFieldError({ control, index, field }: DetailTableFieldErrorP
 }
 
 function getDetailHeaderClass(columnId: string) {
-  const baseClass = "px-1.5 py-2 text-left font-medium whitespace-nowrap text-foreground"
+  const baseClass = "px-1.5 py-1 text-left font-medium whitespace-nowrap text-foreground"
 
   if (columnId === "position") return `w-12 ${baseClass}`
   if (columnId === "taskId") return `min-w-56 ${baseClass}`
@@ -206,14 +206,14 @@ function getDetailHeaderClass(columnId: string) {
 }
 
 function getDetailCellClass(columnId: string) {
-  if (columnId === "position") return "px-1.5 py-1 align-middle text-xs whitespace-nowrap"
-  if (columnId === "taskId") return "min-w-56 px-1.5 py-1 align-top"
-  if (columnId === "executionDate") return "min-w-40 px-1.5 py-1 align-top"
-  if (columnId === "days") return "w-28 px-1.5 py-1 align-top"
-  if (columnId === "relationFormula") return "min-w-64 px-1.5 py-1 align-top"
-  if (columnId === "actions") return "px-1.5 py-1 text-right align-middle"
+  if (columnId === "position") return "px-1.5 py-0.5 align-middle text-xs whitespace-nowrap"
+  if (columnId === "taskId") return "min-w-56 px-1.5 py-0.5 align-middle"
+  if (columnId === "executionDate") return "min-w-40 px-1.5 py-0.5 align-middle"
+  if (columnId === "days") return "w-28 px-1.5 py-0.5 align-middle"
+  if (columnId === "relationFormula") return "min-w-64 px-1.5 py-0.5 align-middle"
+  if (columnId === "actions") return "px-1.5 py-0.5 text-right align-middle"
 
-  return "px-1.5 py-1 align-top"
+  return "px-1.5 py-0.5 align-middle"
 }
 
 const tnaFormSchema = z.object({
@@ -885,7 +885,7 @@ export function TnaFormDialog({
           </button>
         ),
         cell: ({ row }) => (
-          <div className="space-y-1">
+          <div className="flex h-full flex-col justify-center gap-0.5">
             <ExecutionDateInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
@@ -901,7 +901,7 @@ export function TnaFormDialog({
         id: "days",
         header: () => <>Days <span className="text-destructive">*</span></>,
         cell: ({ row }) => (
-          <div className="space-y-1">
+          <div className="flex h-full flex-col justify-center gap-0.5">
             <DaysInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
@@ -917,7 +917,7 @@ export function TnaFormDialog({
         id: "relationFormula",
         header: "Formula",
         cell: ({ row }) => (
-          <div className="space-y-1">
+          <div className="flex h-full flex-col justify-center gap-0.5">
             <FormulaButtonCell
               control={control}
               index={row.index}
@@ -1148,25 +1148,25 @@ export function TnaFormDialog({
                       </div>
                     ) : null}
 
-                    <div className="space-y-3 lg:hidden">
+                    <div className="space-y-2 lg:hidden">
                       {fields.map((field, index) => (
                         <div
                           key={field.id}
                           onDragOver={handleDetailDragOver}
                           onDrop={(event) => handleDetailDrop(event, field.id)}
-                          className={`rounded-lg border border-slate-200 bg-white p-3 transition-opacity dark:border-white/10 dark:bg-slate-950/40 ${draggingDetailId === field.id ? "opacity-60" : ""}`}
+                          className={`rounded-lg border border-slate-200 bg-white p-2.5 transition-opacity dark:border-white/10 dark:bg-slate-950/40 ${draggingDetailId === field.id ? "opacity-60" : ""}`}
                         >
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 draggable
                                 onDragStart={(event) => handleDetailDragStart(event, field.id)}
                                 onDragEnd={() => setDraggingDetailId("")}
-                                className="flex size-7 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
+                                className="flex size-6 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
                                 aria-label={`Drag row ${index + 1}`}
                               >
-                                <GripVertical className="size-3.5" />
+                                <GripVertical className="size-3" />
                               </button>
                               <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
                             </div>
@@ -1174,20 +1174,20 @@ export function TnaFormDialog({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="size-7 rounded-md text-destructive hover:text-destructive"
+                              className="size-6 rounded-md text-destructive hover:text-destructive"
                               onClick={() => remove(index)}
                               disabled={fields.length <= 1}
                             >
-                              <Trash2 className="size-3.5" />
+                              <Trash2 className="size-3" />
                             </Button>
                           </div>
 
-                          <div className="mt-3 space-y-3">
+                          <div className="mt-2.5 space-y-2">
                             <Controller
                               name={`tnaDetails.${index}.taskId`}
                               control={control}
                               render={({ field: taskField }) => (
-                                <div className="space-y-1.5">
+                                <div className="space-y-1">
                                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                                     Task <span className="text-destructive">*</span>
                                   </label>
@@ -1200,65 +1200,65 @@ export function TnaFormDialog({
                                     emptyMessage="No tasks match your search."
                                     disabled={taskOptionsLoading}
                                     showClear={Boolean(taskField.value)}
-                                    inputClassName="h-9 rounded-md px-2 text-xs"
+                                    inputClassName="h-8 rounded-md px-1.5 text-[11px]"
                                     contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
                                   />
-                                  <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                  <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                     {detailErrorAt(errors as Record<string, unknown>, index, "taskId")}
                                   </p>
                                 </div>
                               )}
                             />
 
-                            <div className="grid gap-3 min-[420px]:grid-cols-2">
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Execution date <span className="text-destructive">*</span>
-                                </label>
-                                <ExecutionDateInputCell
-                                  className="h-9 rounded-md px-2 text-xs"
+                              <div className="grid gap-2 min-[420px]:grid-cols-2">
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                    Execution date <span className="text-destructive">*</span>
+                                  </label>
+                                  <ExecutionDateInputCell
+                                    className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleExecutionDateChange(index, value)}
                                   ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
                                 />
-                                <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                  <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
                                 </p>
                               </div>
 
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Days <span className="text-destructive">*</span>
-                                </label>
-                                <DaysInputCell
-                                  className="h-9 rounded-md px-2 text-xs"
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                    Days <span className="text-destructive">*</span>
+                                  </label>
+                                  <DaysInputCell
+                                    className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleDaysChange(index, value)}
                                   ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
                                 />
-                                <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                  <p className="min-h-3.5 text-[10px] leading-3.5 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "days")}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                Formula
-                              </label>
-                              <FormulaButtonCell
-                                className="h-9"
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                  Formula
+                                </label>
+                                <FormulaButtonCell
+                                  className="h-8"
                                 control={control}
                                 index={index}
                                 renderFormulaLabel={getRenderedFormulaLabel}
                                 onClearFormula={handleClearRelationFormula}
                                 onOpenFormula={handleRelationFormulaButtonClick}
                               />
-                              <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                 {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
                               </p>
                             </div>
@@ -1271,7 +1271,7 @@ export function TnaFormDialog({
                       <table className="w-full min-w-230 border-collapse text-xs">
                         <thead>
                           {detailTable.getHeaderGroups().map((headerGroup) => (
-                            <tr key={headerGroup.id} className="h-9 border-b hover:bg-transparent">
+            <tr key={headerGroup.id} className="h-11 border-b align-middle hover:bg-transparent">
                               {headerGroup.headers.map((header) => (
                                 <th key={header.id} className={`${getDetailHeaderClass(header.column.id)} sticky top-0 z-20 bg-white shadow-[inset_0_-1px_0_rgba(226,232,240,0.9)] dark:bg-slate-950`}>
                                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -1286,7 +1286,7 @@ export function TnaFormDialog({
                               key={row.id}
                               onDragOver={handleDetailDragOver}
                               onDrop={(event) => handleDetailDrop(event, row.original.id)}
-                              className={`h-10 border-b align-top transition-colors hover:bg-muted/50 ${draggingDetailId === row.original.id ? "opacity-60" : ""}`}
+                              className={`h-11 border-b align-middle transition-colors hover:bg-muted/50 ${draggingDetailId === row.original.id ? "opacity-60" : ""}`}
                             >
                               {row.getVisibleCells().map((cell) => (
                                 <td key={cell.id} className={getDetailCellClass(cell.column.id)}>
