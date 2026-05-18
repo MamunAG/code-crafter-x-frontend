@@ -64,6 +64,23 @@ export type TnaDetailRecord = {
   deleted_at?: string | null
 }
 
+export type TnaDetailRevisionRecord = {
+  id: string
+  tnaDetailId: string
+  previousExecutionDate?: string | null
+  newExecutionDate?: string | null
+  note?: string | null
+  created_by_id?: string | null
+  updated_by_id?: string | null
+  deleted_by_id?: string | null
+  created_by_user?: UserSummary | null
+  updated_by_user?: UserSummary | null
+  deleted_by_user?: UserSummary | null
+  created_at?: string | null
+  updated_at?: string | null
+  deleted_at?: string | null
+}
+
 export type TnaRecord = {
   id: string
   buyerId: string
@@ -95,6 +112,14 @@ export type TnaDetailFormValues = {
   days: string
   sortOrder?: number
   relationFormula: string
+  isPersisted?: boolean
+  revisions?: TnaDetailRevisionFormValues[]
+}
+
+export type TnaDetailRevisionFormValues = {
+  previousExecutionDate: string
+  newExecutionDate: string
+  note?: string
 }
 
 export type TnaFormValues = {

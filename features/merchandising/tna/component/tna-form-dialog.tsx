@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
-import { ArrowDownNarrowWide, CalendarIcon, Download, GripVertical, Loader2, Plus, Trash2, X } from "lucide-react"
+import { ArrowDownNarrowWide, CalendarClock, CalendarIcon, Download, GripVertical, Loader2, Plus, Trash2, X } from "lucide-react"
 import type { DragEvent } from "react"
 import { z } from "zod"
 
@@ -18,9 +18,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import { createTaskFormulaToken, evaluateTnaRelationFormula, renderTnaRelationFormula } from "../tna-formula.utils"
-import type { TnaDetailFormValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "../tna.types"
+import type { TnaDetailFormValues, TnaDetailRevisionRecord, TnaFormValues, TnaRecord, TnaTaskRecord } from "../tna.types"
 import { TnaFormulaDialog } from "./tna-formula-dialog"
 import { TnaImportDialog, type ImportTnaOption, type LoadImportTnaOptionsParams } from "./tna-import-dialog"
+import { TnaRevisionDialog, type TnaRevisionDraft } from "./tna-revision-dialog"
 
 type TnaEditorMode = "create" | "edit"
 
@@ -45,6 +46,7 @@ type TnaFormDialogProps = {
   loadJobOptions: (params: AppComboboxLoadParams, buyerId?: string) => Promise<AppComboboxLoadResult<JobOption>>
   loadImportTnaOptions: (params: LoadImportTnaOptionsParams) => Promise<AppComboboxLoadResult<ImportTnaOption>>
   loadImportTnaRecord: (id: string) => Promise<TnaRecord>
+  loadDetailRevisions: (tnaId: string, detailId: string) => Promise<TnaDetailRevisionRecord[]>
   onOpenChange: (open: boolean) => void
   onNewTask?: () => void
   onSubmit: (values: TnaFormValues) => void | Promise<void>
@@ -69,6 +71,7 @@ type DaysInputCellProps = {
   ariaInvalid?: boolean
   className: string
   control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  disabled?: boolean
   index: number
   register: ReturnType<typeof useForm<TnaFormValues>>["register"]
   onValueChange?: (value: string) => void
@@ -78,6 +81,7 @@ type ExecutionDateInputCellProps = {
   ariaInvalid?: boolean
   className: string
   control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  disabled?: boolean
   index: number
   register: ReturnType<typeof useForm<TnaFormValues>>["register"]
   onValueChange?: (value: string) => void
@@ -128,7 +132,7 @@ function FormulaButtonCell({ className = "h-7", control, index, renderFormulaLab
   )
 }
 
-function DaysInputCell({ ariaInvalid = false, className, control, index, register, onValueChange }: DaysInputCellProps) {
+function DaysInputCell({ ariaInvalid = false, className, control, disabled = false, index, register, onValueChange }: DaysInputCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
   const days = useWatch({ control, name: `tnaDetails.${index}.days` }) ?? ""
   const leadTime = useWatch({ control, name: "leadTime" }) ?? ""
@@ -138,14 +142,19 @@ function DaysInputCell({ ariaInvalid = false, className, control, index, registe
   const exceedsLeadTime = daysNumber !== null && leadTimeNumber !== null && daysNumber > leadTimeNumber
   const overBy = daysNumber !== null && leadTimeNumber !== null ? daysNumber - leadTimeNumber : 0
   const daysField = register(`tnaDetails.${index}.days`)
+  const disabledTitle = hasFormula
+    ? "This row is controlled by a formula."
+    : disabled
+      ? "Use Revise to change the execution date for this saved row."
+      : ""
 
   return (
     <Input
       type="number"
       min={0}
       step="1"
-      disabled={hasFormula}
-      title={hasFormula ? "This row is controlled by a formula." : exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used when applying Set start date"}
+      disabled={hasFormula || disabled}
+      title={disabledTitle || (exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used when applying Set start date")}
       className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : ""}`}
       aria-invalid={ariaInvalid}
       {...daysField}
@@ -157,17 +166,22 @@ function DaysInputCell({ ariaInvalid = false, className, control, index, registe
   )
 }
 
-function ExecutionDateInputCell({ ariaInvalid = false, className, control, index, register, onValueChange }: ExecutionDateInputCellProps) {
+function ExecutionDateInputCell({ ariaInvalid = false, className, control, disabled = false, index, register, onValueChange }: ExecutionDateInputCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
   const hasFormula = Boolean(formula.trim())
   const executionDateField = register(`tnaDetails.${index}.executionDate`)
+  const disabledTitle = hasFormula
+    ? "This row is controlled by a formula."
+    : disabled
+      ? "Use Revise to change the execution date for this saved row."
+      : undefined
 
   return (
     <Input
       type="date"
       className={className}
-      disabled={hasFormula}
-      title={hasFormula ? "This row is controlled by a formula." : undefined}
+      disabled={hasFormula || disabled}
+      title={disabledTitle}
       aria-invalid={ariaInvalid}
       {...executionDateField}
       onChange={(event) => {
@@ -200,7 +214,7 @@ function getDetailHeaderClass(columnId: string) {
   if (columnId === "executionDate") return `min-w-40 ${baseClass}`
   if (columnId === "days") return `w-28 ${baseClass}`
   if (columnId === "relationFormula") return `min-w-64 ${baseClass}`
-  if (columnId === "actions") return `w-16 ${baseClass} text-right`
+  if (columnId === "actions") return `w-20 ${baseClass} text-right`
 
   return baseClass
 }
@@ -226,7 +240,16 @@ const tnaFormSchema = z.object({
       taskId: z.string().trim().min(1, "Task is required."),
       executionDate: z.string().trim().min(1, "Execution date is required."),
       days: z.string().trim().min(1, "Days are required.").refine((value) => Number.isFinite(Number(value)) && Number(value) >= 0, "Days must be a number greater than or equal to zero."),
+      sortOrder: z.number().optional(),
       relationFormula: z.string().trim(),
+      isPersisted: z.boolean().optional(),
+      revisions: z.array(
+        z.object({
+          previousExecutionDate: z.string().trim().min(1),
+          newExecutionDate: z.string().trim().min(1),
+          note: z.string().optional(),
+        }),
+      ).optional(),
     }),
   ).min(1, "At least one task row is required."),
 })
@@ -238,6 +261,8 @@ function emptyDetailRow(): TnaDetailFormValues {
     executionDate: "",
     days: "1",
     relationFormula: "",
+    isPersisted: false,
+    revisions: [],
   }
 }
 
@@ -399,6 +424,7 @@ export function TnaFormDialog({
   loadJobOptions,
   loadImportTnaOptions,
   loadImportTnaRecord,
+  loadDetailRevisions,
   onOpenChange,
   onNewTask,
   onSubmit,
@@ -416,6 +442,13 @@ export function TnaFormDialog({
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [startDateDialogOpen, setStartDateDialogOpen] = useState(false)
   const [pendingStartDate, setPendingStartDate] = useState<Date | undefined>(undefined)
+  const [revisionDialogOpen, setRevisionDialogOpen] = useState(false)
+  const [revisionDetailIndex, setRevisionDetailIndex] = useState<number | null>(null)
+  const [revisionDraft, setRevisionDraft] = useState<TnaRevisionDraft>({ newExecutionDate: "", note: "" })
+  const [savedRevisionHistory, setSavedRevisionHistory] = useState<TnaDetailRevisionRecord[]>([])
+  const [revisionHistoryLoading, setRevisionHistoryLoading] = useState(false)
+  const [revisionHistoryError, setRevisionHistoryError] = useState("")
+  const revisionHistoryRequestIdRef = useRef(0)
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
@@ -462,6 +495,12 @@ export function TnaFormDialog({
       setImportDialogOpen(false)
       setStartDateDialogOpen(false)
       setPendingStartDate(undefined)
+      setRevisionDialogOpen(false)
+      setRevisionDetailIndex(null)
+      setRevisionDraft({ newExecutionDate: "", note: "" })
+      setSavedRevisionHistory([])
+      setRevisionHistoryLoading(false)
+      setRevisionHistoryError("")
       return
     }
 
@@ -473,6 +512,12 @@ export function TnaFormDialog({
     setImportDialogOpen(false)
     setStartDateDialogOpen(false)
     setPendingStartDate(undefined)
+    setRevisionDialogOpen(false)
+    setRevisionDetailIndex(null)
+    setRevisionDraft({ newExecutionDate: "", note: "" })
+    setSavedRevisionHistory([])
+    setRevisionHistoryLoading(false)
+    setRevisionHistoryError("")
   }, [initialBuyer, initialJob, initialValues, open, reset])
 
   useEffect(() => {
@@ -527,6 +572,12 @@ export function TnaFormDialog({
   const watchedDetails = useMemo(() => watchedTnaDetails ?? [], [watchedTnaDetails])
   const watchedLeadTime = useWatch({ control, name: "leadTime" }) ?? ""
   const leadTimeWarning = useMemo(() => getLeadTimeWarning(watchedDetails, watchedLeadTime), [watchedDetails, watchedLeadTime])
+  const activeRevisionDetail = revisionDetailIndex === null ? null : watchedDetails[revisionDetailIndex] ?? null
+  const activeRevisionTaskLabel = activeRevisionDetail
+    ? taskOptions.find((task) => task.id === activeRevisionDetail.taskId)?.name || `Row ${(revisionDetailIndex ?? 0) + 1}`
+    : ""
+  const revisionPreviousExecutionDate = activeRevisionDetail?.executionDate ?? ""
+  const revisionUnchanged = revisionDraft.newExecutionDate.trim() === revisionPreviousExecutionDate.trim()
 
   const handleValidSubmit = useCallback((values: TnaFormValues) => {
     return onSubmit(values)
@@ -784,6 +835,102 @@ export function TnaFormDialog({
     })
   }, [getValues, setValue])
 
+  const canReviseDetail = useCallback((index: number) => {
+    const detail = watchedDetails[index]
+    return Boolean(detail?.isPersisted && !detail.relationFormula.trim())
+  }, [watchedDetails])
+
+  const getReviseDisabledReason = useCallback((index: number) => {
+    const detail = watchedDetails[index]
+
+    if (detail?.relationFormula.trim()) {
+      return "Formula-driven rows are read-only for now."
+    }
+
+    if (!detail?.isPersisted) {
+      return "Save this row first before creating revision history."
+    }
+
+    return "Revise execution date"
+  }, [watchedDetails])
+
+  const loadRevisionHistory = useCallback(async (index: number) => {
+    const detail = getValues(`tnaDetails.${index}`)
+    if (!currentTnaId || !detail?.id || !detail.isPersisted) {
+      setSavedRevisionHistory([])
+      setRevisionHistoryError("")
+      setRevisionHistoryLoading(false)
+      return
+    }
+
+    const requestId = revisionHistoryRequestIdRef.current + 1
+    revisionHistoryRequestIdRef.current = requestId
+    setRevisionHistoryLoading(true)
+    setRevisionHistoryError("")
+
+    try {
+      const history = await loadDetailRevisions(currentTnaId, detail.id)
+      if (revisionHistoryRequestIdRef.current === requestId) {
+        setSavedRevisionHistory(history)
+      }
+    } catch (caughtError) {
+      if (revisionHistoryRequestIdRef.current === requestId) {
+        setSavedRevisionHistory([])
+        setRevisionHistoryError(caughtError instanceof Error ? caughtError.message : "Unable to load revision history right now.")
+      }
+    } finally {
+      if (revisionHistoryRequestIdRef.current === requestId) {
+        setRevisionHistoryLoading(false)
+      }
+    }
+  }, [currentTnaId, getValues, loadDetailRevisions])
+
+  const handleOpenRevisionDialog = useCallback((index: number) => {
+    const detail = getValues(`tnaDetails.${index}`)
+    if (!detail?.isPersisted || detail.relationFormula.trim()) return
+
+    setRevisionDetailIndex(index)
+    setRevisionDraft({
+      newExecutionDate: detail.executionDate,
+      note: "",
+    })
+    setSavedRevisionHistory([])
+    setRevisionHistoryError("")
+    setRevisionDialogOpen(true)
+    void loadRevisionHistory(index)
+  }, [getValues, loadRevisionHistory])
+
+  const handleSaveRevision = useCallback(() => {
+    if (revisionDetailIndex === null) return
+
+    const detail = getValues(`tnaDetails.${revisionDetailIndex}`)
+    if (!detail) return
+
+    const previousExecutionDate = detail.executionDate.trim()
+    const newExecutionDate = revisionDraft.newExecutionDate.trim()
+
+    if (!previousExecutionDate || !newExecutionDate || previousExecutionDate === newExecutionDate) {
+      return
+    }
+
+    const revisions = getValues(`tnaDetails.${revisionDetailIndex}.revisions`) ?? []
+
+    handleExecutionDateChange(revisionDetailIndex, newExecutionDate)
+    setValue(`tnaDetails.${revisionDetailIndex}.revisions`, [
+      ...revisions,
+      {
+        previousExecutionDate,
+        newExecutionDate,
+        note: revisionDraft.note.trim(),
+      },
+    ], {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+
+    setRevisionDraft({ newExecutionDate, note: "" })
+  }, [getValues, handleExecutionDateChange, revisionDetailIndex, revisionDraft.newExecutionDate, revisionDraft.note, setValue])
+
   useEffect(() => {
     if (!open) return
 
@@ -889,6 +1036,7 @@ export function TnaFormDialog({
             <ExecutionDateInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
+              disabled={Boolean(watchedDetails[row.index]?.isPersisted)}
               index={row.index}
               register={register}
               onValueChange={(value) => handleExecutionDateChange(row.index, value)}
@@ -905,6 +1053,7 @@ export function TnaFormDialog({
             <DaysInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
+              disabled={Boolean(watchedDetails[row.index]?.isPersisted)}
               index={row.index}
               register={register}
               onValueChange={(value) => handleDaysChange(row.index, value)}
@@ -932,21 +1081,40 @@ export function TnaFormDialog({
       {
         id: "actions",
         header: "Action",
-        cell: ({ row }) => (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7 rounded-md text-destructive hover:text-destructive"
-            onClick={() => remove(row.index)}
-            disabled={fields.length <= 1}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
-        ),
+        cell: ({ row }) => {
+          const stagedRevisionCount = watchedDetails[row.index]?.revisions?.length ?? 0
+
+          return (
+            <div className="flex items-center justify-end gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={`size-7 rounded-md ${stagedRevisionCount > 0 ? "text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200" : "text-slate-500 hover:text-primary"}`}
+                onClick={() => handleOpenRevisionDialog(row.index)}
+                disabled={!canReviseDetail(row.index)}
+                title={getReviseDisabledReason(row.index)}
+                aria-label={`Revise row ${row.index + 1}`}
+              >
+                <CalendarClock className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-md text-destructive hover:text-destructive"
+                onClick={() => remove(row.index)}
+                disabled={fields.length <= 1}
+                aria-label={`Remove row ${row.index + 1}`}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          )
+        },
       },
     ],
-    [control, fields.length, getRenderedFormulaLabel, handleClearRelationFormula, handleDaysChange, handleExecutionDateChange, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
+    [canReviseDetail, control, fields.length, getRenderedFormulaLabel, getReviseDisabledReason, handleClearRelationFormula, handleDaysChange, handleExecutionDateChange, handleExecutionDateSort, handleOpenRevisionDialog, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading, watchedDetails],
   )
 
   const detailTable = useReactTable({
@@ -1170,16 +1338,31 @@ export function TnaFormDialog({
                               </button>
                               <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-6 rounded-md text-destructive hover:text-destructive"
-                              onClick={() => remove(index)}
-                              disabled={fields.length <= 1}
-                            >
-                              <Trash2 className="size-3" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className={`size-6 rounded-md ${(watchedDetails[index]?.revisions?.length ?? 0) > 0 ? "text-emerald-700 hover:text-emerald-800 dark:text-emerald-300" : "text-slate-500 hover:text-primary"}`}
+                                onClick={() => handleOpenRevisionDialog(index)}
+                                disabled={!canReviseDetail(index)}
+                                title={getReviseDisabledReason(index)}
+                                aria-label={`Revise row ${index + 1}`}
+                              >
+                                <CalendarClock className="size-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-6 rounded-md text-destructive hover:text-destructive"
+                                onClick={() => remove(index)}
+                                disabled={fields.length <= 1}
+                                aria-label={`Remove row ${index + 1}`}
+                              >
+                                <Trash2 className="size-3" />
+                              </Button>
+                            </div>
                           </div>
 
                           <div className="mt-2.5 space-y-2">
@@ -1218,6 +1401,7 @@ export function TnaFormDialog({
                                   <ExecutionDateInputCell
                                     className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
+                                  disabled={Boolean(watchedDetails[index]?.isPersisted)}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleExecutionDateChange(index, value)}
@@ -1235,6 +1419,7 @@ export function TnaFormDialog({
                                   <DaysInputCell
                                     className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
+                                  disabled={Boolean(watchedDetails[index]?.isPersisted)}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleDaysChange(index, value)}
@@ -1400,6 +1585,35 @@ export function TnaFormDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <TnaRevisionDialog
+        open={revisionDialogOpen}
+        taskLabel={activeRevisionTaskLabel}
+        previousExecutionDate={revisionPreviousExecutionDate}
+        draft={revisionDraft}
+        savedRevisions={savedRevisionHistory}
+        pendingRevisions={activeRevisionDetail?.revisions ?? []}
+        historyLoading={revisionHistoryLoading}
+        historyError={revisionHistoryError}
+        revisionUnchanged={revisionUnchanged}
+        onDraftChange={setRevisionDraft}
+        onOpenChange={(nextOpen) => {
+          setRevisionDialogOpen(nextOpen)
+          if (!nextOpen) {
+            revisionHistoryRequestIdRef.current += 1
+            setRevisionDetailIndex(null)
+            setRevisionDraft({ newExecutionDate: "", note: "" })
+            setSavedRevisionHistory([])
+            setRevisionHistoryLoading(false)
+            setRevisionHistoryError("")
+          }
+        }}
+        onRetryHistory={() => {
+          if (revisionDetailIndex !== null) {
+            void loadRevisionHistory(revisionDetailIndex)
+          }
+        }}
+        onSave={handleSaveRevision}
+      />
       <TnaFormulaDialog
         open={formulaDialogOpen}
         activeTaskButtonId={formulaDetailIndex === null ? "" : (watchedDetails[formulaDetailIndex]?.id || `row-${formulaDetailIndex}`)}

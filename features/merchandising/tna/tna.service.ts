@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   PaginatedResponse,
   TnaFilterValues,
+  TnaDetailRevisionRecord,
   TnaFormValues,
   TnaRecord,
   TnaTaskRecord,
@@ -75,11 +76,19 @@ function buildTnaPayload(values: TnaFormValues) {
     jobId: values.jobId.trim(),
     leadTime: normalizeNumber(values.leadTime),
     tnaDetails: values.tnaDetails.map((detail, index) => ({
+      id: detail.id,
       taskId: detail.taskId.trim(),
       executionDate: detail.executionDate.trim(),
       days: normalizeNumber(detail.days),
       sortOrder: index + 1,
       relationFormula: optionalString(detail.relationFormula),
+      revisions: detail.revisions
+        ?.filter((revision) => revision.previousExecutionDate.trim() && revision.newExecutionDate.trim())
+        .map((revision) => ({
+          previousExecutionDate: revision.previousExecutionDate.trim(),
+          newExecutionDate: revision.newExecutionDate.trim(),
+          note: optionalString(revision.note ?? ""),
+        })),
     })),
   }
 }
@@ -141,6 +150,29 @@ export async function fetchTnaRecord({
   const payload = await readJsonResponse<TnaRecord>(response)
   if (!payload.data) throw new Error("The TNA record was returned without data.")
   return payload.data
+}
+
+export async function fetchTnaDetailRevisions({
+  apiUrl,
+  accessToken,
+  tnaId,
+  detailId,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  tnaId: string
+  detailId: string
+  organizationId?: string
+}): Promise<TnaDetailRevisionRecord[]> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/tna/${tnaId}/details/${detailId}/revisions`), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<TnaDetailRevisionRecord[]>(response)
+  return payload.data ?? []
 }
 
 export async function createTna({

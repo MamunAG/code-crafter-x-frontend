@@ -22,7 +22,7 @@ import { ActiveTnaSection } from "./component/active-tna-section"
 import { DeletedTnaSection } from "./component/deleted-tna-section"
 import { TnaFormDialog } from "./component/tna-form-dialog"
 import { TnaTaskFromDialog } from "./component/tna-task-from-dialog"
-import { createTna, fetchTnaRecord, fetchTnaRecords, fetchTnaTasks, permanentlyDeleteTna, restoreTna, softDeleteTna, updateTna } from "./tna.service"
+import { createTna, fetchTnaDetailRevisions, fetchTnaRecord, fetchTnaRecords, fetchTnaTasks, permanentlyDeleteTna, restoreTna, softDeleteTna, updateTna } from "./tna.service"
 import type { PaginationMeta, TnaFilterValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "./tna.types"
 
 type TnaEditorMode = "create" | "edit"
@@ -50,6 +50,8 @@ const DEFAULT_FORM_VALUES: TnaFormValues = {
       executionDate: "",
       days: "1",
       relationFormula: "",
+      isPersisted: false,
+      revisions: [],
     },
   ],
 }
@@ -546,6 +548,28 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
     [apiUrl, handleAuthFailure, selectedOrganizationId],
   )
 
+  const loadDetailRevisions = useCallback(
+    async (tnaId: string, detailId: string) => {
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) throw new Error("Your session expired. Please sign in again.")
+
+        return await fetchTnaDetailRevisions({
+          apiUrl,
+          accessToken: token,
+          tnaId,
+          detailId,
+          organizationId: selectedOrganizationId || undefined,
+        })
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load revision history right now."
+        handleAuthFailure(message)
+        throw caughtError
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
   const openCreateDialog = useCallback(() => {
     if (!accessRules?.canCreate) {
       toast.error("You do not have permission to create TNA records.")
@@ -596,6 +620,8 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
           days: String(detail.days ?? 0),
           sortOrder: detail.sortOrder ?? undefined,
           relationFormula: detail.relationFormula ?? "",
+          isPersisted: true,
+          revisions: [],
         })),
       })
       setInitialBuyer(record.buyerId ? { value: record.buyerId, label: getBuyerLabel(record) } : null)
@@ -973,6 +999,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
         loadJobOptions={loadJobOptions}
         loadImportTnaOptions={loadImportTnaOptions}
         loadImportTnaRecord={loadImportTnaRecord}
+        loadDetailRevisions={loadDetailRevisions}
         onNewTask={() => setTaskManagerOpen(true)}
         onOpenChange={(open) => {
           setEditorOpen(open)

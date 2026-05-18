@@ -43,6 +43,8 @@ function importedDetailRows(record: TnaRecord): TnaDetailFormValues[] {
     days: String(detail.days ?? 0),
     sortOrder: detail.sortOrder ?? undefined,
     relationFormula: detail.relationFormula ?? "",
+    isPersisted: false,
+    revisions: [],
   }))
 }
 
