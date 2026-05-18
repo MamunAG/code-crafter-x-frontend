@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
-import { ArrowDownNarrowWide, CalendarIcon, Download, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
+import { ArrowDownNarrowWide, CalendarIcon, Download, GripVertical, Loader2, Plus, Trash2, X } from "lucide-react"
 import type { DragEvent } from "react"
 import { z } from "zod"
 
@@ -55,6 +55,7 @@ type FormulaButtonCellProps = {
   control: ReturnType<typeof useForm<TnaFormValues>>["control"]
   index: number
   renderFormulaLabel: (formula: string) => string
+  onClearFormula: (index: number) => void
   onOpenFormula: (index: number) => void
 }
 
@@ -82,7 +83,7 @@ const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
 const EXCEEDING_DAYS_INPUT_CLASS = "border-amber-400 bg-amber-50 font-semibold text-amber-900 shadow-[0_0_0_1px_rgba(245,158,11,0.18)] dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100"
 
-function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onOpenFormula }: FormulaButtonCellProps) {
+function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onClearFormula, onOpenFormula }: FormulaButtonCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
   const hasFormula = Boolean(formula.trim())
   const stateClassName = hasFormula
@@ -90,16 +91,30 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
     : "border-dashed border-slate-300 bg-transparent text-slate-400 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:border-white/15 dark:text-slate-500 dark:hover:border-white/25 dark:hover:bg-white/[0.04] dark:hover:text-slate-300"
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      className={`${className} w-full justify-start rounded-md px-2 text-left text-xs ${stateClassName}`}
-      onClick={() => onOpenFormula(index)}
-    >
-      <span className="truncate">
-        {renderFormulaLabel(formula)}
-      </span>
-    </Button>
+    <div className="flex items-center gap-1.5">
+      <Button
+        type="button"
+        variant="outline"
+        className={`${className} min-w-0 flex-1 justify-start rounded-md px-2 text-left text-xs ${stateClassName}`}
+        onClick={() => onOpenFormula(index)}
+      >
+        <span className="truncate">
+          {renderFormulaLabel(formula)}
+        </span>
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={`${className} shrink-0 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-red-500/10 dark:hover:text-red-300`}
+        disabled={!hasFormula}
+        onClick={() => onClearFormula(index)}
+        aria-label={`Clear formula for row ${index + 1}`}
+        title="Clear formula"
+      >
+        <X className="size-3.5" />
+      </Button>
+    </div>
   )
 }
 
@@ -356,6 +371,14 @@ export function TnaFormDialog({
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
+  const pendingStartDateLabel = pendingStartDate
+    ? pendingStartDate.toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "long",
+      weekday: "short",
+      year: "numeric",
+    })
+    : "No date selected"
 
   const {
     control,
@@ -544,6 +567,13 @@ export function TnaFormDialog({
     setFormulaInitialValue(currentValue)
     setFormulaDialogOpen(true)
   }, [getValues])
+
+  const handleClearRelationFormula = useCallback((index: number) => {
+    setValue(`tnaDetails.${index}.relationFormula`, "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }, [setValue])
 
   const getExecutionDateInputProps = useCallback((index: number) => {
     return register(`tnaDetails.${index}.executionDate`)
@@ -748,6 +778,7 @@ export function TnaFormDialog({
               control={control}
               index={row.index}
               renderFormulaLabel={getRenderedFormulaLabel}
+              onClearFormula={handleClearRelationFormula}
               onOpenFormula={handleRelationFormulaButtonClick}
             />
             <DetailTableFieldError control={control} index={row.index} field="relationFormula" />
@@ -771,7 +802,7 @@ export function TnaFormDialog({
         ),
       },
     ],
-    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
+    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleClearRelationFormula, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
   )
 
   const detailTable = useReactTable({
@@ -1076,6 +1107,7 @@ export function TnaFormDialog({
                                   control={control}
                                   index={index}
                                   renderFormulaLabel={getRenderedFormulaLabel}
+                                  onClearFormula={handleClearRelationFormula}
                                   onOpenFormula={handleRelationFormulaButtonClick}
                                 />
                                 <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
@@ -1159,20 +1191,58 @@ export function TnaFormDialog({
           }
         }}
       >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Start Date</DialogTitle>
-            <DialogDescription>Select the first task date. Other task dates will be calculated from Days.</DialogDescription>
+        <DialogContent className="overflow-hidden p-0 sm:max-w-[23rem]">
+          <DialogHeader className="border-b border-slate-200/70 px-4 pb-3 pt-4 text-left dark:border-white/10">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <CalendarIcon className="size-4" />
+              </span>
+              <div>
+                <DialogTitle>Set start date</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Other task dates will be calculated from the Days column.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="flex justify-center">
+
+          <div className="space-y-3 px-4 py-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-white/10 dark:bg-white/[0.04]">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Selected date</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950 dark:text-slate-50">{pendingStartDateLabel}</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-white/10 dark:bg-slate-950/40">
             <Calendar
               mode="single"
               selected={pendingStartDate}
               onSelect={setPendingStartDate}
               captionLayout="dropdown"
+                className="mx-auto w-full max-w-[17.5rem] bg-transparent p-0 [--cell-size:2rem]"
+                classNames={{
+                  root: "w-full",
+                  months: "relative flex w-full flex-col",
+                  month: "flex w-full flex-col gap-3",
+                  month_caption: "flex h-9 w-full items-center justify-center px-10",
+                  caption_label: "flex items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-slate-950 dark:text-slate-50 [&>svg]:size-3.5 [&>svg]:text-slate-500",
+                  dropdowns: "flex h-9 w-full items-center justify-center gap-1.5 text-sm font-semibold text-slate-950 dark:text-slate-50",
+                  nav: "absolute inset-x-0 top-0 flex h-9 w-full items-center justify-between",
+                  button_previous: "size-7 rounded-full p-0 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.08]",
+                  button_next: "size-7 rounded-full p-0 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.08]",
+                  table: "w-full border-collapse",
+                  weekdays: "grid grid-cols-7 border-b border-slate-100 pb-1.5 dark:border-white/10",
+                  weekday: "flex h-6 items-center justify-center text-[11px] font-semibold text-slate-500 dark:text-slate-400",
+                  week: "mt-1 grid grid-cols-7 gap-y-1",
+                  day: "flex size-8 items-center justify-center p-0 text-center",
+                  day_button: "size-7 rounded-full border-0 text-sm font-medium text-slate-800 hover:bg-slate-100 data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:text-slate-100 dark:hover:bg-white/[0.08]",
+                  today: "bg-slate-100 text-slate-950 dark:bg-white/[0.08] dark:text-slate-50",
+                  outside: "text-slate-400 opacity-80 dark:text-slate-500",
+                }}
             />
+            </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="border-t border-slate-200/70 bg-slate-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
             <Button type="button" variant="outline" className="rounded-xl" onClick={() => setStartDateDialogOpen(false)}>
               Cancel
             </Button>
