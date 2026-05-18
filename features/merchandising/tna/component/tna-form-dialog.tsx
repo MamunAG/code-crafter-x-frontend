@@ -852,7 +852,7 @@ export function TnaFormDialog({
             name={`tnaDetails.${row.index}.taskId`}
             control={control}
             render={({ field: taskField }) => (
-              <div className="space-y-1">
+              <div className="flex h-full flex-col justify-center gap-0.5">
                 <AppCombobox
                   value={taskComboboxOptions.find((task) => task.value === taskField.value) ?? null}
                   onValueChange={(task) => taskField.onChange(task?.value ?? "")}
