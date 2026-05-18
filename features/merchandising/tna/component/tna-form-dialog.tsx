@@ -71,6 +71,16 @@ type DaysInputCellProps = {
   control: ReturnType<typeof useForm<TnaFormValues>>["control"]
   index: number
   register: ReturnType<typeof useForm<TnaFormValues>>["register"]
+  onValueChange?: (value: string) => void
+}
+
+type ExecutionDateInputCellProps = {
+  ariaInvalid?: boolean
+  className: string
+  control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  index: number
+  register: ReturnType<typeof useForm<TnaFormValues>>["register"]
+  onValueChange?: (value: string) => void
 }
 
 type LeadTimeWarning = {
@@ -118,23 +128,52 @@ function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLab
   )
 }
 
-function DaysInputCell({ ariaInvalid = false, className, control, index, register }: DaysInputCellProps) {
+function DaysInputCell({ ariaInvalid = false, className, control, index, register, onValueChange }: DaysInputCellProps) {
+  const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
   const days = useWatch({ control, name: `tnaDetails.${index}.days` }) ?? ""
   const leadTime = useWatch({ control, name: "leadTime" }) ?? ""
   const daysNumber = getFiniteNumber(days)
   const leadTimeNumber = getFiniteNumber(leadTime)
+  const hasFormula = Boolean(formula.trim())
   const exceedsLeadTime = daysNumber !== null && leadTimeNumber !== null && daysNumber > leadTimeNumber
   const overBy = daysNumber !== null && leadTimeNumber !== null ? daysNumber - leadTimeNumber : 0
+  const daysField = register(`tnaDetails.${index}.days`)
 
   return (
     <Input
       type="number"
       min={0}
       step="1"
-      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used when applying Set start date"}
+      disabled={hasFormula}
+      title={hasFormula ? "This row is controlled by a formula." : exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used when applying Set start date"}
       className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : ""}`}
       aria-invalid={ariaInvalid}
-      {...register(`tnaDetails.${index}.days`)}
+      {...daysField}
+      onChange={(event) => {
+        daysField.onChange(event)
+        onValueChange?.(event.target.value)
+      }}
+    />
+  )
+}
+
+function ExecutionDateInputCell({ ariaInvalid = false, className, control, index, register, onValueChange }: ExecutionDateInputCellProps) {
+  const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
+  const hasFormula = Boolean(formula.trim())
+  const executionDateField = register(`tnaDetails.${index}.executionDate`)
+
+  return (
+    <Input
+      type="date"
+      className={className}
+      disabled={hasFormula}
+      title={hasFormula ? "This row is controlled by a formula." : undefined}
+      aria-invalid={ariaInvalid}
+      {...executionDateField}
+      onChange={(event) => {
+        executionDateField.onChange(event)
+        onValueChange?.(event.target.value)
+      }}
     />
   )
 }
@@ -267,6 +306,15 @@ function addDaysToDateOnly(startDateValue: string, daysToAdd: number) {
   const nextDate = new Date(startDate.getTime())
   nextDate.setUTCDate(nextDate.getUTCDate() + daysToAdd)
   return formatDateOnly(nextDate)
+}
+
+function getPlanDayNumber(startDateValue: string, executionDateValue: string) {
+  const startDate = parseDateOnly(startDateValue)
+  const executionDate = parseDateOnly(executionDateValue)
+  if (!startDate || !executionDate) return null
+
+  const msPerDay = 24 * 60 * 60 * 1000
+  return Math.round((executionDate.getTime() - startDate.getTime()) / msPerDay) + 1
 }
 
 function getPositiveInteger(value: string) {
@@ -574,10 +622,6 @@ export function TnaFormDialog({
     })
   }, [setValue])
 
-  const getExecutionDateInputProps = useCallback((index: number) => {
-    return register(`tnaDetails.${index}.executionDate`)
-  }, [register])
-
   const taskComboboxOptions = useMemo<TaskOption[]>(
     () => taskOptions.map((task) => ({ value: task.id, label: task.name })),
     [taskOptions],
@@ -593,7 +637,7 @@ export function TnaFormDialog({
   )
 
   const formulaRecalculationKey = useMemo(
-    () => watchedDetails.map((detail) => `${detail.taskId}|${detail.executionDate}|${detail.relationFormula}`).join("||"),
+    () => watchedDetails.map((detail) => `${detail.taskId}|${detail.relationFormula}`).join("||"),
     [watchedDetails],
   )
 
@@ -620,14 +664,36 @@ export function TnaFormDialog({
       return
     }
 
+    const nextDays = index === 0
+      ? 1
+      : getPlanDayNumber(details[0]?.executionDate ?? "", nextDate)
+
     setValue(`tnaDetails.${index}.executionDate`, nextDate, {
       shouldDirty: true,
       shouldValidate: true,
     })
-    details[index] = {
+
+    const nextDetail = {
       ...details[index],
       executionDate: nextDate,
     }
+
+    if (nextDays !== null) {
+      const nextDaysValue = String(Math.max(0, nextDays))
+      if (nextDaysValue !== nextDetail.days) {
+        setValue(`tnaDetails.${index}.days`, nextDaysValue, {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+        details[index] = {
+          ...nextDetail,
+          days: nextDaysValue,
+        }
+        return
+      }
+    }
+
+    details[index] = nextDetail
   }, [setValue])
 
   const recalculateDetailDates = useCallback((details: TnaDetailFormValues[]) => {
@@ -655,16 +721,75 @@ export function TnaFormDialog({
     })
   }, [setValue])
 
-  useEffect(() => {
-    if (!open) return
-
-    const details = getValues("tnaDetails")
+  const recalculateFormulaDates = useCallback((details: TnaDetailFormValues[]) => {
     details.forEach((detail, index) => {
       if (detail.relationFormula.trim()) {
         recalculateFormulaDate(index, details)
       }
     })
-  }, [formulaRecalculationKey, getValues, open, recalculateFormulaDate])
+  }, [recalculateFormulaDate])
+
+  const handleExecutionDateChange = useCallback((index: number, nextExecutionDate: string) => {
+    const details = getValues("tnaDetails")
+    if (!details[index]) return
+
+    setValue(`tnaDetails.${index}.executionDate`, nextExecutionDate, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+
+    const nextDetails = details.map((detail, detailIndex) => (
+      detailIndex === index
+        ? { ...detail, executionDate: nextExecutionDate }
+        : detail
+    ))
+
+    if (index === 0) {
+      setValue("tnaDetails.0.days", "1", {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      return
+    }
+
+    const nextDays = getPlanDayNumber(details[0]?.executionDate ?? "", nextExecutionDate)
+    if (nextDays !== null) {
+      const nextDaysValue = String(Math.max(0, nextDays))
+      setValue(`tnaDetails.${index}.days`, nextDaysValue, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      nextDetails[index] = {
+        ...nextDetails[index],
+        days: nextDaysValue,
+      }
+    }
+  }, [getValues, setValue])
+
+  const handleDaysChange = useCallback((index: number, nextDaysValue: string) => {
+    const details = getValues("tnaDetails")
+    const detail = details[index]
+    if (!detail) return
+
+    const nextDays = getPositiveInteger(nextDaysValue)
+    if (nextDays === null) return
+
+    const referenceDate = index === 0 ? detail.executionDate : details[0]?.executionDate
+    const nextExecutionDate = referenceDate ? addDaysToDateOnly(referenceDate, nextDays - 1) : null
+    if (!nextExecutionDate) return
+
+    setValue(`tnaDetails.${index}.executionDate`, nextExecutionDate, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }, [getValues, setValue])
+
+  useEffect(() => {
+    if (!open) return
+
+    const details = getValues("tnaDetails")
+    recalculateFormulaDates(details)
+  }, [formulaRecalculationKey, getValues, open, recalculateFormulaDates])
 
   function handleStartDateButtonClick() {
     setPendingStartDate(parseCalendarDate(getValues("tnaDetails.0.executionDate")) ?? new Date())
@@ -694,6 +819,7 @@ export function TnaFormDialog({
     }
 
     recalculateDetailDates(details)
+    recalculateFormulaDates(details)
     setStartDateDialogOpen(false)
   }
 
@@ -760,10 +886,12 @@ export function TnaFormDialog({
         ),
         cell: ({ row }) => (
           <div className="space-y-1">
-            <Input
-              type="date"
+            <ExecutionDateInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
-              {...getExecutionDateInputProps(row.index)}
+              control={control}
+              index={row.index}
+              register={register}
+              onValueChange={(value) => handleExecutionDateChange(row.index, value)}
             />
             <DetailTableFieldError control={control} index={row.index} field="executionDate" />
           </div>
@@ -779,6 +907,7 @@ export function TnaFormDialog({
               control={control}
               index={row.index}
               register={register}
+              onValueChange={(value) => handleDaysChange(row.index, value)}
             />
             <DetailTableFieldError control={control} index={row.index} field="days" />
           </div>
@@ -817,7 +946,7 @@ export function TnaFormDialog({
         ),
       },
     ],
-    [control, fields.length, getExecutionDateInputProps, getRenderedFormulaLabel, handleClearRelationFormula, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
+    [control, fields.length, getRenderedFormulaLabel, handleClearRelationFormula, handleDaysChange, handleExecutionDateChange, handleExecutionDateSort, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
   )
 
   const detailTable = useReactTable({
@@ -863,7 +992,7 @@ export function TnaFormDialog({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
-            <div className="flex min-h-full flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5 lg:h-full lg:min-h-0">
+            <div className="flex min-h-full flex-col gap-2 px-4 py-2 sm:px-6 sm:py-2 lg:h-full lg:min-h-0">
               {loading ? (
                 <div className="space-y-4 py-2">
                   <Skeleton className="h-11 w-full rounded-xl" />
@@ -871,14 +1000,14 @@ export function TnaFormDialog({
                   <Skeleton className="h-11 w-full rounded-xl" />
                 </div>
               ) : (
-                <div className="flex min-h-0 flex-1 flex-col gap-5">
-                  <div className="grid gap-4 md:grid-cols-3">
+                <div className="flex min-h-0 flex-1 flex-col gap-1">
+                  <div className="grid gap-3 md:grid-cols-3 mb-1">
                     <Controller
                       name="buyerId"
                       control={control}
                       render={({ field }) => (
-                        <div className="space-y-2">
-                          <label htmlFor="tna-buyer" className="text-sm font-medium">
+                        <div className="flex items-center">
+                          <label htmlFor="tna-buyer" className="text-sm font-medium text-nowrap px-1">
                             Buyer <span className="text-destructive">*</span>
                           </label>
                           <AppCombobox
@@ -908,8 +1037,8 @@ export function TnaFormDialog({
                       name="jobId"
                       control={control}
                       render={({ field }) => (
-                        <div className="space-y-2">
-                          <label htmlFor="tna-job" className="text-sm font-medium">
+                        <div className="flex items-center">
+                          <label htmlFor="tna-job" className="text-sm font-medium text-nowrap px-1">
                             Job <span className="text-destructive">*</span>
                           </label>
                           <AppCombobox
@@ -941,9 +1070,10 @@ export function TnaFormDialog({
                         </div>
                       )}
                     />
+
                     <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <label htmlFor="tna-leadTime" className="text-sm font-medium">
+                      <div className="flex items-center">
+                        <label htmlFor="tna-leadTime" className="text-sm font-medium text-nowrap px-1">
                           Lead time <span className="text-destructive">*</span>
                         </label>
                         <Input
@@ -963,7 +1093,7 @@ export function TnaFormDialog({
 
 
                   <div className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden dark:border-white/10 dark:bg-white/[0.03]">
-                    <div className="sticky top-0 z-30 -mx-3 -mt-3 flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-white/10 dark:bg-slate-950/95">
+                    <div className="-mx-3 -mt-3 flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-white/10 dark:bg-slate-950/95">
                       <div>
                         <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">TNA detail rows</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1019,123 +1149,126 @@ export function TnaFormDialog({
                     ) : null}
 
                     <div className="space-y-3 lg:hidden">
-                        {fields.map((field, index) => (
-                          <div
-                            key={field.id}
-                            onDragOver={handleDetailDragOver}
-                            onDrop={(event) => handleDetailDrop(event, field.id)}
-                            className={`rounded-lg border border-slate-200 bg-white p-3 transition-opacity dark:border-white/10 dark:bg-slate-950/40 ${draggingDetailId === field.id ? "opacity-60" : ""}`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  draggable
-                                  onDragStart={(event) => handleDetailDragStart(event, field.id)}
-                                  onDragEnd={() => setDraggingDetailId("")}
-                                  className="flex size-7 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
-                                  aria-label={`Drag row ${index + 1}`}
-                                >
-                                  <GripVertical className="size-3.5" />
-                                </button>
-                                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
-                              </div>
-                              <Button
+                      {fields.map((field, index) => (
+                        <div
+                          key={field.id}
+                          onDragOver={handleDetailDragOver}
+                          onDrop={(event) => handleDetailDrop(event, field.id)}
+                          className={`rounded-lg border border-slate-200 bg-white p-3 transition-opacity dark:border-white/10 dark:bg-slate-950/40 ${draggingDetailId === field.id ? "opacity-60" : ""}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-7 rounded-md text-destructive hover:text-destructive"
-                                onClick={() => remove(index)}
-                                disabled={fields.length <= 1}
+                                draggable
+                                onDragStart={(event) => handleDetailDragStart(event, field.id)}
+                                onDragEnd={() => setDraggingDetailId("")}
+                                className="flex size-7 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-900/5 hover:text-slate-600 active:cursor-grabbing dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
+                                aria-label={`Drag row ${index + 1}`}
                               >
-                                <Trash2 className="size-3.5" />
-                              </Button>
+                                <GripVertical className="size-3.5" />
+                              </button>
+                              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Row {index + 1}</p>
                             </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 rounded-md text-destructive hover:text-destructive"
+                              onClick={() => remove(index)}
+                              disabled={fields.length <= 1}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
 
-                            <div className="mt-3 space-y-3">
-                              <Controller
-                                name={`tnaDetails.${index}.taskId`}
-                                control={control}
-                                render={({ field: taskField }) => (
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                      Task <span className="text-destructive">*</span>
-                                    </label>
-                                    <AppCombobox
-                                      value={taskComboboxOptions.find((task) => task.value === taskField.value) ?? null}
-                                      onValueChange={(task) => taskField.onChange(task?.value ?? "")}
-                                      items={taskComboboxOptions}
-                                      placeholder="Select task"
-                                      loadingMessage="Loading tasks..."
-                                      emptyMessage="No tasks match your search."
-                                      disabled={taskOptionsLoading}
-                                      showClear={Boolean(taskField.value)}
-                                      inputClassName="h-9 rounded-md px-2 text-xs"
-                                      contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
-                                    />
-                                    <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
-                                      {detailErrorAt(errors as Record<string, unknown>, index, "taskId")}
-                                    </p>
-                                  </div>
-                                )}
-                              />
-
-                              <div className="grid gap-3 min-[420px]:grid-cols-2">
+                          <div className="mt-3 space-y-3">
+                            <Controller
+                              name={`tnaDetails.${index}.taskId`}
+                              control={control}
+                              render={({ field: taskField }) => (
                                 <div className="space-y-1.5">
                                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    Execution date <span className="text-destructive">*</span>
+                                    Task <span className="text-destructive">*</span>
                                   </label>
-                                  <Input
-                                    type="date"
-                                    className="h-9 rounded-md px-2 text-xs"
-                                    aria-invalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
-                                    {...getExecutionDateInputProps(index)}
+                                  <AppCombobox
+                                    value={taskComboboxOptions.find((task) => task.value === taskField.value) ?? null}
+                                    onValueChange={(task) => taskField.onChange(task?.value ?? "")}
+                                    items={taskComboboxOptions}
+                                    placeholder="Select task"
+                                    loadingMessage="Loading tasks..."
+                                    emptyMessage="No tasks match your search."
+                                    disabled={taskOptionsLoading}
+                                    showClear={Boolean(taskField.value)}
+                                    inputClassName="h-9 rounded-md px-2 text-xs"
+                                    contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
                                   />
                                   <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
-                                    {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
+                                    {detailErrorAt(errors as Record<string, unknown>, index, "taskId")}
                                   </p>
                                 </div>
+                              )}
+                            />
 
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    Days <span className="text-destructive">*</span>
-                                  </label>
-                                  <DaysInputCell
-                                    className="h-9 rounded-md px-2 text-xs"
-                                    control={control}
-                                    index={index}
-                                    register={register}
-                                    ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
-                                  />
-                                  <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
-                                    {detailErrorAt(errors as Record<string, unknown>, index, "days")}
-                                  </p>
-                                </div>
+                            <div className="grid gap-3 min-[420px]:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                  Execution date <span className="text-destructive">*</span>
+                                </label>
+                                <ExecutionDateInputCell
+                                  className="h-9 rounded-md px-2 text-xs"
+                                  control={control}
+                                  index={index}
+                                  register={register}
+                                  onValueChange={(value) => handleExecutionDateChange(index, value)}
+                                  ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
+                                />
+                                <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                  {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
+                                </p>
                               </div>
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Formula
+                                  Days <span className="text-destructive">*</span>
                                 </label>
-                                <FormulaButtonCell
-                                  className="h-9"
+                                <DaysInputCell
+                                  className="h-9 rounded-md px-2 text-xs"
                                   control={control}
                                   index={index}
-                                  renderFormulaLabel={getRenderedFormulaLabel}
-                                  onClearFormula={handleClearRelationFormula}
-                                  onOpenFormula={handleRelationFormulaButtonClick}
+                                  register={register}
+                                  onValueChange={(value) => handleDaysChange(index, value)}
+                                  ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
                                 />
                                 <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
-                                  {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
+                                  {detailErrorAt(errors as Record<string, unknown>, index, "days")}
                                 </p>
                               </div>
                             </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                Formula
+                              </label>
+                              <FormulaButtonCell
+                                className="h-9"
+                                control={control}
+                                index={index}
+                                renderFormulaLabel={getRenderedFormulaLabel}
+                                onClearFormula={handleClearRelationFormula}
+                                onOpenFormula={handleRelationFormulaButtonClick}
+                              />
+                              <p className="min-h-4 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
+                              </p>
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                    </div>
 
                     <div className="hidden w-full max-w-full min-w-0 overflow-auto overscroll-contain rounded-md border border-slate-200/70 bg-white pb-2 [scrollbar-gutter:stable] lg:block lg:min-h-0 lg:flex-1 dark:border-white/10 dark:bg-slate-950/40">
-                      <table className="w-full min-w-[920px] border-collapse text-xs">
+                      <table className="w-full min-w-230 border-collapse text-xs">
                         <thead>
                           {detailTable.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id} className="h-9 border-b hover:bg-transparent">
@@ -1228,11 +1361,11 @@ export function TnaFormDialog({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-white/10 dark:bg-slate-950/40">
-            <Calendar
-              mode="single"
-              selected={pendingStartDate}
-              onSelect={setPendingStartDate}
-              captionLayout="dropdown"
+              <Calendar
+                mode="single"
+                selected={pendingStartDate}
+                onSelect={setPendingStartDate}
+                captionLayout="dropdown"
                 className="mx-auto w-full max-w-[17.5rem] bg-transparent p-0 [--cell-size:2rem]"
                 classNames={{
                   root: "w-full",
@@ -1253,7 +1386,7 @@ export function TnaFormDialog({
                   today: "bg-slate-100 text-slate-950 dark:bg-white/[0.08] dark:text-slate-50",
                   outside: "text-slate-400 opacity-80 dark:text-slate-500",
                 }}
-            />
+              />
             </div>
           </div>
 
