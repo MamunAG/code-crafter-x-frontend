@@ -56,7 +56,7 @@ function hasMeaningfulDetailRows(details: TnaDetailFormValues[]) {
     detail.taskId.trim() ||
     detail.executionDate.trim() ||
     detail.relationFormula.trim() ||
-    (detail.days.trim() && detail.days.trim() !== "0"),
+    (detail.days.trim() && detail.days.trim() !== "0" && detail.days.trim() !== "1"),
   )
 }
 

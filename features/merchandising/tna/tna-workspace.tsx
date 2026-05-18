@@ -48,7 +48,7 @@ const DEFAULT_FORM_VALUES: TnaFormValues = {
       id: crypto.randomUUID(),
       taskId: "",
       executionDate: "",
-      days: "0",
+      days: "1",
       relationFormula: "",
     },
   ],

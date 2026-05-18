@@ -1,22 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { Controller, useFieldArray, useForm, useFormState, useWatch } from "react-hook-form"
-import { ArrowDownNarrowWide, Download, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
-import type { DragEvent, FocusEvent } from "react"
+import { ArrowDownNarrowWide, CalendarIcon, Download, GripVertical, Loader2, Plus, Trash2 } from "lucide-react"
+import type { DragEvent } from "react"
 import { z } from "zod"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, type AppComboboxOption } from "@/components/app-combobox"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import { createTaskFormulaToken, evaluateTnaRelationFormula, renderTnaRelationFormula } from "../tna-formula.utils"
+import { createTaskFormulaToken, renderTnaRelationFormula } from "../tna-formula.utils"
 import type { TnaDetailFormValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "../tna.types"
 import { TnaFormulaDialog } from "./tna-formula-dialog"
 import { TnaImportDialog, type ImportTnaOption, type LoadImportTnaOptionsParams } from "./tna-import-dialog"
@@ -79,9 +80,7 @@ type LeadTimeWarning = {
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
 const DETAIL_TABLE_INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
-const CALCULATED_DAYS_INPUT_CLASS = "bg-slate-50 text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"
 const EXCEEDING_DAYS_INPUT_CLASS = "border-amber-400 bg-amber-50 font-semibold text-amber-900 shadow-[0_0_0_1px_rgba(245,158,11,0.18)] dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100"
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function FormulaButtonCell({ className = "h-8", control, index, renderFormulaLabel, onOpenFormula }: FormulaButtonCellProps) {
   const formula = useWatch({ control, name: `tnaDetails.${index}.relationFormula` }) ?? ""
@@ -117,9 +116,8 @@ function DaysInputCell({ ariaInvalid = false, className, control, index, registe
       type="number"
       min={0}
       step="1"
-      readOnly
-      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Calculated from the first execution date"}
-      className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : CALCULATED_DAYS_INPUT_CLASS}`}
+      title={exceedsLeadTime ? `This row is ${overBy} day(s) over lead time.` : "Used to calculate the execution date from the start date"}
+      className={`${className} ${exceedsLeadTime ? EXCEEDING_DAYS_INPUT_CLASS : ""}`}
       aria-invalid={ariaInvalid}
       {...register(`tnaDetails.${index}.days`)}
     />
@@ -184,7 +182,7 @@ function emptyDetailRow(): TnaDetailFormValues {
     id: crypto.randomUUID(),
     taskId: "",
     executionDate: "",
-    days: "0",
+    days: "1",
     relationFormula: "",
   }
 }
@@ -205,6 +203,22 @@ function parseDateOnly(value: string) {
   return date
 }
 
+function parseCalendarDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (!match) return undefined
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return undefined
+  }
+
+  return date
+}
+
 function getFiniteNumber(value: string) {
   const trimmedValue = value.trim()
   if (!trimmedValue) return null
@@ -213,31 +227,36 @@ function getFiniteNumber(value: string) {
   return Number.isFinite(numberValue) ? numberValue : null
 }
 
-function getInclusivePlanDay(startDateValue: string, currentDateValue: string) {
-  const currentDate = parseDateOnly(currentDateValue)
-  const startDate = parseDateOnly(startDateValue)
-
-  if (!currentDate || !startDate) return null
-
-  return Math.abs(Math.round((currentDate.getTime() - startDate.getTime()) / MS_PER_DAY)) + 1
-}
-
-function getCalculatedDetailDays(details: TnaDetailFormValues[], index: number) {
-  if (index === 0) return "1"
-
-  const planDay = getInclusivePlanDay(details[0]?.executionDate ?? "", details[index]?.executionDate ?? "")
-  return planDay === null ? null : String(planDay)
-}
-
-function getDetailsWithCalculatedDays(details: TnaDetailFormValues[]) {
-  return details.map((detail, index) => {
-    const nextDays = getCalculatedDetailDays(details, index)
-    return nextDays && nextDays !== detail.days ? { ...detail, days: nextDays } : detail
-  })
-}
-
 function getDateSortValue(value: string) {
   return parseDateOnly(value)?.getTime() ?? null
+}
+
+function formatDateOnly(date: Date) {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(date.getUTCDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function formatCalendarDateOnly(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function addDaysToDateOnly(startDateValue: string, daysToAdd: number) {
+  const startDate = parseDateOnly(startDateValue)
+  if (!startDate || !Number.isInteger(daysToAdd)) return null
+
+  const nextDate = new Date(startDate.getTime())
+  nextDate.setUTCDate(nextDate.getUTCDate() + daysToAdd)
+  return formatDateOnly(nextDate)
+}
+
+function getPositiveInteger(value: string) {
+  const numberValue = getFiniteNumber(value)
+  return numberValue !== null && Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null
 }
 
 function getLeadTimeWarning(details: TnaDetailFormValues[], leadTimeValue: string): LeadTimeWarning | null {
@@ -332,7 +351,8 @@ export function TnaFormDialog({
   const [formulaDetailIndex, setFormulaDetailIndex] = useState<number | null>(null)
   const [formulaInitialValue, setFormulaInitialValue] = useState("")
   const [importDialogOpen, setImportDialogOpen] = useState(false)
-  const focusedExecutionDateIndexRef = useRef<number | null>(null)
+  const [startDateDialogOpen, setStartDateDialogOpen] = useState(false)
+  const [pendingStartDate, setPendingStartDate] = useState<Date | undefined>(undefined)
   const selectedBuyerId = selectedBuyer?.value?.trim() ?? ""
   const title = mode === "create" ? "Create TNA" : "Edit TNA"
   const description = mode === "create" ? "Add a TNA record with its task timeline." : "Update the selected TNA record."
@@ -369,6 +389,8 @@ export function TnaFormDialog({
       setJobOptions(initialJob ? [initialJob] : [])
       setJobOpen(false)
       setImportDialogOpen(false)
+      setStartDateDialogOpen(false)
+      setPendingStartDate(undefined)
       return
     }
 
@@ -378,6 +400,8 @@ export function TnaFormDialog({
     setJobOptions(initialJob ? [initialJob] : [])
     setJobOpen(false)
     setImportDialogOpen(false)
+    setStartDateDialogOpen(false)
+    setPendingStartDate(undefined)
   }, [initialBuyer, initialJob, initialValues, open, reset])
 
   useEffect(() => {
@@ -434,10 +458,7 @@ export function TnaFormDialog({
   const leadTimeWarning = useMemo(() => getLeadTimeWarning(watchedDetails, watchedLeadTime), [watchedDetails, watchedLeadTime])
 
   const handleValidSubmit = useCallback((values: TnaFormValues) => {
-    return onSubmit({
-      ...values,
-      tnaDetails: getDetailsWithCalculatedDays(values.tnaDetails),
-    })
+    return onSubmit(values)
   }, [onSubmit])
 
   function handleInvalid() {
@@ -487,7 +508,7 @@ export function TnaFormDialog({
   function applyImportedRows(rows: TnaDetailFormValues[]) {
     replace(rows.length > 0 ? rows : [emptyDetailRow()])
     setImportDialogOpen(false)
-    recalculateDetailDays(rows)
+    recalculateDetailDates(rows)
   }
 
   const handleExecutionDateSort = useCallback(() => {
@@ -525,20 +546,7 @@ export function TnaFormDialog({
   }, [getValues])
 
   const getExecutionDateInputProps = useCallback((index: number) => {
-    const registration = register(`tnaDetails.${index}.executionDate`)
-
-    return {
-      ...registration,
-      onFocus: () => {
-        focusedExecutionDateIndexRef.current = index
-      },
-      onBlur: (event: FocusEvent<HTMLInputElement>) => {
-        if (focusedExecutionDateIndexRef.current === index) {
-          focusedExecutionDateIndexRef.current = null
-        }
-        void registration.onBlur(event)
-      },
-    }
+    return register(`tnaDetails.${index}.executionDate`)
   }, [register])
 
   const taskComboboxOptions = useMemo<TaskOption[]>(
@@ -555,18 +563,13 @@ export function TnaFormDialog({
     [taskComboboxOptions],
   )
 
-  const recalculationKey = useMemo(
-    () => watchedDetails.map((detail) => `${detail.taskId}|${detail.executionDate}|${detail.relationFormula}`).join("||"),
-    [watchedDetails],
-  )
-
   const detailOrderKey = useMemo(
     () => fields.map((field) => field.id).join("||"),
     [fields],
   )
 
-  const daysRecalculationKey = useMemo(
-    () => `${detailOrderKey}::${watchedDetails.map((detail) => detail.executionDate).join("||")}`,
+  const dateRecalculationKey = useMemo(
+    () => `${detailOrderKey}::${watchedDetails[0]?.executionDate ?? ""}::${watchedDetails.map((detail) => detail.days).join("||")}`,
     [detailOrderKey, watchedDetails],
   )
 
@@ -587,37 +590,27 @@ export function TnaFormDialog({
     return renderedFormula || "Add formula"
   }, [taskLabelsById])
 
-  const recalculateFormulaDate = useCallback((index: number, details: TnaDetailFormValues[]) => {
-    const nextDate = evaluateTnaRelationFormula({ details, targetIndex: index })
-    if (!nextDate || nextDate === details[index]?.executionDate) {
+  const recalculateDetailDates = useCallback((details: TnaDetailFormValues[]) => {
+    const startDateValue = details[0]?.executionDate ?? ""
+
+    if (!parseDateOnly(startDateValue)) {
       return
     }
 
-    setValue(`tnaDetails.${index}.executionDate`, nextDate, {
-      shouldDirty: true,
-      shouldValidate: true,
-    })
-    details[index] = {
-      ...details[index],
-      executionDate: nextDate,
-    }
-  }, [setValue])
-
-  const recalculateDetailDays = useCallback((details: TnaDetailFormValues[]) => {
     details.forEach((detail, index) => {
-      const nextDays = getCalculatedDetailDays(details, index)
+      const days = getPositiveInteger(detail.days)
+      if (days === null) return
 
-      if (!nextDays || nextDays === detail.days) {
-        return
-      }
+      const nextDate = index === 0 ? startDateValue : addDaysToDateOnly(startDateValue, days - 1)
+      if (!nextDate || nextDate === detail.executionDate) return
 
-      setValue(`tnaDetails.${index}.days`, nextDays, {
-        shouldDirty: false,
-        shouldValidate: false,
+      setValue(`tnaDetails.${index}.executionDate`, nextDate, {
+        shouldDirty: true,
+        shouldValidate: true,
       })
       details[index] = {
         ...detail,
-        days: nextDays,
+        executionDate: nextDate,
       }
     })
   }, [setValue])
@@ -625,19 +618,39 @@ export function TnaFormDialog({
   useEffect(() => {
     if (!open) return
 
+    recalculateDetailDates(getValues("tnaDetails"))
+  }, [dateRecalculationKey, getValues, open, recalculateDetailDates])
+
+  function handleStartDateButtonClick() {
+    setPendingStartDate(parseCalendarDate(getValues("tnaDetails.0.executionDate")) ?? new Date())
+    setStartDateDialogOpen(true)
+  }
+
+  function handleApplyStartDate() {
+    if (!pendingStartDate) return
+
+    const startDateValue = formatCalendarDateOnly(pendingStartDate)
     const details = getValues("tnaDetails")
-    details.forEach((detail, index) => {
-      if (detail.relationFormula.trim() && focusedExecutionDateIndexRef.current !== index) {
-        recalculateFormulaDate(index, details)
-      }
+
+    if (!details.length) {
+      replace([{ ...emptyDetailRow(), executionDate: startDateValue }])
+      setStartDateDialogOpen(false)
+      return
+    }
+
+    setValue("tnaDetails.0.executionDate", startDateValue, {
+      shouldDirty: true,
+      shouldValidate: true,
     })
-  }, [getValues, open, recalculationKey, recalculateFormulaDate])
 
-  useEffect(() => {
-    if (!open) return
+    details[0] = {
+      ...details[0],
+      executionDate: startDateValue,
+    }
 
-    recalculateDetailDays(getValues("tnaDetails"))
-  }, [daysRecalculationKey, getValues, open, recalculateDetailDays])
+    recalculateDetailDates(details)
+    setStartDateDialogOpen(false)
+  }
 
   const detailColumns = useMemo<ColumnDef<TnaDetailTableRow>[]>(
     () => [
@@ -921,6 +934,15 @@ export function TnaFormDialog({
                           <Download className="size-3.5" />
                           Import
                         </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl sm:w-auto"
+                          onClick={handleStartDateButtonClick}
+                        >
+                          <CalendarIcon className="size-3.5" />
+                          Set start date
+                        </Button>
                         {onNewTask ? (
                           <Button
                             type="button"
@@ -1128,6 +1150,38 @@ export function TnaFormDialog({
           onOpenChange={setImportDialogOpen}
         />
       ) : null}
+      <Dialog
+        open={startDateDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setStartDateDialogOpen(nextOpen)
+          if (!nextOpen) {
+            setPendingStartDate(undefined)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Start Date</DialogTitle>
+            <DialogDescription>Select the first task date. Other task dates will be calculated from Days.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <Calendar
+              mode="single"
+              selected={pendingStartDate}
+              onSelect={setPendingStartDate}
+              captionLayout="dropdown"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setStartDateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" className="rounded-xl" disabled={!pendingStartDate} onClick={handleApplyStartDate}>
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <TnaFormulaDialog
         open={formulaDialogOpen}
         initialFormula={formulaInitialValue}
@@ -1150,10 +1204,7 @@ export function TnaFormDialog({
             shouldDirty: true,
             shouldValidate: true,
           })
-          if (formula.trim()) {
-            recalculateFormulaDate(formulaDetailIndex, details)
-          }
-          recalculateDetailDays(details)
+          recalculateDetailDates(details)
           setFormulaDialogOpen(false)
           setFormulaDetailIndex(null)
           setFormulaInitialValue("")
