@@ -180,7 +180,7 @@ function ExecutionDateInputCell({ ariaInvalid = false, className, control, index
 
 function DetailTableError({ message }: { message: string }) {
   if (!message) return null
-  return <p className="pt-1 text-[10px] leading-3 text-red-600 dark:text-red-300">{message}</p>
+  return <p className="pt-0.5 text-[10px] leading-3 text-red-600 dark:text-red-300">{message}</p>
 }
 
 function DetailTableFieldError({ control, index, field }: DetailTableFieldErrorProps) {
@@ -1271,7 +1271,7 @@ export function TnaFormDialog({
                       <table className="w-full min-w-230 border-collapse text-xs">
                         <thead>
                           {detailTable.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="h-11 border-b align-middle hover:bg-transparent">
+            <tr key={headerGroup.id} className="h-9 border-b align-middle hover:bg-transparent">
                               {headerGroup.headers.map((header) => (
                                 <th key={header.id} className={`${getDetailHeaderClass(header.column.id)} sticky top-0 z-20 bg-white shadow-[inset_0_-1px_0_rgba(226,232,240,0.9)] dark:bg-slate-950`}>
                                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -1286,7 +1286,7 @@ export function TnaFormDialog({
                               key={row.id}
                               onDragOver={handleDetailDragOver}
                               onDrop={(event) => handleDetailDrop(event, row.original.id)}
-                              className={`h-11 border-b align-middle transition-colors hover:bg-muted/50 ${draggingDetailId === row.original.id ? "opacity-60" : ""}`}
+                              className={`h-9 border-b align-middle transition-colors hover:bg-muted/50 ${draggingDetailId === row.original.id ? "opacity-60" : ""}`}
                             >
                               {row.getVisibleCells().map((cell) => (
                                 <td key={cell.id} className={getDetailCellClass(cell.column.id)}>
