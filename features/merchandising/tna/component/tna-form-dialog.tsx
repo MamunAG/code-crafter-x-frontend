@@ -160,6 +160,9 @@ function DaysInputCell({ ariaInvalid = false, className, control, disabled = fal
       {...daysField}
       onChange={(event) => {
         daysField.onChange(event)
+      }}
+      onBlur={(event) => {
+        daysField.onBlur(event)
         onValueChange?.(event.target.value)
       }}
     />
@@ -185,11 +188,12 @@ function ExecutionDateInputCell({ ariaInvalid = false, className, control, disab
       aria-invalid={ariaInvalid}
       {...executionDateField}
       onChange={(event) => {
-        const nextValue = event.target.value
         executionDateField.onChange(event)
-        if (parseDateOnly(nextValue)) {
-          onValueChange?.(nextValue)
-        }
+      }}
+      onBlur={(event) => {
+        executionDateField.onBlur(event)
+        const nextValue = event.target.value
+        if (parseDateOnly(nextValue)) onValueChange?.(nextValue)
       }}
     />
   )
@@ -1039,7 +1043,6 @@ export function TnaFormDialog({
             <ExecutionDateInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
-              disabled={Boolean(watchedDetails[row.index]?.isPersisted)}
               index={row.index}
               register={register}
               onValueChange={(value) => handleExecutionDateChange(row.index, value)}
@@ -1056,7 +1059,6 @@ export function TnaFormDialog({
             <DaysInputCell
               className={DETAIL_TABLE_INPUT_CLASS}
               control={control}
-              disabled={Boolean(watchedDetails[row.index]?.isPersisted)}
               index={row.index}
               register={register}
               onValueChange={(value) => handleDaysChange(row.index, value)}
@@ -1404,7 +1406,6 @@ export function TnaFormDialog({
                                   <ExecutionDateInputCell
                                     className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
-                                  disabled={Boolean(watchedDetails[index]?.isPersisted)}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleExecutionDateChange(index, value)}
@@ -1422,7 +1423,6 @@ export function TnaFormDialog({
                                   <DaysInputCell
                                     className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
-                                  disabled={Boolean(watchedDetails[index]?.isPersisted)}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleDaysChange(index, value)}
