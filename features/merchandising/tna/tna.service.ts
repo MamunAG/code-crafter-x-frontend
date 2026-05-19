@@ -131,6 +131,30 @@ export async function fetchTnaRecords({
   return payload.data
 }
 
+export async function fetchTnaReport({
+  apiUrl,
+  accessToken,
+  filters = {},
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  filters?: Partial<TnaFilterValues>
+  organizationId?: string
+}): Promise<TnaRecord[]> {
+  const url = buildApiUrl(apiUrl, "/api/v1/tna/report")
+  appendFilterParams(url, filters)
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<TnaRecord[]>(response)
+  return payload.data ?? []
+}
+
 export async function fetchTnaRecord({
   apiUrl,
   accessToken,

@@ -185,8 +185,11 @@ function ExecutionDateInputCell({ ariaInvalid = false, className, control, disab
       aria-invalid={ariaInvalid}
       {...executionDateField}
       onChange={(event) => {
+        const nextValue = event.target.value
         executionDateField.onChange(event)
-        onValueChange?.(event.target.value)
+        if (parseDateOnly(nextValue)) {
+          onValueChange?.(nextValue)
+        }
       }}
     />
   )

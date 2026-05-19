@@ -53,6 +53,7 @@ export type TnaDetailRecord = {
   days?: number | null
   sortOrder?: number | null
   relationFormula?: string | null
+  revisions?: TnaDetailRevisionRecord[]
   created_by_id?: string | null
   updated_by_id?: string | null
   deleted_by_id?: string | null

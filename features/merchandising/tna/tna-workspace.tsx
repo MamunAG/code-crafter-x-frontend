@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
+import { FileText, Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { AppComboboxLoadParams, AppComboboxLoadResult, AppComboboxOption } from "@/components/app-combobox"
@@ -870,6 +870,12 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
                     <RefreshCcw className="size-3.5" />
                     Refresh
                   </Button>
+                  {accessRules?.canView ? (
+                    <Button type="button" variant="outline" onClick={() => router.push("/merchandising/production/tna/report")} className="rounded-xl">
+                      <FileText className="size-3.5" />
+                      Report
+                    </Button>
+                  ) : null}
                   {accessRules?.canCreate ? (
                     <Button type="button" onClick={openCreateDialog} className="rounded-xl">
                       <Plus className="size-3.5" />
