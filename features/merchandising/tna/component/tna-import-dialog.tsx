@@ -357,7 +357,7 @@ export function TnaImportDialog({
                   loadingMessage="Loading buyers..."
                   emptyMessage="No buyers match your search."
                   showClear={Boolean(importBuyer)}
-                  contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                  contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
                 />
               </div>
 
@@ -380,7 +380,7 @@ export function TnaImportDialog({
                   emptyMessage={importBuyerId ? "No jobs match your search." : "Select a buyer to load matching jobs."}
                   showClear={Boolean(importJob)}
                   disabled={!importBuyerId}
-                  contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+                  contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
                 />
               </div>
 

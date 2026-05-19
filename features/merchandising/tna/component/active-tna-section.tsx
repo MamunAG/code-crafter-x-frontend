@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 import { MoreHorizontal, Plus, Search } from "lucide-react"
 import { type ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table"
@@ -25,7 +25,7 @@ type ActiveTnaSectionProps = {
   draftFilters: TnaFilterValues
   activeFilters: TnaFilterValues
   loadBuyerOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
-  loadJobOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  loadJobOptions: (params: AppComboboxLoadParams, buyerId?: string) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   onDraftFiltersChange: (nextValues: TnaFilterValues) => void
   onActiveFiltersChange: (nextValues: TnaFilterValues) => void
   onPageChange: (nextPage: number | ((current: number) => number)) => void
@@ -110,6 +110,12 @@ export function ActiveTnaSection({
 
   const filterBuyerValue = draftFilters.buyerId && selectedBuyer?.value === draftFilters.buyerId ? selectedBuyer : null
   const filterJobValue = draftFilters.jobId && selectedJob?.value === draftFilters.jobId ? selectedJob : null
+  const selectedBuyerId = draftFilters.buyerId.trim()
+
+  const loadFilterJobOptions = useCallback(
+    (params: AppComboboxLoadParams) => loadJobOptions(params, selectedBuyerId),
+    [loadJobOptions, selectedBuyerId],
+  )
 
   const filterCount = useMemo(
     () => [draftFilters.buyerId, draftFilters.jobId].filter((value) => value.trim()).length,
@@ -218,7 +224,8 @@ export function ActiveTnaSection({
               value={filterBuyerValue}
               onValueChange={(buyer) => {
                 setSelectedBuyer(buyer)
-                onDraftFiltersChange({ ...draftFilters, buyerId: buyer?.value ?? "" })
+                setSelectedJob(null)
+                onDraftFiltersChange({ ...draftFilters, buyerId: buyer?.value ?? "", jobId: "" })
               }}
               loadItems={loadBuyerOptions}
               initialLimit={10}
@@ -228,27 +235,29 @@ export function ActiveTnaSection({
               emptyMessage="No buyers match your search."
               showClear={Boolean(draftFilters.buyerId)}
               inputClassName="h-7 rounded-md px-2 text-xs"
-              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+              contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
 
           <div className="min-w-0 space-y-1">
             <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Job</label>
             <AppCombobox
+              key={selectedBuyerId || "active-tna-buyer-empty"}
               value={filterJobValue}
               onValueChange={(job) => {
                 setSelectedJob(job)
                 onDraftFiltersChange({ ...draftFilters, jobId: job?.value ?? "" })
               }}
-              loadItems={loadJobOptions}
+              loadItems={loadFilterJobOptions}
               initialLimit={10}
               searchLimit={10}
-              placeholder="All jobs"
+              placeholder={selectedBuyerId ? "All jobs" : "Select buyer first"}
               loadingMessage="Loading jobs..."
-              emptyMessage="No jobs match your search."
+              emptyMessage={selectedBuyerId ? "No jobs match your search." : "Select a buyer to load matching jobs."}
               showClear={Boolean(draftFilters.jobId)}
+              disabled={!selectedBuyerId}
               inputClassName="h-7 rounded-md px-2 text-xs"
-              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+              contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
 
@@ -257,7 +266,16 @@ export function ActiveTnaSection({
               <Search className="size-3.5" />
               Search
             </Button>
-            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onResetFilters}>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-xl sm:w-auto"
+              onClick={() => {
+                setSelectedBuyer(null)
+                setSelectedJob(null)
+                onResetFilters()
+              }}
+            >
               Reset
             </Button>
             {canCreateTna ? (

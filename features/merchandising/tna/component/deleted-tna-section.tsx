@@ -199,7 +199,7 @@ export function DeletedTnaSection({
               emptyMessage="No buyers match your search."
               showClear={Boolean(deletedDraftFilters.buyerId)}
               inputClassName="h-7 rounded-md px-2 text-xs"
-              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+              contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
 
@@ -219,7 +219,7 @@ export function DeletedTnaSection({
               emptyMessage="No jobs match your search."
               showClear={Boolean(deletedDraftFilters.jobId)}
               inputClassName="h-7 rounded-md px-2 text-xs"
-              contentClassName="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
+              contentClassName="overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95"
             />
           </div>
 
