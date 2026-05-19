@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { renderTnaRelationFormula } from "../tna-formula.utils"
@@ -118,11 +119,11 @@ export function ActiveTnaSection({
   )
 
   const filterCount = useMemo(
-    () => [draftFilters.buyerId, draftFilters.jobId].filter((value) => value.trim()).length,
+    () => [draftFilters.buyerId, draftFilters.jobId, draftFilters.leadTime ?? ""].filter((value) => value.trim()).length,
     [draftFilters],
   )
 
-  const filtersActive = Boolean(activeFilters.buyerId || activeFilters.jobId)
+  const filtersActive = Boolean(activeFilters.buyerId || activeFilters.jobId || activeFilters.leadTime)
 
   const pageSummary = useMemo(() => {
     if (!meta || meta.total === 0) return "No TNA records found"
@@ -261,7 +262,22 @@ export function ActiveTnaSection({
             />
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-4">
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="active-tna-lead-time-filter" className="text-xs font-medium text-slate-700 dark:text-slate-300">Lead time</label>
+            <Input
+              id="active-tna-lead-time-filter"
+              value={draftFilters.leadTime ?? ""}
+              onChange={(event) => {
+                onDraftFiltersChange({ ...draftFilters, leadTime: event.target.value.replace(/\D/g, "") })
+              }}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="All lead times"
+              className="h-7 rounded-md px-2 text-xs"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-3">
             <Button type="submit" className="w-full rounded-xl sm:w-auto">
               <Search className="size-3.5" />
               Search
