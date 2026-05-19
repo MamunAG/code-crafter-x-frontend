@@ -199,6 +199,58 @@ function ExecutionDateInputCell({ ariaInvalid = false, className, control, disab
   )
 }
 
+function DetailActionsCell({
+  control,
+  fieldsLength,
+  index,
+  onOpenRevision,
+  onRemove,
+}: {
+  control: ReturnType<typeof useForm<TnaFormValues>>["control"]
+  fieldsLength: number
+  index: number
+  onOpenRevision: (index: number) => void
+  onRemove: (index: number) => void
+}) {
+  const detail = useWatch({ control, name: `tnaDetails.${index}` })
+  const hasFormula = Boolean(detail?.relationFormula?.trim())
+  const canRevise = Boolean(detail?.isPersisted && !hasFormula)
+  const stagedRevisionCount = detail?.revisions?.length ?? 0
+  const reviseDisabledReason = hasFormula
+    ? "Formula-driven rows are read-only for now."
+    : !detail?.isPersisted
+      ? "Save this TNA before creating revision history."
+      : ""
+
+  return (
+    <div className="flex items-center justify-end gap-0.5">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={`size-7 rounded-md ${stagedRevisionCount > 0 ? "text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200" : "text-slate-500 hover:text-primary"}`}
+        onClick={() => onOpenRevision(index)}
+        disabled={!canRevise}
+        title={reviseDisabledReason}
+        aria-label={`Revise row ${index + 1}`}
+      >
+        <CalendarClock className="size-3.5" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-7 rounded-md text-destructive hover:text-destructive"
+        onClick={() => onRemove(index)}
+        disabled={fieldsLength <= 1}
+        aria-label={`Remove row ${index + 1}`}
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </div>
+  )
+}
+
 function DetailTableError({ message }: { message: string }) {
   if (!message) return null
   return <p className="pt-0.5 text-[10px] leading-3 text-red-600 dark:text-red-300">{message}</p>
@@ -1086,40 +1138,18 @@ export function TnaFormDialog({
       {
         id: "actions",
         header: "Action",
-        cell: ({ row }) => {
-          const stagedRevisionCount = watchedDetails[row.index]?.revisions?.length ?? 0
-
-          return (
-            <div className="flex items-center justify-end gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={`size-7 rounded-md ${stagedRevisionCount > 0 ? "text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200" : "text-slate-500 hover:text-primary"}`}
-                onClick={() => handleOpenRevisionDialog(row.index)}
-                disabled={!canReviseDetail(row.index)}
-                title={getReviseDisabledReason(row.index)}
-                aria-label={`Revise row ${row.index + 1}`}
-              >
-                <CalendarClock className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 rounded-md text-destructive hover:text-destructive"
-                onClick={() => remove(row.index)}
-                disabled={fields.length <= 1}
-                aria-label={`Remove row ${row.index + 1}`}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </div>
-          )
-        },
+        cell: ({ row }) => (
+          <DetailActionsCell
+            control={control}
+            fieldsLength={fields.length}
+            index={row.index}
+            onOpenRevision={handleOpenRevisionDialog}
+            onRemove={remove}
+          />
+        ),
       },
     ],
-    [canReviseDetail, control, fields.length, getRenderedFormulaLabel, getReviseDisabledReason, handleClearRelationFormula, handleDaysChange, handleExecutionDateChange, handleExecutionDateSort, handleOpenRevisionDialog, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading, watchedDetails],
+    [control, fields.length, getRenderedFormulaLabel, handleClearRelationFormula, handleDaysChange, handleExecutionDateChange, handleExecutionDateSort, handleOpenRevisionDialog, handleRelationFormulaButtonClick, register, remove, taskComboboxOptions, taskOptionsLoading],
   )
 
   const detailTable = useReactTable({
