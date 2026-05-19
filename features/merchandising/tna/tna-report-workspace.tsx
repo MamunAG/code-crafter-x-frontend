@@ -3,22 +3,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { ArrowLeft, FileSpreadsheet, Loader2, Printer, RefreshCcw, Search } from "lucide-react"
+import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, Loader2, Mail, Printer, RefreshCcw, Search } from "lucide-react"
 
 import { AppCombobox, type AppComboboxLoadParams, type AppComboboxLoadResult, type AppComboboxOption } from "@/components/app-combobox"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
 import { fetchJobNumbersByBuyer } from "@/features/merchandising/jobs/job.service"
+import { fetchUserOrganizations } from "@/features/organization/organization.service"
+import type { OrganizationRecord } from "@/features/organization/organization.types"
+import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 import { toast } from "sonner"
 
 import { TnaFormDialog } from "./component/tna-form-dialog"
 import type { ImportTnaOption, LoadImportTnaOptionsParams } from "./component/tna-import-dialog"
-import { fetchTnaDetailRevisions, fetchTnaRecord, fetchTnaRecords, fetchTnaReport, fetchTnaTasks, updateTna } from "./tna.service"
+import { downloadTnaReportPdf, fetchTnaDetailRevisions, fetchTnaRecord, fetchTnaRecords, fetchTnaReport, fetchTnaTasks, updateTna } from "./tna.service"
 import type { TnaDetailRecord, TnaDetailRevisionRecord, TnaFilterValues, TnaFormValues, TnaRecord, TnaTaskRecord } from "./tna.types"
 
 type TaskColumn = {
@@ -26,6 +30,8 @@ type TaskColumn = {
   label: string
   sortOrder: number
 }
+
+type ReportOrganizationHeader = Pick<OrganizationRecord, "name" | "address"> | null
 
 const DEFAULT_REPORT_FILTERS: TnaFilterValues = { buyerId: "", jobId: "", leadTime: "" }
 const DEFAULT_FORM_VALUES: TnaFormValues = {
@@ -136,6 +142,80 @@ function getTaskCellLines(detail?: TnaDetailRecord) {
   return [formatReportDate(detail.executionDate), ...getRevisionLines(detail)]
 }
 
+function buildTnaReportExcelHtml(records: TnaRecord[], taskColumns: TaskColumn[], organizationHeader: ReportOrganizationHeader) {
+  const headerCells = ["Buyer", "Job", "Lead", ...taskColumns.map((task) => task.label)]
+  const columnCount = headerCells.length
+  const organizationName = organizationHeader?.name?.trim()
+  const organizationAddress = organizationHeader?.address?.trim()
+  const reportHeaderRows = [
+    organizationName ? `<tr><th class="report-title" colspan="${columnCount}">${escapeExcelHtml(organizationName)}</th></tr>` : "",
+    organizationAddress ? `<tr><th class="report-address" colspan="${columnCount}">${escapeExcelHtml(organizationAddress)}</th></tr>` : "",
+    `<tr><th class="report-name" colspan="${columnCount}">TNA Report</th></tr>`,
+    `<tr><td class="report-spacer" colspan="${columnCount}"></td></tr>`,
+  ].join("")
+  const bodyRows = records.map((record) => {
+    const detailsByTaskId = getDetailsByTaskId(record)
+    const cells = [
+      getBuyerLabel(record),
+      getJobLabel(record),
+      Number(record.leadTime ?? 0),
+      ...taskColumns.map((task) => getTaskCellLines(detailsByTaskId[task.taskId]).join("<br>")),
+    ]
+
+    return `<tr>${cells.map((cell) => `<td>${escapeExcelHtml(cell).replaceAll("&lt;br&gt;", "<br>")}</td>`).join("")}</tr>`
+  })
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          table { border-collapse: collapse; }
+          th, td { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; white-space: nowrap; }
+          td { mso-number-format: "\\@"; }
+          .report-title, .report-address, .report-name, .report-spacer { border: 0; }
+          .report-title { font-size: 16px; font-weight: 700; }
+          .report-address { font-size: 11px; font-weight: 400; }
+          .report-name { font-size: 13px; font-weight: 700; padding-top: 8px; }
+          .report-spacer { height: 8px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            ${reportHeaderRows}
+            <tr>${headerCells.map((cell) => `<th>${escapeExcelHtml(cell)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>${bodyRows.join("")}</tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+function buildTnaReportExcelBlob(records: TnaRecord[], taskColumns: TaskColumn[], organizationHeader: ReportOrganizationHeader) {
+  return new Blob([buildTnaReportExcelHtml(records, taskColumns, organizationHeader)], { type: "application/vnd.ms-excel;charset=utf-8" })
+}
+
+function buildTnaReportExcelFilename() {
+  return `tna-report-${new Date().toISOString().slice(0, 10)}.xls`
+}
+
+function buildTnaReportPdfFilename() {
+  return `tna-report-${new Date().toISOString().slice(0, 10)}.pdf`
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function ReportTaskCell({ detail }: { detail?: TnaDetailRecord }) {
   if (!detail) {
     return <span className="text-slate-300 dark:text-slate-600">-</span>
@@ -155,6 +235,16 @@ function ReportTaskCell({ detail }: { detail?: TnaDetailRecord }) {
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function ReportOrganizationHeader({ organization }: { organization: ReportOrganizationHeader }) {
+  return (
+    <div className="hidden text-center text-slate-950 dark:text-white print:mb-2 print:block print:text-black">
+      {organization?.name?.trim() ? <div className="text-base font-bold print:text-sm">{organization.name.trim()}</div> : null}
+      {organization?.address?.trim() ? <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300 print:text-[9px] print:text-black">{organization.address.trim()}</div> : null}
+      <div className="mt-1 text-sm font-semibold print:text-[10px]">TNA Report</div>
     </div>
   )
 }
@@ -180,6 +270,8 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [taskOptions, setTaskOptions] = useState<TnaTaskRecord[]>([])
   const [taskOptionsLoading, setTaskOptionsLoading] = useState(true)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [organizationHeader, setOrganizationHeader] = useState<ReportOrganizationHeader>(null)
   const selectedBuyerId = draftFilters.buyerId.trim()
 
   const handleAuthFailure = useCallback(
@@ -511,6 +603,44 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
   }, [])
 
   useEffect(() => {
+    let active = true
+
+    async function loadOrganizationHeader() {
+      if (!selectedOrganizationId) {
+        setOrganizationHeader(null)
+        return
+      }
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+        const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+        if (!token || !storedUser?.id) throw new Error("Your session expired. Please sign in again.")
+
+        const organizations = await fetchUserOrganizations({
+          apiUrl,
+          accessToken: token,
+          userId: storedUser.id,
+        })
+        const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null
+
+        if (active) {
+          setOrganizationHeader(selectedOrganization ? { name: selectedOrganization.name, address: selectedOrganization.address } : null)
+        }
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load organization details right now."
+        handleAuthFailure(message)
+        if (active) setOrganizationHeader(null)
+      }
+    }
+
+    void loadOrganizationHeader()
+
+    return () => {
+      active = false
+    }
+  }, [apiUrl, handleAuthFailure, selectedOrganizationId])
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       void loadReport()
     }, 0)
@@ -521,50 +651,70 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
   const taskColumns = useMemo(() => buildTaskColumns(records), [records])
 
   const handleExportExcel = useCallback(() => {
-    const headerCells = ["Buyer", "Job", "Lead", ...taskColumns.map((task) => task.label)]
-    const bodyRows = records.map((record) => {
-      const detailsByTaskId = getDetailsByTaskId(record)
-      const cells = [
-        getBuyerLabel(record),
-        getJobLabel(record),
-        Number(record.leadTime ?? 0),
-        ...taskColumns.map((task) => getTaskCellLines(detailsByTaskId[task.taskId]).join("<br>")),
-      ]
+    if (!records.length) return
 
-      return `<tr>${cells.map((cell) => `<td>${escapeExcelHtml(cell).replaceAll("&lt;br&gt;", "<br>")}</td>`).join("")}</tr>`
-    })
+    downloadBlob(buildTnaReportExcelBlob(records, taskColumns, organizationHeader), buildTnaReportExcelFilename())
+  }, [organizationHeader, records, taskColumns])
 
-    const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <style>
-            table { border-collapse: collapse; }
-            th, td { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; white-space: nowrap; }
-            td { mso-number-format: "\\@"; }
-          </style>
-        </head>
-        <body>
-          <table>
-            <thead>
-              <tr>${headerCells.map((cell) => `<th>${escapeExcelHtml(cell)}</th>`).join("")}</tr>
-            </thead>
-            <tbody>${bodyRows.join("")}</tbody>
-          </table>
-        </body>
-      </html>
-    `
+  const handleExportPdf = useCallback(async () => {
+    if (!records.length) {
+      toast.error("No TNA records are available to export.")
+      return
+    }
 
-    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `tna-report-${new Date().toISOString().slice(0, 10)}.xls`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  }, [records, taskColumns])
+    if (exportingPdf) return
+
+    setExportingPdf(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+
+      const blob = await downloadTnaReportPdf({
+        apiUrl,
+        accessToken: token,
+        filters: activeFilters,
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      downloadBlob(blob, buildTnaReportPdfFilename())
+      toast.success("TNA report PDF downloaded.")
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to download the TNA report PDF right now."
+      if (!handleAuthFailure(message)) toast.error(message)
+    } finally {
+      setExportingPdf(false)
+    }
+  }, [activeFilters, apiUrl, exportingPdf, handleAuthFailure, records.length, selectedOrganizationId])
+
+  const handleEmailDraft = useCallback(() => {
+    if (!records.length) {
+      toast.error("No TNA records are available to email.")
+      return
+    }
+
+    const filename = buildTnaReportExcelFilename()
+    downloadBlob(buildTnaReportExcelBlob(records, taskColumns, organizationHeader), filename)
+
+    const subject = "TNA Report"
+    const organizationLines = organizationHeader?.name?.trim()
+      ? [
+          `Organization: ${organizationHeader.name.trim()}`,
+          organizationHeader.address?.trim() ? `Address: ${organizationHeader.address.trim()}` : "",
+          "",
+        ]
+      : []
+    const body = [
+      "Please find the TNA report attached.",
+      "",
+      ...organizationLines,
+      `Downloaded file: ${filename}`,
+      "",
+      "The report file was downloaded by the browser. Please attach it to this email before sending.",
+    ].join("\n")
+
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }, [organizationHeader, records, taskColumns])
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden print:block print:h-auto print:overflow-visible">
@@ -603,7 +753,7 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
                   <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">TNA Report</h1>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Right-click a report row for context actions.</p>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 print:hidden">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 print:hidden">
                   <Button type="button" variant="outline" onClick={() => router.push("/merchandising/production/tna")} className="rounded-xl">
                     <ArrowLeft className="size-3.5" />
                     Back
@@ -612,10 +762,29 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
                     <Printer className="size-3.5" />
                     Print
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleExportExcel} disabled={!records.length} className="rounded-xl">
-                    <FileSpreadsheet className="size-3.5" />
-                    Excel
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline" disabled={!records.length} className="rounded-xl">
+                        <Download className="size-3.5" />
+                        Export
+                        <ChevronDown className="ml-auto size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onSelect={handleExportExcel}>
+                        <FileSpreadsheet className="size-3.5" />
+                        Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => void handleExportPdf()} disabled={exportingPdf}>
+                        <FileText className="size-3.5" />
+                        {exportingPdf ? "Downloading PDF..." : "PDF"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleEmailDraft}>
+                        <Mail className="size-3.5" />
+                        Email Draft
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button type="button" variant="outline" onClick={() => setRefreshVersion((current) => current + 1)} className="rounded-xl">
                     <RefreshCcw className="size-3.5" />
                     Refresh
@@ -723,6 +892,7 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
             </div>
           ) : records.length > 0 ? (
             <div className="tna-report-print-section min-w-0 space-y-0 print:space-y-1">
+              <ReportOrganizationHeader organization={organizationHeader} />
               {records.map((record) => {
                 const detailsByTaskId = getDetailsByTaskId(record)
                 const recordTaskColumns = buildTaskColumns([record])

@@ -16,14 +16,16 @@ function buildRequestHeaders({
   accessToken,
   organizationId,
   contentType,
+  accept = "application/json",
 }: {
   accessToken: string
   organizationId?: string
   contentType?: string
+  accept?: string
 }) {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
-    Accept: "application/json",
+    Accept: accept,
   }
 
   if (contentType) headers["Content-Type"] = contentType
@@ -153,6 +155,41 @@ export async function fetchTnaReport({
 
   const payload = await readJsonResponse<TnaRecord[]>(response)
   return payload.data ?? []
+}
+
+export async function downloadTnaReportPdf({
+  apiUrl,
+  accessToken,
+  filters = {},
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  filters?: Partial<TnaFilterValues>
+  organizationId?: string
+}): Promise<Blob> {
+  const url = buildApiUrl(apiUrl, "/api/v1/tna/report/pdf")
+  appendFilterParams(url, filters)
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId, accept: "application/pdf" }),
+    cache: "no-store",
+  })
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error("You do not have permission to export the TNA report.")
+  }
+
+  if (!response.ok) {
+    throw new Error("Unable to download the TNA report PDF right now.")
+  }
+
+  return response.blob()
 }
 
 export async function fetchTnaRecord({
