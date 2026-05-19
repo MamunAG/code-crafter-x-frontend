@@ -478,10 +478,11 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
     async ({
       buyerId,
       jobId,
+      leadTime,
       query,
       page: pageNumber,
       limit: pageLimit,
-    }: AppComboboxLoadParams & { buyerId?: string; jobId?: string }) => {
+    }: AppComboboxLoadParams & { buyerId?: string; jobId?: string; leadTime?: string }) => {
       try {
         const token = window.localStorage.getItem("access_token")
         if (!token) throw new Error("Your session expired. Please sign in again.")
@@ -492,7 +493,7 @@ export function TnaWorkspace({ apiUrl }: { apiUrl: string }) {
           accessToken: token,
           page: normalizedQuery ? 1 : pageNumber,
           limit: normalizedQuery ? 100 : pageLimit,
-          filters: { buyerId: buyerId ?? "", jobId: jobId ?? "" },
+          filters: { buyerId: buyerId ?? "", jobId: jobId ?? "", leadTime: leadTime ?? "" },
           organizationId: selectedOrganizationId || undefined,
         })
 

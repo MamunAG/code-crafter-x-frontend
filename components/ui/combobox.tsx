@@ -64,6 +64,16 @@ function ComboboxInput({
     <InputGroup className={cn("w-auto", className)}>
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        aria-autocomplete="list"
+        data-1p-ignore="true"
+        data-autocompletion="off"
+        data-bwignore="true"
+        data-form-type="other"
+        data-lpignore="true"
         {...props}
       />
       <InputGroupAddon align="inline-end">

@@ -58,6 +58,7 @@ async function readJsonResponse<T>(response: Response) {
 function appendFilterParams(url: URL, filters: Partial<TnaFilterValues>) {
   if (filters.buyerId?.trim()) url.searchParams.set("buyerId", filters.buyerId.trim())
   if (filters.jobId?.trim()) url.searchParams.set("jobId", filters.jobId.trim())
+  if (filters.leadTime?.trim()) url.searchParams.set("leadTime", filters.leadTime.trim())
 }
 
 function optionalString(value: string) {

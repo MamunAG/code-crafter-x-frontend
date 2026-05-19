@@ -103,6 +103,7 @@ export type TnaRecord = {
 export type TnaFilterValues = {
   buyerId: string
   jobId: string
+  leadTime?: string
 }
 
 export type TnaDetailFormValues = {

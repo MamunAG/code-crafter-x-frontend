@@ -339,10 +339,15 @@ export function AppCombobox<T extends AppComboboxOption>({
         id={inputElementId}
         placeholder={resolvedLoading ? loadingMessage : placeholder}
         name={inputProps?.name ?? `app-combobox-${generatedInputName}`}
-        autoComplete="new-password"
+        autoComplete="off"
         autoCorrect="off"
         autoCapitalize="none"
         spellCheck={false}
+        aria-autocomplete="list"
+        data-1p-ignore="true"
+        data-autocompletion="off"
+        data-bwignore="true"
+        data-form-type="other"
         data-lpignore="true"
         className={cn("w-full", inputClassName, className)}
         disabled={resolvedDisabled}
