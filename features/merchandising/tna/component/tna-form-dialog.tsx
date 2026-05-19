@@ -1293,10 +1293,8 @@ export function TnaFormDialog({
                     </div>
                   </div>
 
-
-
-                  <div className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden dark:border-white/10 dark:bg-white/[0.03]">
-                    <div className="-mx-3 -mt-3 flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-white/10 dark:bg-slate-950/95">
+                  <div className="space-y-3 rounded-xl border-slate-200/80 bg-slate-50/60 p-3 sm:p-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden dark:border-white/10 dark:bg-white/3 border overflow-hidden">
+                    <div className="rounded-tl-xl rounded-tr-xl flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-white/10 dark:bg-slate-950/95">
                       <div>
                         <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">TNA detail rows</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1428,55 +1426,55 @@ export function TnaFormDialog({
                               )}
                             />
 
-                              <div className="grid gap-2 min-[420px]:grid-cols-2">
-                                <div className="space-y-1">
-                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    Execution date <span className="text-destructive">*</span>
-                                  </label>
-                                  <ExecutionDateInputCell
-                                    className="h-8 rounded-md px-1.5 text-[11px]"
+                            <div className="grid gap-2 min-[420px]:grid-cols-2">
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                  Execution date <span className="text-destructive">*</span>
+                                </label>
+                                <ExecutionDateInputCell
+                                  className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleExecutionDateChange(index, value)}
                                   ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "executionDate"))}
                                 />
-                                  <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                                <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "executionDate")}
                                 </p>
                               </div>
 
-                                <div className="space-y-1">
-                                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    Days <span className="text-destructive">*</span>
-                                  </label>
-                                  <DaysInputCell
-                                    className="h-8 rounded-md px-1.5 text-[11px]"
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                  Days <span className="text-destructive">*</span>
+                                </label>
+                                <DaysInputCell
+                                  className="h-8 rounded-md px-1.5 text-[11px]"
                                   control={control}
                                   index={index}
                                   register={register}
                                   onValueChange={(value) => handleDaysChange(index, value)}
                                   ariaInvalid={Boolean(detailErrorAt(errors as Record<string, unknown>, index, "days"))}
                                 />
-                                  <p className="min-h-3.5 text-[10px] leading-3.5 text-red-600 dark:text-red-300">
+                                <p className="min-h-3.5 text-[10px] leading-3.5 text-red-600 dark:text-red-300">
                                   {detailErrorAt(errors as Record<string, unknown>, index, "days")}
                                 </p>
                               </div>
                             </div>
 
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                  Formula
-                                </label>
-                                <FormulaButtonCell
-                                  className="h-8"
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                Formula
+                              </label>
+                              <FormulaButtonCell
+                                className="h-8"
                                 control={control}
                                 index={index}
                                 renderFormulaLabel={getRenderedFormulaLabel}
                                 onClearFormula={handleClearRelationFormula}
                                 onOpenFormula={handleRelationFormulaButtonClick}
                               />
-                                <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
+                              <p className="min-h-3.5 text-[10px] leading-4 text-red-600 dark:text-red-300">
                                 {detailErrorAt(errors as Record<string, unknown>, index, "relationFormula")}
                               </p>
                             </div>
@@ -1489,7 +1487,7 @@ export function TnaFormDialog({
                       <table className="w-full min-w-230 border-collapse text-xs">
                         <thead>
                           {detailTable.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="h-9 border-b align-middle hover:bg-transparent">
+                            <tr key={headerGroup.id} className="h-9 border-b align-middle hover:bg-transparent">
                               {headerGroup.headers.map((header) => (
                                 <th key={header.id} className={`${getDetailHeaderClass(header.column.id)} sticky top-0 z-20 bg-white shadow-[inset_0_-1px_0_rgba(226,232,240,0.9)] dark:bg-slate-950`}>
                                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}

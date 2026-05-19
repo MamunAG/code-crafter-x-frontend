@@ -490,9 +490,13 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
       }
     }
 
-    void loadTasks()
+    const timeout = window.setTimeout(() => {
+      void loadTasks()
+    }, 0)
+
     return () => {
       active = false
+      window.clearTimeout(timeout)
     }
   }, [apiUrl, handleAuthFailure, refreshVersion, selectedOrganizationId])
 
@@ -507,7 +511,11 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
   }, [])
 
   useEffect(() => {
-    void loadReport()
+    const timeout = window.setTimeout(() => {
+      void loadReport()
+    }, 0)
+
+    return () => window.clearTimeout(timeout)
   }, [loadReport, refreshVersion])
 
   const taskColumns = useMemo(() => buildTaskColumns(records), [records])
@@ -723,38 +731,38 @@ export function TnaReportWorkspace({ apiUrl }: { apiUrl: string }) {
                 return (
                   <ContextMenu key={record.id}>
                     <ContextMenuTrigger asChild className="select-text">
-                  <ScrollArea
-                    className="group w-full max-w-full min-w-0 select-text rounded-none bg-white print:break-inside-avoid print:overflow-visible dark:bg-slate-950/50"
-                    viewportClassName="w-full pb-3 print:overflow-visible print:pb-0"
-                  >
-                    <table className="w-full table-fixed select-text border-separate border-spacing-0 text-xs print:text-[8px]" style={{ minWidth: recordTableMinWidth }}>
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-950 dark:bg-white/4 dark:text-slate-50">
-                          <th className="w-20 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold first:border-l print:w-14 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Buyer</th>
-                          <th className="w-20 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:w-14 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Job</th>
-                          <th className="w-16 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:w-10 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Lead</th>
-                          {recordTaskColumns.map((task) => (
-                            <th key={task.taskId} className="border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">
-                              {task.label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors first:border-l group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{getBuyerLabel(record)}</td>
-                          <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{getJobLabel(record)}</td>
-                          <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{Number(record.leadTime ?? 0)}</td>
-                          {recordTaskColumns.map((task) => (
-                            <td key={task.taskId} className="border-b border-r border-slate-300 px-1 py-1 align-middle transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">
-                              <ReportTaskCell detail={detailsByTaskId[task.taskId]} />
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                    <ScrollBar orientation="horizontal" />
-                  </ScrollArea>
+                      <ScrollArea
+                        className="group w-full max-w-full min-w-0 select-text rounded-none bg-white print:break-inside-avoid print:overflow-visible dark:bg-slate-950/50"
+                        viewportClassName="w-full pb-3 print:overflow-visible print:pb-0"
+                      >
+                        <table className="w-full table-fixed select-text border-separate border-spacing-0 text-xs print:text-[8px]" style={{ minWidth: recordTableMinWidth }}>
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-950 dark:bg-white/4 dark:text-slate-50">
+                              <th className="w-20 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold first:border-l print:w-14 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Buyer</th>
+                              <th className="w-20 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:w-14 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Job</th>
+                              <th className="w-16 border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:w-10 print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">Lead</th>
+                              {recordTaskColumns.map((task) => (
+                                <th key={task.taskId} className="border-b border-r border-t border-slate-300 px-1.5 py-1 text-center text-xs font-bold print:px-0.5 print:py-0.5 print:text-[8px] dark:border-white/15">
+                                  {task.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors first:border-l group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{getBuyerLabel(record)}</td>
+                              <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{getJobLabel(record)}</td>
+                              <td className="border-b border-r border-slate-300 px-1.5 py-1 text-center text-xs transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:text-[8px] print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">{Number(record.leadTime ?? 0)}</td>
+                              {recordTaskColumns.map((task) => (
+                                <td key={task.taskId} className="border-b border-r border-slate-300 px-1 py-1 align-middle transition-colors group-hover:bg-emerald-50 print:px-0.5 print:py-0.5 print:group-hover:bg-transparent dark:border-white/15 dark:group-hover:bg-emerald-500/10">
+                                  <ReportTaskCell detail={detailsByTaskId[task.taskId]} />
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                        <ScrollBar orientation="horizontal" />
+                      </ScrollArea>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-40">
                       <ContextMenuItem onSelect={() => void openEditDialog(record.id)}>
