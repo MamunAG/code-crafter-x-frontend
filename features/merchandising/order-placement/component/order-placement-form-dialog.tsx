@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils"
 import type { OrderPlacementDetailFormValues, OrderPlacementDialogSectionId, OrderPlacementFormError, OrderPlacementFormValues } from "../order-placement.types"
 
 type SelectOption = AppComboboxOption
+type FactoryEditableField = "factoryCmPerDzn" | "factoryFob" | "factoryShipmentDate"
 
 type OrderPlacementFormDialogProps = {
   open: boolean
@@ -186,8 +187,14 @@ export function OrderPlacementFormDialog({
   const [supplierOpen, setSupplierOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<OrderPlacementDialogSectionId>("basic-info")
   const [activeFillDownRowIndex, setActiveFillDownRowIndex] = useState<number | null>(null)
+  const [activeFillDownField, setActiveFillDownField] = useState<FactoryEditableField | null>(null)
   const [jobDetailsError, setJobDetailsError] = useState("")
   const sectionRefs = useRef<Record<OrderPlacementDialogSectionId, HTMLDivElement | null>>({ "basic-info": null, details: null, status: null })
+  const factoryInputRefs = useRef<Record<FactoryEditableField, Array<HTMLInputElement | null>>>({
+    factoryCmPerDzn: [],
+    factoryFob: [],
+    factoryShipmentDate: [],
+  })
   const isEditMode = mode === "edit"
   const totalQuantity = formatNumber(sumDetails(values.orderPlacementDetails, "quantity"))
   const totalFactoryCm = formatNumber(sumDetails(values.orderPlacementDetails, "totalFactoryCm"))
@@ -216,8 +223,14 @@ export function OrderPlacementFormDialog({
     })
   }
 
-  function fillDownFromRow(rowIndex: number) {
+  function handleFactoryInputFocus(rowIndex: number, field: FactoryEditableField) {
+    setActiveFillDownRowIndex(rowIndex)
+    setActiveFillDownField(field)
+  }
+
+  function fillDownFromRow(rowIndex: number, field: FactoryEditableField | null) {
     if (rowIndex < 0 || rowIndex >= values.orderPlacementDetails.length - 1) return
+    if (!field) return
 
     const source = values.orderPlacementDetails[rowIndex]
     const nextOrderPlacementDetails = values.orderPlacementDetails.map((detail, index) => {
@@ -225,29 +238,46 @@ export function OrderPlacementFormDialog({
 
       const nextDetail = {
         ...detail,
-        factoryCmPerDzn: source.factoryCmPerDzn,
-        factoryFob: source.factoryFob,
-        factoryShipmentDate: source.factoryShipmentDate,
+        [field]: source[field],
       }
-      nextDetail.totalFactoryCm = calculateFactoryCm(nextDetail.quantity, nextDetail.factoryCmPerDzn)
-      nextDetail.totalFactoryFob = calculateFactoryFob(nextDetail.quantity, nextDetail.factoryFob)
+      if (field === "factoryCmPerDzn") nextDetail.totalFactoryCm = calculateFactoryCm(nextDetail.quantity, nextDetail.factoryCmPerDzn)
+      if (field === "factoryFob") nextDetail.totalFactoryFob = calculateFactoryFob(nextDetail.quantity, nextDetail.factoryFob)
       return nextDetail
     })
 
     onValuesChange({ ...values, orderPlacementDetails: nextOrderPlacementDetails })
   }
 
-  function handleEditableKeyDown(event: KeyboardEvent<HTMLInputElement>, rowIndex: number) {
-    if (!isFillDownShortcut(event)) return
+  function focusNextFactoryCell(rowIndex: number, field: FactoryEditableField) {
+    const nextInput = factoryInputRefs.current[field][rowIndex + 1]
+    if (!nextInput) return
+
+    nextInput.focus()
+    try {
+      nextInput.select()
+    } catch {
+      // Date inputs may not support selection in every browser.
+    }
+  }
+
+  function handleEditableKeyDown(event: KeyboardEvent<HTMLInputElement>, rowIndex: number, field: FactoryEditableField) {
+    if (isFillDownShortcut(event)) {
+      event.preventDefault()
+      fillDownFromRow(rowIndex, field)
+      return
+    }
+
+    if (event.key !== "Enter") return
 
     event.preventDefault()
-    fillDownFromRow(rowIndex)
+    focusNextFactoryCell(rowIndex, field)
   }
 
   async function handleJobChange(option: SelectOption | null) {
     onJobOptionChange(option)
     setJobDetailsError("")
     setActiveFillDownRowIndex(null)
+    setActiveFillDownField(null)
     if (!option) {
       onValuesChange({ ...values, jobId: "", orderPlacementDetails: [] })
       return
@@ -333,7 +363,7 @@ export function OrderPlacementFormDialog({
                         <CardContent className="grid max-w-full min-w-0 gap-3 px-3 pb-3 sm:px-4 md:grid-cols-2 xl:grid-cols-3">
                           <div className={FIELD_CLASS}>
                             <FieldLabel required>Buyer</FieldLabel>
-                            <AppCombobox open={buyerOpen} onOpenChange={setBuyerOpen} value={selectedBuyer} onValueChange={(option) => { setActiveFillDownRowIndex(null); onBuyerOptionChange(option); onJobOptionChange(null); onValuesChange({ ...values, buyerId: option?.value ?? "", jobId: "", orderPlacementDetails: [] }) }} loadItems={loadBuyerOptions} placeholder="Search buyer" disabled={isEditMode} showClear={Boolean(values.buyerId) && !isEditMode} />
+                            <AppCombobox open={buyerOpen} onOpenChange={setBuyerOpen} value={selectedBuyer} onValueChange={(option) => { setActiveFillDownRowIndex(null); setActiveFillDownField(null); onBuyerOptionChange(option); onJobOptionChange(null); onValuesChange({ ...values, buyerId: option?.value ?? "", jobId: "", orderPlacementDetails: [] }) }} loadItems={loadBuyerOptions} placeholder="Search buyer" disabled={isEditMode} showClear={Boolean(values.buyerId) && !isEditMode} />
                           </div>
                           <div className={FIELD_CLASS}>
                             <FieldLabel required>Job</FieldLabel>
@@ -380,10 +410,10 @@ export function OrderPlacementFormDialog({
                               variant="outline"
                               size="sm"
                               className="h-7 rounded-md px-2 text-xs"
-                              disabled={activeFillDownRowIndex == null || activeFillDownRowIndex >= values.orderPlacementDetails.length - 1}
+                              disabled={activeFillDownRowIndex == null || activeFillDownField == null || activeFillDownRowIndex >= values.orderPlacementDetails.length - 1}
                               onClick={() => {
                                 if (activeFillDownRowIndex == null) return
-                                fillDownFromRow(activeFillDownRowIndex)
+                                fillDownFromRow(activeFillDownRowIndex, activeFillDownField)
                               }}
                             >
                               Fill Down
@@ -428,9 +458,9 @@ export function OrderPlacementFormDialog({
                                         <td className={TABLE_CELL_CLASS}><span className="block min-w-0 truncate">{hideZeroValue(detail.fob)}</span></td>
                                         <td className={TABLE_CELL_CLASS}><span className="block min-w-0 truncate">{hideZeroValue(detail.cm)}</span></td>
                                         <td className={TABLE_CELL_CLASS}><span className="block min-w-0 truncate">{detail.deliveryDate}</span></td>
-                                        <td className="px-1.5 py-2 align-top"><Input value={hideZeroValue(detail.factoryCmPerDzn)} onFocus={() => setActiveFillDownRowIndex(index)} onKeyDown={(event) => handleEditableKeyDown(event, index)} onChange={(event) => updateDetail(detail.id, { factoryCmPerDzn: event.target.value })} inputMode="decimal" className={INPUT_CLASS} /></td>
-                                        <td className="px-1.5 py-2 align-top"><Input value={hideZeroValue(detail.factoryFob)} onFocus={() => setActiveFillDownRowIndex(index)} onKeyDown={(event) => handleEditableKeyDown(event, index)} onChange={(event) => updateDetail(detail.id, { factoryFob: event.target.value })} inputMode="decimal" className={INPUT_CLASS} /></td>
-                                        <td className="px-1.5 py-2 align-top"><Input type="date" value={detail.factoryShipmentDate} onFocus={() => setActiveFillDownRowIndex(index)} onKeyDown={(event) => handleEditableKeyDown(event, index)} onChange={(event) => updateDetail(detail.id, { factoryShipmentDate: event.target.value })} className={INPUT_CLASS} /></td>
+                                        <td className="px-1.5 py-2 align-top"><Input ref={(element) => { factoryInputRefs.current.factoryCmPerDzn[index] = element }} value={hideZeroValue(detail.factoryCmPerDzn)} onFocus={() => handleFactoryInputFocus(index, "factoryCmPerDzn")} onKeyDown={(event) => handleEditableKeyDown(event, index, "factoryCmPerDzn")} onChange={(event) => updateDetail(detail.id, { factoryCmPerDzn: event.target.value })} inputMode="decimal" className={INPUT_CLASS} /></td>
+                                        <td className="px-1.5 py-2 align-top"><Input ref={(element) => { factoryInputRefs.current.factoryFob[index] = element }} value={hideZeroValue(detail.factoryFob)} onFocus={() => handleFactoryInputFocus(index, "factoryFob")} onKeyDown={(event) => handleEditableKeyDown(event, index, "factoryFob")} onChange={(event) => updateDetail(detail.id, { factoryFob: event.target.value })} inputMode="decimal" className={INPUT_CLASS} /></td>
+                                        <td className="px-1.5 py-2 align-top"><Input ref={(element) => { factoryInputRefs.current.factoryShipmentDate[index] = element }} type="date" value={detail.factoryShipmentDate} onFocus={() => handleFactoryInputFocus(index, "factoryShipmentDate")} onKeyDown={(event) => handleEditableKeyDown(event, index, "factoryShipmentDate")} onChange={(event) => updateDetail(detail.id, { factoryShipmentDate: event.target.value })} className={INPUT_CLASS} /></td>
                                         <td className={TABLE_CELL_CLASS}><span className="block min-w-0 truncate">{hideZeroValue(detail.totalFactoryCm)}</span></td>
                                         <td className={TABLE_CELL_CLASS}><span className="block min-w-0 truncate">{hideZeroValue(detail.totalFactoryFob)}</span></td>
                                       </tr>
