@@ -61,7 +61,7 @@ export type OrderPlacementDetailRecord = {
   deliveryDate?: string | null
   cuttingLimitPercentage?: number | null
   remarks?: string | null
-  factoryCm?: number | null
+  factoryCmPerDzn?: number | null
   factoryFob?: number | null
   factoryShipmentDate?: string | null
   totalFactoryCm?: number | null
@@ -77,6 +77,7 @@ export type OrderPlacementRecord = {
   currencyId: number
   currency?: CurrencySummary | null
   placementDate?: string | null
+  exchangeRateBDT?: number | null
   factoryId: string
   factory?: SupplierSummary | null
   isPlaced?: boolean
@@ -120,7 +121,7 @@ export type OrderPlacementDetailFormValues = {
   deliveryDate: string
   cuttingLimitPercentage: string
   remarks: string
-  factoryCm: string
+  factoryCmPerDzn: string
   factoryFob: string
   factoryShipmentDate: string
   totalFactoryCm: string
@@ -132,6 +133,7 @@ export type OrderPlacementFormValues = {
   jobId: string
   currencyId: string
   placementDate: string
+  exchangeRateBDT: string
   factoryId: string
   isPlaced: boolean
   orderPlacementDetails: OrderPlacementDetailFormValues[]

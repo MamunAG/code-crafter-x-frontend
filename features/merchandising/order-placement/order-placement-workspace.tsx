@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ClipboardCheck, Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
+import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { AppComboboxLoadParams, AppComboboxOption } from "@/components/app-combobox"
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
+import { fetchCurrencies, fetchCurrency, fetchCurrencyExchangeRateByDate } from "@/features/app-config/currencies/currency.service"
 import { fetchSuppliers } from "@/features/app-config/suppliers/supplier.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchBuyers } from "@/features/merchandising/buyers/buyer.service"
@@ -60,6 +60,7 @@ const DEFAULT_FORM_VALUES: OrderPlacementFormValues = {
   jobId: "",
   currencyId: "",
   placementDate: new Date().toISOString().slice(0, 10),
+  exchangeRateBDT: "1",
   factoryId: "",
   isPlaced: false,
   orderPlacementDetails: [],
@@ -75,6 +76,11 @@ function formatNumberForInput(value: string | number | null | undefined) {
   return Number.isFinite(numericValue) ? String(numericValue) : String(value)
 }
 
+function formatPositiveNumberForInput(value: string | number | null | undefined, fallback = "1") {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) && numericValue > 0 ? String(numericValue) : fallback
+}
+
 function formatStyleLabel(styleNo?: string | null, styleName?: string | null) {
   return [styleNo?.trim(), styleName?.trim()].filter(Boolean).join(" - ")
 }
@@ -83,11 +89,11 @@ function getColorLabel(detail: Pick<JobDetailRecord, "color"> | Pick<OrderPlacem
   return detail.color?.colorDisplayName?.trim() || detail.color?.colorName?.trim() || ""
 }
 
-function calculateFactoryCm(quantity: string | number | null | undefined, factoryCm: string | number | null | undefined) {
+function calculateFactoryCm(quantity: string | number | null | undefined, factoryCmPerDzn: string | number | null | undefined) {
   const quantityValue = Number(quantity)
-  const cmValue = Number(factoryCm)
+  const cmValue = Number(factoryCmPerDzn)
   if (!Number.isFinite(quantityValue) || !Number.isFinite(cmValue)) return "0"
-  const total = quantityValue * (cmValue / 12)
+  const total = (quantityValue / 12) * cmValue
   return Number.isInteger(total) ? String(total) : total.toFixed(2).replace(/\.?0+$/, "")
 }
 
@@ -101,7 +107,7 @@ function calculateFactoryFob(quantity: string | number | null | undefined, facto
 
 function jobDetailToFormValue(detail: JobDetailRecord): OrderPlacementDetailFormValues {
   const quantity = formatNumberForInput(detail.quantity)
-  const factoryCm = "0"
+  const factoryCmPerDzn = "0"
   const factoryFob = "0"
   return {
     id: crypto.randomUUID(),
@@ -121,17 +127,17 @@ function jobDetailToFormValue(detail: JobDetailRecord): OrderPlacementDetailForm
     deliveryDate: detail.deliveryDate ? String(detail.deliveryDate).slice(0, 10) : "",
     cuttingLimitPercentage: formatNumberForInput(detail.cuttingLimitPercentage),
     remarks: detail.remarks ?? "",
-    factoryCm,
+    factoryCmPerDzn,
     factoryFob,
     factoryShipmentDate: "",
-    totalFactoryCm: calculateFactoryCm(quantity, factoryCm),
+    totalFactoryCm: calculateFactoryCm(quantity, factoryCmPerDzn),
     totalFactoryFob: calculateFactoryFob(quantity, factoryFob),
   }
 }
 
 function placementDetailToFormValue(detail: OrderPlacementDetailRecord): OrderPlacementDetailFormValues {
   const quantity = formatNumberForInput(detail.quantity)
-  const factoryCm = formatNumberForInput(detail.factoryCm)
+  const factoryCmPerDzn = formatNumberForInput(detail.factoryCmPerDzn)
   const factoryFob = formatNumberForInput(detail.factoryFob)
   return {
     id: detail.id || crypto.randomUUID(),
@@ -151,10 +157,10 @@ function placementDetailToFormValue(detail: OrderPlacementDetailRecord): OrderPl
     deliveryDate: detail.deliveryDate ? String(detail.deliveryDate).slice(0, 10) : "",
     cuttingLimitPercentage: formatNumberForInput(detail.cuttingLimitPercentage),
     remarks: detail.remarks ?? "",
-    factoryCm,
+    factoryCmPerDzn,
     factoryFob,
     factoryShipmentDate: detail.factoryShipmentDate ? String(detail.factoryShipmentDate).slice(0, 10) : "",
-    totalFactoryCm: formatNumberForInput(detail.totalFactoryCm ?? calculateFactoryCm(quantity, factoryCm)),
+    totalFactoryCm: formatNumberForInput(detail.totalFactoryCm ?? calculateFactoryCm(quantity, factoryCmPerDzn)),
     totalFactoryFob: formatNumberForInput(detail.totalFactoryFob ?? calculateFactoryFob(quantity, factoryFob)),
   }
 }
@@ -436,6 +442,58 @@ export function OrderPlacementWorkspace({ apiUrl }: { apiUrl: string }) {
     [apiUrl, selectedOrganizationId],
   )
 
+  const refreshExchangeRate = useCallback(
+    async (currencyId: string, placementDate: string) => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+      const accessToken = token
+
+      async function resolveExchangeRate() {
+        if (!currencyId.trim() || !placementDate.trim()) return "1"
+
+        const currency = await fetchCurrency({
+          apiUrl,
+          accessToken,
+          id: Number(currencyId),
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        const currencyCode = currency.currencyCode?.trim()
+        if (!currencyCode) return "1"
+
+        const exchangeRateBDTRecord = await fetchCurrencyExchangeRateByDate({
+          apiUrl,
+          accessToken,
+          currencyCode,
+          currencyDate: placementDate,
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        return formatPositiveNumberForInput(exchangeRateBDTRecord?.rate_in_bdt)
+      }
+
+      try {
+        const exchangeRateBDT = await resolveExchangeRate()
+        setEditorValues((current) => {
+          if (current.currencyId !== currencyId || current.placementDate !== placementDate) return current
+          return { ...current, exchangeRateBDT }
+        })
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load the exchange rate right now."
+        if (!handleAuthFailure(message)) {
+          setEditorValues((current) => {
+            if (current.currencyId !== currencyId || current.placementDate !== placementDate) return current
+            return { ...current, exchangeRateBDT: "1" }
+          })
+        }
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
   const loadAllJobOptions = useCallback(
     async ({ query, page: pageNumber, limit: pageLimit }: AppComboboxLoadParams) => {
       const token = window.localStorage.getItem("access_token")
@@ -528,6 +586,7 @@ export function OrderPlacementWorkspace({ apiUrl }: { apiUrl: string }) {
         jobId: record.jobId,
         currencyId: String(record.currencyId),
         placementDate: record.placementDate ? String(record.placementDate).slice(0, 10) : "",
+        exchangeRateBDT: formatPositiveNumberForInput(record.exchangeRateBDT),
         factoryId: record.factoryId,
         isPlaced: Boolean(record.isPlaced),
         orderPlacementDetails: (record.orderPlacementDetails ?? []).map(placementDetailToFormValue),
@@ -767,6 +826,7 @@ export function OrderPlacementWorkspace({ apiUrl }: { apiUrl: string }) {
         onCurrencyOptionChange={setSelectedCurrency}
         onSupplierOptionChange={setSelectedSupplier}
         onValuesChange={setEditorValues}
+        onExchangeRateRefresh={refreshExchangeRate}
         onJobDetailsLoad={loadJobDetails}
         onOpenChange={(open) => {
           setEditorOpen(open)

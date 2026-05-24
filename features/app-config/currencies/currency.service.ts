@@ -1,4 +1,4 @@
-import type { ApiResponse, CurrencyFilterValues, CurrencyFormValues, CurrencyRecord, PaginatedResponse } from "./currency.types"
+import type { ApiResponse, CurrencyExchangeRateRecord, CurrencyFilterValues, CurrencyFormValues, CurrencyRecord, PaginatedResponse } from "./currency.types"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -61,6 +61,31 @@ export async function fetchCurrency({ apiUrl, accessToken, id, organizationId }:
   const payload = await readJsonResponse<CurrencyRecord>(response)
   if (!payload.data) throw new Error("The currency record was returned without data.")
   return payload.data
+}
+
+export async function fetchCurrencyExchangeRateByDate({
+  apiUrl,
+  accessToken,
+  currencyCode,
+  currencyDate,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  currencyCode: string
+  currencyDate: string
+  organizationId?: string
+}): Promise<CurrencyExchangeRateRecord | null> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/currency/exchange-rates/${encodeURIComponent(currencyCode)}/${encodeURIComponent(currencyDate)}`), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  if (response.status === 404) return null
+
+  const payload = await readJsonResponse<CurrencyExchangeRateRecord>(response)
+  return payload.data ?? null
 }
 
 export async function createCurrency({ apiUrl, accessToken, payload, organizationId }: { apiUrl: string; accessToken: string; payload: CurrencyFormValues; organizationId?: string }) {

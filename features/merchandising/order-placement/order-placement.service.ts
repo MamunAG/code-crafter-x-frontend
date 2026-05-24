@@ -66,12 +66,18 @@ function normalizeNumber(value: string) {
   return trimmedValue ? Number(trimmedValue) : 0
 }
 
+function normalizePositiveNumber(value: string, fallback = 1) {
+  const numericValue = Number(value.trim())
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : fallback
+}
+
 function buildOrderPlacementPayload(values: OrderPlacementFormValues) {
   return {
     buyerId: values.buyerId.trim(),
     jobId: values.jobId.trim(),
     currencyId: Number(values.currencyId),
     placementDate: values.placementDate,
+    exchangeRateBDT: normalizePositiveNumber(values.exchangeRateBDT),
     factoryId: values.factoryId.trim(),
     isPlaced: values.isPlaced,
     orderPlacementDetails: values.orderPlacementDetails.map((detail) => ({
@@ -88,7 +94,7 @@ function buildOrderPlacementPayload(values: OrderPlacementFormValues) {
       deliveryDate: optionalString(detail.deliveryDate),
       cuttingLimitPercentage: normalizeNumber(detail.cuttingLimitPercentage),
       remarks: optionalString(detail.remarks),
-      factoryCm: normalizeNumber(detail.factoryCm),
+      factoryCmPerDzn: normalizeNumber(detail.factoryCmPerDzn),
       factoryFob: normalizeNumber(detail.factoryFob),
       factoryShipmentDate: optionalString(detail.factoryShipmentDate),
       totalFactoryCm: normalizeNumber(detail.totalFactoryCm),

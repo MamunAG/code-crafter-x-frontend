@@ -45,6 +45,13 @@ export type CurrencyRecord = {
   deleted_at?: string | null
 }
 
+export type CurrencyExchangeRateRecord = {
+  id: number
+  currency_date: string
+  currency_code: string
+  rate_in_bdt: number | string
+}
+
 export type CurrencyFilterValues = {
   currencyName: string
   currencyCode: string
