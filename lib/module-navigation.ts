@@ -274,14 +274,14 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             href: "/merchandising/production",
             children: [
               {
-                label: "Order Placement",
-                href: "/merchandising/production/orders/order-placement",
-                permissionMenuName: "Order Placement",
-              },
-              {
                 label: "Job Entry",
                 href: "/merchandising/production/orders/purchase-order",
                 permissionMenuName: "Job Entry",
+              },
+              {
+                label: "Order Placement",
+                href: "/merchandising/production/orders/order-placement",
+                permissionMenuName: "Order Placement",
               },
               {
                 label: "Work orders",
@@ -536,11 +536,11 @@ export function filterModuleSidebarGroupsByPermissions(
 
     return items.length
       ? [
-          {
-            ...group,
-            items,
-          },
-        ]
+        {
+          ...group,
+          items,
+        },
+      ]
       : []
   })
 }
