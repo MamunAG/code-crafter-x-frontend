@@ -5,6 +5,21 @@ import type {
   MaterialRecord,
   PaginatedResponse,
 } from "./material.types"
+import { MATERIAL_IMAGE_TOO_LARGE_MESSAGE } from "./material.constants"
+
+type BackendFileRecord = {
+  id?: number
+  file_id: number
+  file_name?: string
+  original_name?: string
+  file_path?: string
+  file_url?: string
+  public_url?: string
+  thumbnail_url?: string
+  mime_type?: string
+  uploaded_by?: string
+  uploaded_at?: string
+}
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -90,6 +105,7 @@ function buildMaterialPayload(payload: MaterialFormValues) {
     description: optionalString(payload.description),
     unitId: optionalNumber(payload.unitId),
     materialGroupId: optionalString(payload.materialGroupId),
+    imageId: optionalNumber(payload.imageId),
     isActive: payload.isActive,
   }
 }
@@ -220,6 +236,58 @@ export async function updateMaterial({
   }
 
   return payloadData.data
+}
+
+export async function uploadMaterialImageFile({
+  apiUrl,
+  accessToken,
+  file,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+}): Promise<BackendFileRecord> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(`${apiUrl}/api/v1/files/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    body: formData,
+  })
+
+  let payload: { success?: boolean; message?: string; data?: BackendFileRecord } | null = null
+
+  try {
+    payload = (await response.json()) as { success?: boolean; message?: string; data?: BackendFileRecord }
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 413) {
+    throw new Error(MATERIAL_IMAGE_TOO_LARGE_MESSAGE)
+  }
+
+  if (
+    payload?.message?.toLowerCase().includes("file too large") ||
+    payload?.message?.toLowerCase().includes("payload too large") ||
+    payload?.message?.includes("LIMIT_FILE_SIZE")
+  ) {
+    throw new Error(MATERIAL_IMAGE_TOO_LARGE_MESSAGE)
+  }
+
+  if (!response.ok || !payload?.success || !payload.data) {
+    throw new Error(payload?.message || "Unable to save the uploaded image right now.")
+  }
+
+  return payload.data
 }
 
 export async function downloadMaterialUploadTemplate({

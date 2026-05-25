@@ -32,6 +32,18 @@ export type MaterialLookupRecord = {
   shortName?: string | null
 }
 
+export type FileSummary = {
+  id?: number | null
+  file_id?: number | null
+  file_name?: string | null
+  original_name?: string | null
+  file_path?: string | null
+  file_url?: string | null
+  public_url?: string | null
+  thumbnail_url?: string | null
+  mime_type?: string | null
+}
+
 export type MaterialRecord = {
   id: string
   name: string
@@ -39,8 +51,10 @@ export type MaterialRecord = {
   description?: string | null
   unitId?: number | null
   materialGroupId?: string | null
+  imageId?: number | null
   unit?: MaterialLookupRecord | null
   materialGroup?: MaterialLookupRecord | null
+  image?: FileSummary | null
   organizationId?: string | null
   isActive?: boolean
   created_by_id?: string | null
@@ -67,5 +81,6 @@ export type MaterialFormValues = {
   description: string
   unitId: string
   materialGroupId: string
+  imageId: string
   isActive: boolean
 }

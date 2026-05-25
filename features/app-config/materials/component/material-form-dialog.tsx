@@ -1,11 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { Loader2 } from "lucide-react"
+import { Loader2, Upload } from "lucide-react"
 
+import {
+  AppCombobox,
+  type AppComboboxLoadParams,
+  type AppComboboxLoadResult,
+  type AppComboboxOption,
+} from "@/components/app-combobox"
 import { Button } from "@/components/ui/button"
-import { AppSelect, type AppSelectOption } from "@/components/app-select"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 
+import { MATERIAL_IMAGE_MAX_SIZE_LABEL } from "../material.constants"
 import type { MaterialFormValues } from "../material.types"
 
 type MaterialEditorMode = "create" | "edit"
@@ -29,8 +35,17 @@ type MaterialFormDialogProps = {
   error: string
   mode: MaterialEditorMode
   initialValues: MaterialFormValues
-  unitOptions: AppSelectOption[]
-  materialGroupOptions: AppSelectOption[]
+  unitOptions: AppComboboxOption[]
+  materialGroupOptions: AppComboboxOption[]
+  imagePreviewUrl: string
+  imageUploading: boolean
+  loadUnitOptions: (
+    params: AppComboboxLoadParams
+  ) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  loadMaterialGroupOptions: (
+    params: AppComboboxLoadParams
+  ) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  onImageUpload: (file: File | null | undefined) => Promise<string | null>
   onOpenChange: (open: boolean) => void
   onSubmit: (values: MaterialFormValues) => void
 }
@@ -59,10 +74,21 @@ export function MaterialFormDialog({
   initialValues,
   unitOptions,
   materialGroupOptions,
+  imagePreviewUrl,
+  imageUploading,
+  loadUnitOptions,
+  loadMaterialGroupOptions,
+  onImageUpload,
   onOpenChange,
   onSubmit,
 }: MaterialFormDialogProps) {
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
   const [draft, setDraft] = useState(initialValues)
+  const [unitOpen, setUnitOpen] = useState(false)
+  const [materialGroupOpen, setMaterialGroupOpen] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState<AppComboboxOption | null>(null)
+  const [selectedMaterialGroup, setSelectedMaterialGroup] =
+    useState<AppComboboxOption | null>(null)
   const title = mode === "create" ? "Create material" : "Edit material"
   const description =
     mode === "create"
@@ -72,6 +98,15 @@ export function MaterialFormDialog({
   useEffect(() => {
     if (open) {
       setDraft(initialValues)
+      setSelectedUnit(
+        unitOptions.find((option) => option.value === initialValues.unitId) ??
+          null
+      )
+      setSelectedMaterialGroup(
+        materialGroupOptions.find(
+          (option) => option.value === initialValues.materialGroupId
+        ) ?? null
+      )
     }
   }, [initialValues, open])
 
@@ -128,37 +163,46 @@ export function MaterialFormDialog({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <FieldLabel>Unit</FieldLabel>
-                  <AppSelect
-                    value={draft.unitId || "__none__"}
-                    onValueChange={(value) =>
-                      update("unitId", value === "__none__" ? "" : value)
-                    }
-                    options={[
-                      { value: "__none__", label: "No unit" },
-                      ...unitOptions,
-                    ]}
-                    placeholder="Select unit"
+                  <AppCombobox
+                    open={unitOpen}
+                    onOpenChange={setUnitOpen}
+                    value={selectedUnit}
+                    onValueChange={(option) => {
+                      setSelectedUnit(option)
+                      update("unitId", option?.value ?? "")
+                      setUnitOpen(false)
+                    }}
+                    loadItems={loadUnitOptions}
+                    initialLimit={10}
+                    searchLimit={10}
+                    placeholder="Search unit"
+                    emptyMessage="No units found."
+                    showClear={Boolean(draft.unitId)}
                     disabled={loading || submitting}
-                    triggerClassName="h-9 rounded-md px-3 text-sm"
+                    inputClassName="w-full min-w-0"
+                    contentClassName="rounded-lg"
                   />
                 </div>
                 <div className="space-y-2">
                   <FieldLabel>Material group</FieldLabel>
-                  <AppSelect
-                    value={draft.materialGroupId || "__none__"}
-                    onValueChange={(value) =>
-                      update(
-                        "materialGroupId",
-                        value === "__none__" ? "" : value
-                      )
-                    }
-                    options={[
-                      { value: "__none__", label: "No group" },
-                      ...materialGroupOptions,
-                    ]}
-                    placeholder="Select material group"
+                  <AppCombobox
+                    open={materialGroupOpen}
+                    onOpenChange={setMaterialGroupOpen}
+                    value={selectedMaterialGroup}
+                    onValueChange={(option) => {
+                      setSelectedMaterialGroup(option)
+                      update("materialGroupId", option?.value ?? "")
+                      setMaterialGroupOpen(false)
+                    }}
+                    loadItems={loadMaterialGroupOptions}
+                    initialLimit={10}
+                    searchLimit={10}
+                    placeholder="Search material group"
+                    emptyMessage="No material groups found."
+                    showClear={Boolean(draft.materialGroupId)}
                     disabled={loading || submitting}
-                    triggerClassName="h-9 rounded-md px-3 text-sm"
+                    inputClassName="w-full min-w-0"
+                    contentClassName="rounded-lg"
                   />
                 </div>
               </div>
@@ -170,6 +214,60 @@ export function MaterialFormDialog({
                   onChange={(event) => update("description", event.target.value)}
                   placeholder="Input material description"
                   disabled={loading || submitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel>Material image</FieldLabel>
+                <div className="flex flex-col gap-2 rounded-md border border-slate-200 p-2 dark:border-white/10">
+                  {imagePreviewUrl ? (
+                    <div className="flex h-32 items-center justify-center rounded-md bg-slate-50/70 dark:bg-white/[0.03]">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Uploaded material preview"
+                        className="h-full w-auto max-w-full rounded object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                      No image uploaded yet.
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-xl"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={imageUploading || loading || submitting}
+                  >
+                    {imageUploading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="size-3.5" />
+                    )}
+                    Upload image
+                  </Button>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Max file size {MATERIAL_IMAGE_MAX_SIZE_LABEL}.
+                  </p>
+                </div>
+
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    void onImageUpload(event.currentTarget.files?.[0]).then(
+                      (imageId) => {
+                        if (imageId) {
+                          update("imageId", imageId)
+                        }
+                      }
+                    )
+                    event.currentTarget.value = ""
+                  }}
                 />
               </div>
 

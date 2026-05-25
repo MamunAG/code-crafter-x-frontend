@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation"
 import { Loader2, Plus, RefreshCcw, Trash2, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 
+import type {
+  AppComboboxLoadParams,
+  AppComboboxLoadResult,
+  AppComboboxOption,
+} from "@/components/app-combobox"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +38,10 @@ import { ActiveMaterialsSection } from "./component/active-materials-section"
 import { DeletedMaterialsSection } from "./component/deleted-materials-section"
 import { MaterialFormDialog } from "./component/material-form-dialog"
 import {
+  MATERIAL_IMAGE_MAX_SIZE_BYTES,
+  MATERIAL_IMAGE_TOO_LARGE_MESSAGE,
+} from "./material.constants"
+import {
   createMaterial,
   downloadMaterialUploadTemplate,
   fetchMaterial,
@@ -40,6 +49,7 @@ import {
   permanentlyDeleteMaterial,
   restoreMaterial,
   softDeleteMaterial,
+  uploadMaterialImageFile,
   uploadMaterialTemplate,
   updateMaterial,
 } from "./material.service"
@@ -80,6 +90,7 @@ const DEFAULT_FORM_VALUES: MaterialFormValues = {
   description: "",
   unitId: "",
   materialGroupId: "",
+  imageId: "",
   isActive: true,
 }
 
@@ -289,10 +300,10 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
   const [unitOptions, setUnitOptions] = useState<
-    { value: string; label: string }[]
+    AppComboboxOption[]
   >([])
   const [materialGroupOptions, setMaterialGroupOptions] = useState<
-    { value: string; label: string }[]
+    AppComboboxOption[]
   >([])
 
   const [activeFilters, setActiveFilters] =
@@ -308,6 +319,8 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorInitialValues, setEditorInitialValues] =
     useState<MaterialFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("")
+  const [imageUploading, setImageUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
 
@@ -498,32 +511,93 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [apiUrl, selectedOrganizationId])
 
+  const loadUnitOptions = useCallback(
+    async ({
+      query,
+      page: lookupPage,
+      limit: lookupLimit,
+    }: AppComboboxLoadParams): Promise<
+      AppComboboxLoadResult<AppComboboxOption>
+    > => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return { items: [], hasNextPage: false }
+      }
+
+      const response = await fetchUnits({
+        apiUrl,
+        accessToken: token,
+        page: lookupPage,
+        limit: lookupLimit,
+        filters: {
+          name: "",
+          shortName: query,
+          isActive: "active",
+        },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items.map((unit: UnitRecord) => ({
+          value: String(unit.id),
+          label: unit.shortName || unit.name,
+        })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId]
+  )
+
+  const loadMaterialGroupOptions = useCallback(
+    async ({
+      query,
+      page: lookupPage,
+      limit: lookupLimit,
+    }: AppComboboxLoadParams): Promise<
+      AppComboboxLoadResult<AppComboboxOption>
+    > => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return { items: [], hasNextPage: false }
+      }
+
+      const response = await fetchMaterialGroups({
+        apiUrl,
+        accessToken: token,
+        page: lookupPage,
+        limit: lookupLimit,
+        filters: { name: query, description: "", isActive: "true" },
+        organizationId: selectedOrganizationId || undefined,
+      })
+
+      return {
+        items: response.items.map((group: MaterialGroupRecord) => ({
+          value: group.id,
+          label: group.name,
+        })),
+        hasNextPage: response.meta.hasNextPage,
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId]
+  )
+
   useEffect(() => {
     let active = true
 
     async function loadLookups() {
       try {
-        const token = window.localStorage.getItem("access_token")
-        if (!token) {
-          return
-        }
-
-        const [unitsResponse, groupsResponse] = await Promise.all([
-          fetchUnits({
-            apiUrl,
-            accessToken: token,
+        const [unitsResult, groupsResult] = await Promise.allSettled([
+          loadUnitOptions({
             page: 1,
-            limit: 1000,
-            filters: { name: "", shortName: "", isActive: "active" },
-            organizationId: selectedOrganizationId || undefined,
+            query: "",
+            limit: 10,
           }),
-          fetchMaterialGroups({
-            apiUrl,
-            accessToken: token,
+          loadMaterialGroupOptions({
             page: 1,
-            limit: 1000,
-            filters: { name: "", description: "", isActive: "true" },
-            organizationId: selectedOrganizationId || undefined,
+            query: "",
+            limit: 10,
           }),
         ])
 
@@ -531,18 +605,23 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        setUnitOptions(
-          unitsResponse.items.map((unit: UnitRecord) => ({
-            value: String(unit.id),
-            label: unit.shortName ? `${unit.name} (${unit.shortName})` : unit.name,
-          }))
-        )
-        setMaterialGroupOptions(
-          groupsResponse.items.map((group: MaterialGroupRecord) => ({
-            value: group.id,
-            label: group.name,
-          }))
-        )
+        if (unitsResult.status === "fulfilled") {
+          const units = Array.isArray(unitsResult.value)
+            ? unitsResult.value
+            : unitsResult.value.items
+          setUnitOptions(units)
+        } else {
+          setUnitOptions([])
+        }
+
+        if (groupsResult.status === "fulfilled") {
+          const groups = Array.isArray(groupsResult.value)
+            ? groupsResult.value
+            : groupsResult.value.items
+          setMaterialGroupOptions(groups)
+        } else {
+          setMaterialGroupOptions([])
+        }
       } catch {
         if (active) {
           setUnitOptions([])
@@ -556,15 +635,92 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [apiUrl, selectedOrganizationId])
+  }, [loadMaterialGroupOptions, loadUnitOptions])
 
   async function openCreateDialog() {
     setEditorMode("create")
     setEditorError("")
     setEditingId(null)
     setEditorInitialValues(DEFAULT_FORM_VALUES)
+    setImagePreviewUrl("")
+    setImageUploading(false)
     setEditorOpen(true)
   }
+
+  const uploadMaterialImage = useCallback(
+    async (file: File | null | undefined) => {
+      if (!file) {
+        return null
+      }
+
+      if (
+        !accessRules?.canCreate &&
+        !(editorMode === "edit" && accessRules?.canUpdate)
+      ) {
+        toast.error("You do not have permission to upload material images.")
+        return null
+      }
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please choose an image file.")
+        return null
+      }
+
+      if (file.size > MATERIAL_IMAGE_MAX_SIZE_BYTES) {
+        toast.error(MATERIAL_IMAGE_TOO_LARGE_MESSAGE)
+        return null
+      }
+
+      setImageUploading(true)
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return null
+        }
+
+        const fileRecord = await uploadMaterialImageFile({
+          apiUrl,
+          accessToken: token,
+          file,
+        })
+
+        const uploadedPreviewUrl =
+          fileRecord.public_url?.trim() ||
+          fileRecord.file_url?.trim() ||
+          fileRecord.thumbnail_url?.trim() ||
+          ""
+
+        setImagePreviewUrl(uploadedPreviewUrl)
+        toast.success(
+          `Image uploaded successfully. File ID ${fileRecord.file_id} will be saved with the material.`
+        )
+
+        return String(fileRecord.file_id)
+      } catch (caughtError) {
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to upload the material image right now."
+
+        if (!handleAuthFailure(message)) {
+          toast.error(message)
+        }
+        return null
+      } finally {
+        setImageUploading(false)
+      }
+    },
+    [
+      accessRules?.canCreate,
+      accessRules?.canUpdate,
+      apiUrl,
+      editorMode,
+      handleAuthFailure,
+    ]
+  )
 
   async function downloadTemplate() {
     if (!accessRules?.canCreate || downloadingTemplate) {
@@ -681,14 +837,50 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
           organizationId: selectedOrganizationId || undefined,
         })
 
+        if (material.unitId != null && material.unit?.name) {
+          const selectedUnitOption = {
+            value: String(material.unitId),
+            label: material.unit.shortName || material.unit.name,
+          }
+          setUnitOptions((currentOptions) =>
+            currentOptions.some(
+              (option) => option.value === selectedUnitOption.value
+            )
+              ? currentOptions
+              : [selectedUnitOption, ...currentOptions]
+          )
+        }
+
+        if (material.materialGroupId && material.materialGroup?.name) {
+          const selectedMaterialGroupOption = {
+            value: material.materialGroupId,
+            label: material.materialGroup.name,
+          }
+          setMaterialGroupOptions((currentOptions) =>
+            currentOptions.some(
+              (option) => option.value === selectedMaterialGroupOption.value
+            )
+              ? currentOptions
+              : [selectedMaterialGroupOption, ...currentOptions]
+          )
+        }
+
         setEditorInitialValues({
           name: material.name ?? "",
           code: material.code ?? "",
           description: material.description ?? "",
           unitId: material.unitId == null ? "" : String(material.unitId),
           materialGroupId: material.materialGroupId ?? "",
+          imageId: material.imageId == null ? "" : String(material.imageId),
           isActive: material.isActive !== false,
         })
+        setImagePreviewUrl(
+          material.image?.public_url?.trim() ||
+            material.image?.file_url?.trim() ||
+            material.image?.thumbnail_url?.trim() ||
+            material.image?.file_path?.trim() ||
+            ""
+        )
       } catch (caughtError) {
         const message =
           caughtError instanceof Error
@@ -746,6 +938,8 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         setEditorOpen(false)
         setEditorInitialValues(DEFAULT_FORM_VALUES)
         setEditingId(null)
+        setImagePreviewUrl("")
+        setImageUploading(false)
         triggerRefresh()
       } catch (caughtError) {
         const message =
@@ -1166,6 +1360,11 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         initialValues={editorInitialValues}
         unitOptions={unitOptions}
         materialGroupOptions={materialGroupOptions}
+        imagePreviewUrl={imagePreviewUrl}
+        imageUploading={imageUploading}
+        loadUnitOptions={loadUnitOptions}
+        loadMaterialGroupOptions={loadMaterialGroupOptions}
+        onImageUpload={uploadMaterialImage}
         onOpenChange={(open) => {
           setEditorOpen(open)
 
@@ -1175,6 +1374,8 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
             setEditorLoading(false)
             setEditorSubmitting(false)
             setEditingId(null)
+            setImagePreviewUrl("")
+            setImageUploading(false)
           }
         }}
         onSubmit={submitEditor}

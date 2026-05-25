@@ -200,17 +200,21 @@ export function AppCombobox<T extends AppComboboxOption>({
       return
     }
 
+    const expectedInputValue = value?.label ?? ""
     const timeout = window.setTimeout(() => {
       const inputElement = document.getElementById(inputElementId)
 
       if (inputElement instanceof HTMLInputElement) {
         inputElement.focus()
-        inputElement.select()
+
+        if (inputElement.value === expectedInputValue) {
+          inputElement.select()
+        }
       }
     }, 0)
 
     return () => window.clearTimeout(timeout)
-  }, [inputElementId, resolvedDisabled, resolvedOpen])
+  }, [inputElementId, resolvedDisabled, resolvedOpen, value?.label])
 
   useEffect(() => {
     if (!loadItems) {

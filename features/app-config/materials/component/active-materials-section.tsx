@@ -133,6 +133,7 @@ export function ActiveMaterialsSection({
     () =>
       [
         filters.name,
+        filters.code,
         filters.description,
         filters.isActive,
       ].filter((value) => value.trim()).length,
@@ -308,11 +309,15 @@ export function ActiveMaterialsSection({
             event.preventDefault()
             onPageChange(1)
           }}
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_auto]"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_auto]"
         >
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterMaterialName" className="text-xs font-medium text-slate-700 dark:text-slate-300">Material name</label>
             <Input id="filterMaterialName" value={filters.name} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onFilterChange({ ...filters, name: event.target.value })} placeholder="Input material name" />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="filterMaterialCode" className="text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
+            <Input id="filterMaterialCode" value={filters.code} className="h-7 rounded-md px-2 text-xs" onChange={(event) => onFilterChange({ ...filters, code: event.target.value })} placeholder="Input code" />
           </div>
           <div className="min-w-0 space-y-1">
             <label htmlFor="filterMaterialDescription" className="text-xs font-medium text-slate-700 dark:text-slate-300">Description</label>

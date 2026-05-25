@@ -238,3 +238,47 @@ export async function softDeleteMaterialGroup({
 
   await readJsonResponse(response)
 }
+
+export async function restoreMaterialGroup({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/material-group/${id}/restore`),
+    {
+      method: "POST",
+      headers: buildRequestHeaders({ accessToken, organizationId }),
+    }
+  )
+
+  await readJsonResponse(response)
+}
+
+export async function permanentlyDeleteMaterialGroup({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/material-group/${id}/permanent`),
+    {
+      method: "DELETE",
+      headers: buildRequestHeaders({ accessToken, organizationId }),
+    }
+  )
+
+  await readJsonResponse(response)
+}

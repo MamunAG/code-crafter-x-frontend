@@ -2,11 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, MoreHorizontal, Plus, RefreshCcw, Search } from "lucide-react"
+import {
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  RefreshCcw,
+  Search,
+  Trash2,
+  Undo2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { AppDataTable } from "@/components/app-data-table"
 import { AppSelect } from "@/components/app-select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,6 +61,8 @@ import {
   createMaterialGroup,
   fetchMaterialGroup,
   fetchMaterialGroups,
+  permanentlyDeleteMaterialGroup,
+  restoreMaterialGroup,
   softDeleteMaterialGroup,
   updateMaterialGroup,
 } from "./material-group.service"
@@ -54,11 +74,112 @@ import type {
 } from "./material-group.types"
 
 type MaterialGroupEditorMode = "create" | "edit"
+type PendingDeleteMode = "restore" | "permanent"
 type MaterialGroupAccessRules = {
   canView: boolean
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
+}
+
+function getMaterialGroupLabel(group: MaterialGroupRecord) {
+  return group.name
+}
+
+function DeleteConfirmDialog({
+  open,
+  group,
+  working,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean
+  group: MaterialGroupRecord | null
+  working: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete material group</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will soft delete{" "}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {group ? getMaterialGroupLabel(group) : "this material group"}
+            </span>
+            . You can restore it from the recently deleted card before removing
+            it permanently.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={working}
+          >
+            {working ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+function RecentlyDeletedDialog({
+  open,
+  action,
+  group,
+  working,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean
+  action: PendingDeleteMode
+  group: MaterialGroupRecord | null
+  working: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  const title =
+    action === "restore"
+      ? "Restore material group"
+      : "Delete material group permanently"
+  const description =
+    action === "restore"
+      ? "Bring this material group back into the active configuration list."
+      : "This will permanently remove the material group record and cannot be undone."
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {description}{" "}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {group ? getMaterialGroupLabel(group) : "this material group"}
+            </span>
+            .
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant={action === "restore" ? "default" : "destructive"}
+            onClick={onConfirm}
+            disabled={working}
+          >
+            {working ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {action === "restore" ? "Restore" : "Delete permanently"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
 }
 
 const MATERIAL_GROUP_MENU_NAME = "Material Group Entry"
@@ -111,12 +232,20 @@ function getStatusTone(group: MaterialGroupRecord) {
 export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [loadingDeletedGroups, setLoadingDeletedGroups] = useState(true)
   const [error, setError] = useState("")
+  const [deletedError, setDeletedError] = useState("")
   const [groups, setGroups] = useState<MaterialGroupRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+  const [deletedGroups, setDeletedGroups] = useState<MaterialGroupRecord[]>([])
+  const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
+  const [deletedPage, setDeletedPage] = useState(1)
+  const [deletedLimit, setDeletedLimit] = useState(5)
   const [filters, setFilters] =
+    useState<MaterialGroupFilterValues>(DEFAULT_FILTERS)
+  const [deletedFilters, setDeletedFilters] =
     useState<MaterialGroupFilterValues>(DEFAULT_FILTERS)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(() =>
@@ -135,7 +264,17 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
   const [editorInitialValues, setEditorInitialValues] =
     useState<MaterialGroupFormValues>(DEFAULT_FORM_VALUES)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteWorkingId, setDeleteWorkingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<MaterialGroupRecord | null>(
+    null
+  )
+  const [deleteWorking, setDeleteWorking] = useState(false)
+  const [recentlyDeletedGroup, setRecentlyDeletedGroup] =
+    useState<MaterialGroupRecord | null>(null)
+  const [pendingActionTarget, setPendingActionTarget] =
+    useState<MaterialGroupRecord | null>(null)
+  const [pendingActionMode, setPendingActionMode] =
+    useState<PendingDeleteMode | null>(null)
+  const [pendingActionWorking, setPendingActionWorking] = useState(false)
 
   const handleAuthFailure = useCallback(
     (message: string) => {
@@ -223,7 +362,9 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
 
   const loadGroups = useCallback(async () => {
     setLoading(true)
+    setLoadingDeletedGroups(true)
     setError("")
+    setDeletedError("")
 
     try {
       const token = window.localStorage.getItem("access_token")
@@ -233,17 +374,30 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
         return
       }
 
-      const response = await fetchMaterialGroups({
-        apiUrl,
-        accessToken: token,
-        page,
-        limit,
-        filters,
-        organizationId: selectedOrganizationId || undefined,
-      })
+      const [activeResponse, deletedResponse] = await Promise.all([
+        fetchMaterialGroups({
+          apiUrl,
+          accessToken: token,
+          page,
+          limit,
+          filters,
+          organizationId: selectedOrganizationId || undefined,
+        }),
+        fetchMaterialGroups({
+          apiUrl,
+          accessToken: token,
+          page: deletedPage,
+          limit: deletedLimit,
+          filters: deletedFilters,
+          deletedOnly: true,
+          organizationId: selectedOrganizationId || undefined,
+        }),
+      ])
 
-      setGroups(response.items)
-      setMeta(response.meta)
+      setGroups(activeResponse.items)
+      setMeta(activeResponse.meta)
+      setDeletedGroups(deletedResponse.items)
+      setDeletedMeta(deletedResponse.meta)
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
@@ -252,13 +406,18 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
 
       if (!handleAuthFailure(message)) {
         setError(message)
+        setDeletedError(message)
         toast.error(message)
       }
     } finally {
       setLoading(false)
+      setLoadingDeletedGroups(false)
     }
   }, [
     apiUrl,
+    deletedFilters,
+    deletedLimit,
+    deletedPage,
     filters,
     handleAuthFailure,
     limit,
@@ -387,10 +546,19 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
     ]
   )
 
-  const deleteGroup = useCallback(async (group: MaterialGroupRecord) => {
-    if (!accessRules?.canDelete || deleteWorkingId) return
+  const requestSoftDelete = useCallback((group: MaterialGroupRecord) => {
+    setDeleteTarget(group)
+  }, [])
 
-    setDeleteWorkingId(group.id)
+  const confirmSoftDelete = useCallback(async () => {
+    if (!deleteTarget || deleteWorking) return
+
+    if (!accessRules?.canDelete) {
+      toast.error("You do not have permission to delete material groups.")
+      return
+    }
+
+    setDeleteWorking(true)
 
     try {
       const token = window.localStorage.getItem("access_token")
@@ -402,10 +570,12 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
       await softDeleteMaterialGroup({
         apiUrl,
         accessToken: token,
-        id: group.id,
+        id: deleteTarget.id,
         organizationId: selectedOrganizationId || undefined,
       })
-      toast.success("Material group deleted successfully.")
+      setRecentlyDeletedGroup(deleteTarget)
+      setDeleteTarget(null)
+      toast.success("Material group moved to recently deleted.")
       triggerRefresh()
     } catch (caughtError) {
       const message =
@@ -415,13 +585,96 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
 
       if (!handleAuthFailure(message)) toast.error(message)
     } finally {
-      setDeleteWorkingId(null)
+      setDeleteWorking(false)
     }
   }, [
     accessRules?.canDelete,
     apiUrl,
-    deleteWorkingId,
+    deleteTarget,
+    deleteWorking,
     handleAuthFailure,
+    selectedOrganizationId,
+    triggerRefresh,
+  ])
+
+  function openPendingActionDialog(
+    group: MaterialGroupRecord,
+    action: PendingDeleteMode
+  ) {
+    setPendingActionTarget(group)
+    setPendingActionMode(action)
+  }
+
+  const confirmPendingAction = useCallback(async () => {
+    if (!pendingActionTarget || !pendingActionMode || pendingActionWorking) {
+      return
+    }
+
+    setPendingActionWorking(true)
+
+    try {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) {
+        handleAuthFailure("Your session expired. Please sign in again.")
+        return
+      }
+
+      if (pendingActionMode === "restore") {
+        if (!accessRules?.canUpdate) {
+          toast.error("You do not have permission to restore material groups.")
+          return
+        }
+
+        await restoreMaterialGroup({
+          apiUrl,
+          accessToken: token,
+          id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
+        })
+        toast.success("Material group restored successfully.")
+      } else {
+        if (!accessRules?.canDelete) {
+          toast.error(
+            "You do not have permission to permanently delete material groups."
+          )
+          return
+        }
+
+        await permanentlyDeleteMaterialGroup({
+          apiUrl,
+          accessToken: token,
+          id: pendingActionTarget.id,
+          organizationId: selectedOrganizationId || undefined,
+        })
+        toast.success("Material group deleted permanently.")
+      }
+
+      if (recentlyDeletedGroup?.id === pendingActionTarget.id) {
+        setRecentlyDeletedGroup(null)
+      }
+
+      setPendingActionTarget(null)
+      setPendingActionMode(null)
+      triggerRefresh()
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to complete the delete action right now."
+
+      if (!handleAuthFailure(message)) toast.error(message)
+    } finally {
+      setPendingActionWorking(false)
+    }
+  }, [
+    accessRules?.canDelete,
+    accessRules?.canUpdate,
+    apiUrl,
+    handleAuthFailure,
+    pendingActionMode,
+    pendingActionTarget,
+    pendingActionWorking,
+    recentlyDeletedGroup?.id,
     selectedOrganizationId,
     triggerRefresh,
   ])
@@ -432,6 +685,15 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
     const end = Math.min(meta.page * meta.limit, meta.total)
     return `Showing ${start}-${end} of ${meta.total}`
   }, [meta])
+
+  const deletedPageSummary = useMemo(() => {
+    if (!deletedMeta || deletedMeta.total === 0) {
+      return "No deleted material groups found"
+    }
+    const start = (deletedMeta.page - 1) * deletedMeta.limit + 1
+    const end = Math.min(deletedMeta.page * deletedMeta.limit, deletedMeta.total)
+    return `Showing ${start}-${end} of ${deletedMeta.total}`
+  }, [deletedMeta])
 
   const columns = useMemo<ColumnDef<MaterialGroupRecord>[]>(
     () => [
@@ -518,12 +780,8 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
                   {accessRules?.canDelete ? (
                     <DropdownMenuItem
                       variant="destructive"
-                      onSelect={() => void deleteGroup(row.original)}
-                      disabled={deleteWorkingId === row.original.id}
+                      onSelect={() => requestSoftDelete(row.original)}
                     >
-                      {deleteWorkingId === row.original.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : null}
                       Delete material group
                     </DropdownMenuItem>
                   ) : null}
@@ -534,7 +792,7 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
         },
       },
     ],
-    [accessRules, deleteGroup, deleteWorkingId, openEditDialog]
+    [accessRules, openEditDialog, requestSoftDelete]
   )
 
   const table = useReactTable({
@@ -543,12 +801,129 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
     getCoreRowModel: getCoreRowModel(),
   })
 
+  const deletedColumns = useMemo<ColumnDef<MaterialGroupRecord>[]>(
+    () => [
+      {
+        id: "name",
+        header: "Group",
+        cell: ({ row }) => (
+          <div className="pl-4">
+            <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">
+              {row.original.name}
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "description",
+        header: "Description",
+        cell: ({ row }) => (
+          <span className="line-clamp-2 max-w-72 text-xs font-medium text-slate-700 dark:text-slate-200">
+            {row.original.description || "-"}
+          </span>
+        ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge
+            variant={getStatusTone(row.original)}
+            className="rounded-full px-3 py-1"
+          >
+            {getStatusLabel(row.original)}
+          </Badge>
+        ),
+      },
+      {
+        id: "deleted",
+        header: "Deleted",
+        cell: ({ row }) => (
+          <p className="text-xs text-slate-700 dark:text-slate-200">
+            {formatDate(row.original.deleted_at)}
+          </p>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="pr-4">Actions</span>,
+        cell: ({ row }) => {
+          const hasActions = accessRules?.canUpdate || accessRules?.canDelete
+
+          if (!hasActions) {
+            return (
+              <div className="pr-4 text-right text-xs text-slate-400 dark:text-slate-500">
+                No actions
+              </div>
+            )
+          }
+
+          return (
+            <div className="pr-4 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                    <span className="sr-only">Open deleted item actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {accessRules?.canUpdate ? (
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        openPendingActionDialog(row.original, "restore")
+                      }
+                    >
+                      Restore material group
+                    </DropdownMenuItem>
+                  ) : null}
+                  {accessRules?.canUpdate && accessRules?.canDelete ? (
+                    <DropdownMenuSeparator />
+                  ) : null}
+                  {accessRules?.canDelete ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() =>
+                        openPendingActionDialog(row.original, "permanent")
+                      }
+                    >
+                      Delete permanently
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+    ],
+    [accessRules]
+  )
+
+  const deletedTable = useReactTable({
+    data: deletedGroups,
+    columns: deletedColumns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  const activeTotal = meta?.total ?? groups.length
+  const deletedTotal = deletedMeta?.total ?? deletedGroups.length
+  const activeCount = useMemo(
+    () => groups.filter((group) => group.deleted_at == null).length,
+    [groups]
+  )
+
   function clearFilters() {
     setFilters(DEFAULT_FILTERS)
     setPage(1)
   }
 
-  if (loadingAccessRules && loading) {
+  if (loadingAccessRules && loading && loadingDeletedGroups) {
     return (
       <div className="space-y-4 p-4 sm:p-6 lg:p-8">
         <Skeleton className="h-32 rounded-2xl" />
@@ -591,6 +966,29 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
                     Create and maintain material group records for the selected
                     organization.
                   </p>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full px-3 py-1"
+                    >
+                      Total {activeTotal}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Active {activeCount}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
+                      Deleted {deletedTotal}
+                    </Badge>
+                    {recentlyDeletedGroup ? (
+                      <Badge
+                        variant="destructive"
+                        className="rounded-full px-3 py-1"
+                      >
+                        Recently deleted
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -617,6 +1015,58 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
               </div>
             </CardContent>
           </Card>
+
+          {recentlyDeletedGroup ? (
+            <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-50">
+                      Recently deleted material group
+                    </p>
+                    <p className="text-sm text-amber-900/80 dark:text-amber-100/85">
+                      {getMaterialGroupLabel(recentlyDeletedGroup)} was soft
+                      deleted and can still be restored.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {accessRules?.canUpdate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-amber-300 bg-white/70 text-amber-950 hover:bg-white dark:border-amber-400/40 dark:bg-transparent dark:text-amber-50"
+                        onClick={() =>
+                          openPendingActionDialog(
+                            recentlyDeletedGroup,
+                            "restore"
+                          )
+                        }
+                      >
+                        <Undo2 className="size-3.5" />
+                        Restore
+                      </Button>
+                    ) : null}
+                    {accessRules?.canDelete ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="rounded-xl"
+                        onClick={() =>
+                          openPendingActionDialog(
+                            recentlyDeletedGroup,
+                            "permanent"
+                          )
+                        }
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete permanently
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
             <CardHeader className="border-b border-slate-200/70 py-3 dark:border-white/10">
@@ -742,6 +1192,136 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
               )}
             </CardContent>
           </Card>
+
+          <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+            <CardHeader className="border-b border-slate-200/70 py-3 dark:border-white/10">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle className="text-base">
+                    Deleted material groups
+                  </CardTitle>
+                  <CardDescription>{deletedPageSummary}</CardDescription>
+                </div>
+                <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
+                  {deletedTotal} deleted
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-3 sm:px-2">
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  setDeletedPage(1)
+                }}
+                className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_auto]"
+              >
+                <div className="min-w-0 space-y-1">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Group name
+                  </label>
+                  <Input
+                    value={deletedFilters.name}
+                    className="h-7 rounded-md px-2 text-xs"
+                    onChange={(event) =>
+                      setDeletedFilters({
+                        ...deletedFilters,
+                        name: event.target.value,
+                      })
+                    }
+                    placeholder="Input group name"
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Description
+                  </label>
+                  <Input
+                    value={deletedFilters.description}
+                    className="h-7 rounded-md px-2 text-xs"
+                    onChange={(event) =>
+                      setDeletedFilters({
+                        ...deletedFilters,
+                        description: event.target.value,
+                      })
+                    }
+                    placeholder="Input description"
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Status
+                  </label>
+                  <AppSelect
+                    value={deletedFilters.isActive || ALL_STATUS_VALUE}
+                    onValueChange={(value) =>
+                      setDeletedFilters({
+                        ...deletedFilters,
+                        isActive:
+                          value === ALL_STATUS_VALUE ? "" : value,
+                      })
+                    }
+                    placeholder="All statuses"
+                    options={[
+                      { value: ALL_STATUS_VALUE, label: "All statuses" },
+                      { value: "true", label: "Active" },
+                      { value: "false", label: "Inactive" },
+                    ]}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end sm:justify-end xl:col-span-1">
+                  <Button type="submit" className="w-full rounded-xl sm:w-auto">
+                    <Search className="size-3.5" />
+                    Search
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-xl sm:w-auto"
+                    onClick={() => {
+                      setDeletedFilters(DEFAULT_FILTERS)
+                      setDeletedPage(1)
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+
+            <CardContent className="border-t border-slate-200/70 p-0 dark:border-white/10">
+              {deletedError ? (
+                <div className="p-6 text-sm text-red-700 dark:text-red-300">
+                  {deletedError}
+                </div>
+              ) : (
+                <AppDataTable
+                  table={deletedTable}
+                  pageSummary={deletedPageSummary}
+                  page={deletedPage}
+                  totalPages={deletedMeta?.totalPages ?? 1}
+                  pageSize={deletedLimit}
+                  isLoading={loadingDeletedGroups}
+                  pageSizeOptions={[5, 10, 25, 50]}
+                  onPageChange={setDeletedPage}
+                  onPageSizeChange={(nextPageSize) => {
+                    setDeletedLimit(nextPageSize)
+                    setDeletedPage(1)
+                  }}
+                  emptyState={
+                    <div className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center">
+                      <p className="text-sm font-semibold">
+                        No deleted material groups found
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Try clearing or relaxing the current filters.
+                      </p>
+                    </div>
+                  }
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
       </ScrollArea>
 
@@ -764,6 +1344,32 @@ export function MaterialGroupWorkspace({ apiUrl }: { apiUrl: string }) {
           }
         }}
         onSubmit={submitEditor}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        group={deleteTarget}
+        working={deleteWorking}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null)
+          }
+        }}
+        onConfirm={confirmSoftDelete}
+      />
+
+      <RecentlyDeletedDialog
+        open={Boolean(pendingActionTarget && pendingActionMode)}
+        action={pendingActionMode ?? "restore"}
+        group={pendingActionTarget}
+        working={pendingActionWorking}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingActionTarget(null)
+            setPendingActionMode(null)
+          }
+        }}
+        onConfirm={confirmPendingAction}
       />
     </div>
   )
