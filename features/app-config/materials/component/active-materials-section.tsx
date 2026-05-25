@@ -174,6 +174,21 @@ export function ActiveMaterialsSection({
       cell: ({ row }) => <span className="line-clamp-2 max-w-72 text-xs font-medium text-slate-700 dark:text-slate-200">{row.original.description || "-"}</span>,
     },
     {
+      id: "unit",
+      header: "Unit",
+      cell: ({ row }) => {
+        const unit = row.original.unit
+        const label = unit?.shortName ? `${unit.name} (${unit.shortName})` : unit?.name
+
+        return <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{label || "-"}</span>
+      },
+    },
+    {
+      id: "materialGroup",
+      header: "Group",
+      cell: ({ row }) => <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{row.original.materialGroup?.name || "-"}</span>,
+    },
+    {
       id: "status",
       header: "Status",
       cell: ({ row }) => <Badge variant={getStatusTone(row.original)} className="rounded-full px-3 py-1">{getStatusLabel(row.original)}</Badge>,
@@ -378,6 +393,8 @@ export function ActiveMaterialsSection({
                   </div>
 
                   <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p>Unit: {material.unit?.shortName || material.unit?.name || "-"}</p>
+                    <p>Group: {material.materialGroup?.name || "-"}</p>
                     <p>Description: {material.description || "-"}</p>
                     <p>Created: {formatDate(material.created_at)}</p>
                   </div>

@@ -75,12 +75,21 @@ function optionalString(value: string) {
   return trimmedValue || undefined
 }
 
+function optionalNumber(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) return undefined
+
+  const numericValue = Number.parseInt(trimmedValue, 10)
+  return Number.isNaN(numericValue) ? undefined : numericValue
+}
+
 function buildMaterialPayload(payload: MaterialFormValues) {
   return {
     name: payload.name.trim(),
     code: optionalString(payload.code),
     description: optionalString(payload.description),
-    remarks: optionalString(payload.remarks),
+    unitId: optionalNumber(payload.unitId),
+    materialGroupId: optionalString(payload.materialGroupId),
     isActive: payload.isActive,
   }
 }

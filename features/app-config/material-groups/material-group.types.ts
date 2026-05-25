@@ -26,21 +26,10 @@ export type PaginatedResponse<T> = {
   meta: PaginationMeta
 }
 
-export type MaterialLookupRecord = {
-  id: string | number
-  name: string
-  shortName?: string | null
-}
-
-export type MaterialRecord = {
+export type MaterialGroupRecord = {
   id: string
   name: string
-  code?: string | null
   description?: string | null
-  unitId?: number | null
-  materialGroupId?: string | null
-  unit?: MaterialLookupRecord | null
-  materialGroup?: MaterialLookupRecord | null
   organizationId?: string | null
   isActive?: boolean
   created_by_id?: string | null
@@ -54,18 +43,14 @@ export type MaterialRecord = {
   deleted_at?: string | null
 }
 
-export type MaterialFilterValues = {
+export type MaterialGroupFilterValues = {
   name: string
-  code: string
   description: string
   isActive: string
 }
 
-export type MaterialFormValues = {
+export type MaterialGroupFormValues = {
   name: string
-  code: string
   description: string
-  unitId: string
-  materialGroupId: string
   isActive: boolean
 }

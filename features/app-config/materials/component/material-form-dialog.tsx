@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { AppSelect, type AppSelectOption } from "@/components/app-select"
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 
 import type { MaterialFormValues } from "../material.types"
 
@@ -29,6 +29,8 @@ type MaterialFormDialogProps = {
   error: string
   mode: MaterialEditorMode
   initialValues: MaterialFormValues
+  unitOptions: AppSelectOption[]
+  materialGroupOptions: AppSelectOption[]
   onOpenChange: (open: boolean) => void
   onSubmit: (values: MaterialFormValues) => void
 }
@@ -55,6 +57,8 @@ export function MaterialFormDialog({
   error,
   mode,
   initialValues,
+  unitOptions,
+  materialGroupOptions,
   onOpenChange,
   onSubmit,
 }: MaterialFormDialogProps) {
@@ -100,17 +104,16 @@ export function MaterialFormDialog({
 
           <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-4 px-6 py-5">
-              <div className="space-y-2">
-                <FieldLabel required>Name</FieldLabel>
-                <Input
-                  value={draft.name}
-                  onChange={(event) => update("name", event.target.value)}
-                  placeholder="Input material name"
-                  disabled={loading || submitting}
-                />
-              </div>
-
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <FieldLabel required>Name</FieldLabel>
+                  <Input
+                    value={draft.name}
+                    onChange={(event) => update("name", event.target.value)}
+                    placeholder="Input material name"
+                    disabled={loading || submitting}
+                  />
+                </div>
                 <div className="space-y-2">
                   <FieldLabel>Code</FieldLabel>
                   <Input
@@ -120,25 +123,52 @@ export function MaterialFormDialog({
                     disabled={loading || submitting}
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <FieldLabel>Description</FieldLabel>
-                  <Textarea
-                    value={draft.description}
-                    onChange={(event) => update("description", event.target.value)}
-                    placeholder="Input material description"
-                    rows={3}
+                  <FieldLabel>Unit</FieldLabel>
+                  <AppSelect
+                    value={draft.unitId || "__none__"}
+                    onValueChange={(value) =>
+                      update("unitId", value === "__none__" ? "" : value)
+                    }
+                    options={[
+                      { value: "__none__", label: "No unit" },
+                      ...unitOptions,
+                    ]}
+                    placeholder="Select unit"
                     disabled={loading || submitting}
+                    triggerClassName="h-9 rounded-md px-3 text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FieldLabel>Material group</FieldLabel>
+                  <AppSelect
+                    value={draft.materialGroupId || "__none__"}
+                    onValueChange={(value) =>
+                      update(
+                        "materialGroupId",
+                        value === "__none__" ? "" : value
+                      )
+                    }
+                    options={[
+                      { value: "__none__", label: "No group" },
+                      ...materialGroupOptions,
+                    ]}
+                    placeholder="Select material group"
+                    disabled={loading || submitting}
+                    triggerClassName="h-9 rounded-md px-3 text-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <FieldLabel>Remarks</FieldLabel>
-                <Textarea
-                  value={draft.remarks}
-                  onChange={(event) => update("remarks", event.target.value)}
-                  placeholder="Optional remarks"
-                  rows={4}
+                <FieldLabel>Description</FieldLabel>
+                <Input
+                  value={draft.description}
+                  onChange={(event) => update("description", event.target.value)}
+                  placeholder="Input material description"
                   disabled={loading || submitting}
                 />
               </div>

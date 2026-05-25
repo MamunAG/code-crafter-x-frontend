@@ -106,6 +106,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             permissionMenuName: "Supplier Entry",
           },
           {
+            label: "Material Group Entry",
+            href: "/app-config/data/material-groups",
+            permissionMenuName: "Material Group Entry",
+          },
+          {
             label: "Material Entry",
             href: "/app-config/data/materials",
             permissionMenuName: "Material Entry",

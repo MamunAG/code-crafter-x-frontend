@@ -19,6 +19,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { fetchMaterialGroups } from "@/features/app-config/material-groups/material-group.service"
+import type { MaterialGroupRecord } from "@/features/app-config/material-groups/material-group.types"
+import { fetchUnits } from "@/features/app-config/units/unit.service"
+import type { UnitRecord } from "@/features/app-config/units/unit.types"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import {
   readSelectedOrganizationId,
@@ -74,7 +78,8 @@ const DEFAULT_FORM_VALUES: MaterialFormValues = {
   name: "",
   code: "",
   description: "",
-  remarks: "",
+  unitId: "",
+  materialGroupId: "",
   isActive: true,
 }
 
@@ -283,6 +288,12 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedMeta, setDeletedMeta] = useState<PaginationMeta | null>(null)
   const [deletedPage, setDeletedPage] = useState(1)
   const [deletedLimit, setDeletedLimit] = useState(5)
+  const [unitOptions, setUnitOptions] = useState<
+    { value: string; label: string }[]
+  >([])
+  const [materialGroupOptions, setMaterialGroupOptions] = useState<
+    { value: string; label: string }[]
+  >([])
 
   const [activeFilters, setActiveFilters] =
     useState<MaterialFilterValues>(DEFAULT_FILTERS)
@@ -487,6 +498,66 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [apiUrl, selectedOrganizationId])
 
+  useEffect(() => {
+    let active = true
+
+    async function loadLookups() {
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) {
+          return
+        }
+
+        const [unitsResponse, groupsResponse] = await Promise.all([
+          fetchUnits({
+            apiUrl,
+            accessToken: token,
+            page: 1,
+            limit: 1000,
+            filters: { name: "", shortName: "", isActive: "active" },
+            organizationId: selectedOrganizationId || undefined,
+          }),
+          fetchMaterialGroups({
+            apiUrl,
+            accessToken: token,
+            page: 1,
+            limit: 1000,
+            filters: { name: "", description: "", isActive: "true" },
+            organizationId: selectedOrganizationId || undefined,
+          }),
+        ])
+
+        if (!active) {
+          return
+        }
+
+        setUnitOptions(
+          unitsResponse.items.map((unit: UnitRecord) => ({
+            value: String(unit.id),
+            label: unit.shortName ? `${unit.name} (${unit.shortName})` : unit.name,
+          }))
+        )
+        setMaterialGroupOptions(
+          groupsResponse.items.map((group: MaterialGroupRecord) => ({
+            value: group.id,
+            label: group.name,
+          }))
+        )
+      } catch {
+        if (active) {
+          setUnitOptions([])
+          setMaterialGroupOptions([])
+        }
+      }
+    }
+
+    void loadLookups()
+
+    return () => {
+      active = false
+    }
+  }, [apiUrl, selectedOrganizationId])
+
   async function openCreateDialog() {
     setEditorMode("create")
     setEditorError("")
@@ -614,7 +685,8 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
           name: material.name ?? "",
           code: material.code ?? "",
           description: material.description ?? "",
-          remarks: material.remarks ?? "",
+          unitId: material.unitId == null ? "" : String(material.unitId),
+          materialGroupId: material.materialGroupId ?? "",
           isActive: material.isActive !== false,
         })
       } catch (caughtError) {
@@ -1092,6 +1164,8 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         error={editorError}
         mode={editorMode}
         initialValues={editorInitialValues}
+        unitOptions={unitOptions}
+        materialGroupOptions={materialGroupOptions}
         onOpenChange={(open) => {
           setEditorOpen(open)
 
