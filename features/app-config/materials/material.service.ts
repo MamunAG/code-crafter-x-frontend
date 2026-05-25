@@ -1,0 +1,340 @@
+import type {
+  ApiResponse,
+  MaterialFilterValues,
+  MaterialFormValues,
+  MaterialRecord,
+  PaginatedResponse,
+} from "./material.types"
+
+function buildApiUrl(apiUrl: string, path: string) {
+  return new URL(path, apiUrl)
+}
+
+function buildRequestHeaders({
+  accessToken,
+  organizationId,
+  contentType,
+}: {
+  accessToken: string
+  organizationId?: string
+  contentType?: string
+}) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+  }
+
+  if (contentType) headers["Content-Type"] = contentType
+  if (organizationId) headers["x-organization-id"] = organizationId
+
+  return headers
+}
+
+async function readJsonResponse<T>(response: Response) {
+  let payload: ApiResponse<T> | null = null
+
+  try {
+    payload = (await response.json()) as ApiResponse<T>
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error(
+      payload?.message ||
+        "You do not have permission to complete this material action."
+    )
+  }
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(
+      payload?.message || "Unable to complete the material request right now."
+    )
+  }
+
+  return payload
+}
+
+function appendFilterParams(url: URL, filters: Partial<MaterialFilterValues>) {
+  if (filters.name?.trim()) url.searchParams.set("name", filters.name.trim())
+  if (filters.code?.trim()) url.searchParams.set("code", filters.code.trim())
+  if (filters.description?.trim()) {
+    url.searchParams.set("description", filters.description.trim())
+  }
+  if (filters.isActive?.trim()) {
+    url.searchParams.set("isActive", filters.isActive.trim())
+  }
+}
+
+function optionalString(value: string) {
+  const trimmedValue = value.trim()
+  return trimmedValue || undefined
+}
+
+function buildMaterialPayload(payload: MaterialFormValues) {
+  return {
+    name: payload.name.trim(),
+    code: optionalString(payload.code),
+    description: optionalString(payload.description),
+    remarks: optionalString(payload.remarks),
+    isActive: payload.isActive,
+  }
+}
+
+export async function fetchMaterials({
+  apiUrl,
+  accessToken,
+  page,
+  limit,
+  filters,
+  deletedOnly = false,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  page: number
+  limit: number
+  filters: Partial<MaterialFilterValues>
+  deletedOnly?: boolean
+  organizationId?: string
+}): Promise<PaginatedResponse<MaterialRecord>> {
+  const url = buildApiUrl(apiUrl, "/api/v1/material")
+  url.searchParams.set("page", String(page))
+  url.searchParams.set("limit", String(limit))
+  if (deletedOnly) url.searchParams.set("deletedOnly", "true")
+  appendFilterParams(url, filters)
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload =
+    await readJsonResponse<PaginatedResponse<MaterialRecord>>(response)
+
+  if (!payload.data?.items || !payload.data?.meta) {
+    throw new Error("The material list was returned without pagination data.")
+  }
+
+  return payload.data
+}
+
+export async function fetchMaterial({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}): Promise<MaterialRecord> {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/material/${id}`), {
+    method: "GET",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    cache: "no-store",
+  })
+
+  const payload = await readJsonResponse<MaterialRecord>(response)
+  if (!payload.data) {
+    throw new Error("The material record was returned without data.")
+  }
+
+  return payload.data
+}
+
+export async function createMaterial({
+  apiUrl,
+  accessToken,
+  payload,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  payload: MaterialFormValues
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/material"), {
+    method: "POST",
+    headers: buildRequestHeaders({
+      accessToken,
+      organizationId,
+      contentType: "application/json",
+    }),
+    body: JSON.stringify(buildMaterialPayload(payload)),
+  })
+
+  const payloadData = await readJsonResponse<MaterialRecord>(response)
+  if (!payloadData.data) {
+    throw new Error(
+      "The material was saved, but the created record was not returned."
+    )
+  }
+
+  return payloadData.data
+}
+
+export async function updateMaterial({
+  apiUrl,
+  accessToken,
+  id,
+  payload,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  payload: MaterialFormValues
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/material/${id}`), {
+    method: "PATCH",
+    headers: buildRequestHeaders({
+      accessToken,
+      organizationId,
+      contentType: "application/json",
+    }),
+    body: JSON.stringify(buildMaterialPayload(payload)),
+  })
+
+  const payloadData = await readJsonResponse<MaterialRecord>(response)
+  if (!payloadData.data) {
+    throw new Error(
+      "The material was updated, but the updated record was not returned."
+    )
+  }
+
+  return payloadData.data
+}
+
+export async function downloadMaterialUploadTemplate({
+  apiUrl,
+  accessToken,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  organizationId?: string
+}) {
+  const response = await fetch(
+    buildApiUrl(apiUrl, "/api/v1/material/template/upload"),
+    {
+      method: "GET",
+      headers: buildRequestHeaders({ accessToken, organizationId }),
+    }
+  )
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error("You do not have permission to download the material template.")
+  }
+
+  if (!response.ok) {
+    throw new Error("Unable to download the material upload template right now.")
+  }
+
+  return response.blob()
+}
+
+export async function uploadMaterialTemplate({
+  apiUrl,
+  accessToken,
+  file,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  file: File
+  organizationId?: string
+}): Promise<{ inserted: number; skipped: number }> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/material/upload"), {
+    method: "POST",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+    body: formData,
+  })
+
+  const payload = await readJsonResponse<{ inserted: number; skipped: number }>(
+    response
+  )
+
+  if (!payload.data) {
+    throw new Error("The material upload completed without a summary.")
+  }
+
+  return payload.data
+}
+
+export async function softDeleteMaterial({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(buildApiUrl(apiUrl, `/api/v1/material/${id}`), {
+    method: "DELETE",
+    headers: buildRequestHeaders({ accessToken, organizationId }),
+  })
+
+  await readJsonResponse(response)
+}
+
+export async function restoreMaterial({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/material/${id}/restore`),
+    {
+      method: "POST",
+      headers: buildRequestHeaders({ accessToken, organizationId }),
+    }
+  )
+
+  await readJsonResponse(response)
+}
+
+export async function permanentlyDeleteMaterial({
+  apiUrl,
+  accessToken,
+  id,
+  organizationId,
+}: {
+  apiUrl: string
+  accessToken: string
+  id: string
+  organizationId?: string
+}) {
+  const response = await fetch(
+    buildApiUrl(apiUrl, `/api/v1/material/${id}/permanent`),
+    {
+      method: "DELETE",
+      headers: buildRequestHeaders({ accessToken, organizationId }),
+    }
+  )
+
+  await readJsonResponse(response)
+}
