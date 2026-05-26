@@ -218,6 +218,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 permissionMenuName: "Style Setup",
               },
               {
+                label: "Fabric Process Setup",
+                href: "/merchandising/masters/fabric-processes",
+                permissionMenuName: "Fabric Process Setup",
+              },
+              {
                 label: "Color Setup",
                 href: "/merchandising/masters/colors",
                 permissionMenuName: "Color Setup",
