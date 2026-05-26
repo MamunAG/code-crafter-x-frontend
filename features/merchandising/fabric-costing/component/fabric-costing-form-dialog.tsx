@@ -31,7 +31,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import {
-  FABRIC_COSTING_SAMPLE_INPUT,
   calculateFabricCost,
   type FabricCostingInput,
 } from "../fabric-costing-calculation"
@@ -212,41 +211,6 @@ export function FabricCostingFormDialog({
     })
   }
 
-  function applySampleData() {
-    const sampleByName = new Map(
-      FABRIC_COSTING_SAMPLE_INPUT.processes.map((process) => [process.name.trim().toLowerCase(), process]),
-    )
-
-    patchValues({
-      qty: String(FABRIC_COSTING_SAMPLE_INPUT.targetQty),
-      yarns: FABRIC_COSTING_SAMPLE_INPUT.materials.map((material) => ({
-        id: crypto.randomUUID(),
-        yarnId: "",
-        yarnLabel: material.name,
-        percentagePerUnitFabric: String(material.ratioPercent),
-        yarnPricePerUnit: String(material.pricePerKg),
-        totalYarnPrice: "0",
-        yarnWiseProcesses: (material.extraProcesses ?? []).map((process) => ({
-          id: crypto.randomUUID(),
-          processId: "",
-          processLabel: process.name,
-          rateUnitFabric: String(process.costPerKg),
-          wastagePercentage: String(process.wastagePercent),
-        })),
-      })),
-      commonProcesses: FABRIC_COSTING_SAMPLE_INPUT.commonWastages.map((wastage) => {
-        const processMatch = sampleByName.get(wastage.name.trim().toLowerCase())
-        return {
-          id: crypto.randomUUID(),
-          processId: "",
-          processLabel: wastage.name,
-          ratePerUnitFabric: String(processMatch?.costPerKg ?? 0),
-          wastagePercentage: String(wastage.wastagePercent),
-        }
-      }),
-    })
-  }
-
   const allErrors = [...errors.map((error) => error.message), ...calculation.validationErrors]
 
   return (
@@ -340,125 +304,6 @@ export function FabricCostingFormDialog({
                       />
                     </div>
                   </div>
-                  <div className="flex justify-end">
-                    <Button type="button" variant="outline" size="sm" onClick={applySampleData} disabled={disabled}>
-                      Load Example Data
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Fabric Cost</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
-                      {calculation.input.currencySymbol}
-                      {formatMoney(calculation.finalCost)} / KG
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Qty</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
-                      {formatQty(calculation.input.targetQty)} KG
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Total Yarn Qty</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
-                      {formatQty(calculation.totalYarnQty)} KG
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Common Wastage</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
-                      {formatQty(calculation.totalCommonWastage)}%
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Required Process Qty</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
-                      {formatQty(calculation.requiredQty)} KG
-                    </p>
-                  </CardContent>
-                </Card>
-              </section>
-
-              <section className="grid gap-3 md:grid-cols-3">
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Material Cost</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
-                    {calculation.input.currencySymbol}
-                    {formatMoney(calculation.totalMaterialCost)}
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Process Cost</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
-                    {calculation.input.currencySymbol}
-                    {formatMoney(calculation.totalProcessCost)}
-                  </CardContent>
-                </Card>
-                <Card className="border-slate-200/80 dark:border-white/10">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Final Cost</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
-                    {calculation.input.currencySymbol}
-                    {formatMoney(calculation.finalCost)}
-                  </CardContent>
-                </Card>
-              </section>
-
-              <Card className="border-slate-200/80 dark:border-white/10">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Visual Process Flow</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                  <p>{formatQty(calculation.input.targetQty)} KG Finished Fabric</p>
-                  <p>↓</p>
-                  <p>+{formatQty(calculation.totalCommonWastage)}% Common Wastage</p>
-                  <p>↓</p>
-                  <p>{formatQty(calculation.requiredQty)} KG Required Qty</p>
-                  <p>↓</p>
-                  <p className="font-medium">Material Split</p>
-                  {calculation.materialResults.map((material) => (
-                    <p key={material.id}>
-                      {material.name} {formatQty(material.ratioPercent)}% → {formatQty(material.actualQty)} KG →{" "}
-                      {calculation.input.currencySymbol}
-                      {formatMoney(material.totalCost)}
-                    </p>
-                  ))}
-                  <p>↓</p>
-                  <p className="font-medium">Process Cost</p>
-                  {calculation.processResults.map((process) => (
-                    <p key={process.id}>
-                      {process.name} → {calculation.input.currencySymbol}
-                      {formatMoney(process.cost)}
-                    </p>
-                  ))}
                 </CardContent>
               </Card>
 
@@ -812,6 +657,120 @@ export function FabricCostingFormDialog({
                       No common rows added.
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Fabric Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {calculation.input.currencySymbol}
+                      {formatMoney(calculation.finalCost)} / KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.input.targetQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Total Yarn Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.totalYarnQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Common Wastage</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.totalCommonWastage)}%
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Required Process Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.requiredQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <section className="grid gap-3 md:grid-cols-3">
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Material Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.totalMaterialCost)}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Process Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.totalProcessCost)}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Final Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.finalCost)}
+                  </CardContent>
+                </Card>
+              </section>
+
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Visual Process Flow</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                  <p>{formatQty(calculation.input.targetQty)} KG Finished Fabric</p>
+                  <p>↓</p>
+                  <p>+{formatQty(calculation.totalCommonWastage)}% Common Wastage</p>
+                  <p>↓</p>
+                  <p>{formatQty(calculation.requiredQty)} KG Required Qty</p>
+                  <p>↓</p>
+                  <p className="font-medium">Material Split</p>
+                  {calculation.materialResults.map((material) => (
+                    <p key={material.id}>
+                      {material.name} {formatQty(material.ratioPercent)}% → {formatQty(material.actualQty)} KG →{" "}
+                      {calculation.input.currencySymbol}
+                      {formatMoney(material.totalCost)}
+                    </p>
+                  ))}
+                  <p>↓</p>
+                  <p className="font-medium">Process Cost</p>
+                  {calculation.processResults.map((process) => (
+                    <p key={process.id}>
+                      {process.name} → {calculation.input.currencySymbol}
+                      {formatMoney(process.cost)}
+                    </p>
+                  ))}
                 </CardContent>
               </Card>
 
