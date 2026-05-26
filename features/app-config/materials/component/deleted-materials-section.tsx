@@ -369,10 +369,7 @@ export function DeletedMaterialsSection({
                             {getUserLabel(material.created_by_user, material.created_by_id) || "No creator metadata"}
                           </p>
                         </div>
-                        <p>
-                          Updated by:{" "}
-                          {getUserLabel(material.updated_by_user, material.updated_by_id) || "No editor metadata"}
-                        </p>
+                        <p>{getUserLabel(material.updated_by_user, material.updated_by_id) || "No editor metadata"}</p>
                         <p>Deleted: {formatDate(material.deleted_at)}</p>
                       </div>
                     </article>
@@ -417,7 +414,7 @@ export function DeletedMaterialsSection({
                 controlsDisabled={busy}
                 pageSizeOptions={[5, 10, 25, 50]}
                 columnClassNames={{
-                  material: "w-[260px] min-w-[260px]",
+                  material: "w-[320px] min-w-[320px]",
                 }}
                 onPageChange={(nextPage) => onPageChange(nextPage)}
                 onPageSizeChange={(nextPageSize) => {

@@ -253,8 +253,7 @@ export function ActiveMaterialsSection({
             <p className="text-xs text-slate-700 dark:text-slate-200">{formatDate(material.updated_at)}</p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               {getUserLabel(material.updated_by_user, material.updated_by_id)
-                ? `Updated by ${getUserLabel(material.updated_by_user, material.updated_by_id)}`
-                : "No editor metadata"}
+                || "No editor metadata"}
             </p>
           </div>
         ) : (
@@ -461,7 +460,6 @@ export function ActiveMaterialsSection({
                     </div>
                     <p>Updated: {material.updated_at ? formatDate(material.updated_at) : "Not edited yet"}</p>
                     <p>
-                      Updated by:{" "}
                       {getUserLabel(material.updated_by_user, material.updated_by_id) || "No editor metadata"}
                     </p>
                   </div>
@@ -509,7 +507,7 @@ export function ActiveMaterialsSection({
             controlsDisabled={busy}
             pageSizeOptions={[5, 10, 25, 50]}
             columnClassNames={{
-              material: "w-[260px] min-w-[260px]",
+              material: "w-[320px] min-w-[320px]",
             }}
             onPageChange={(nextPage) => onPageChange(nextPage)}
             onPageSizeChange={(nextPageSize) => {
