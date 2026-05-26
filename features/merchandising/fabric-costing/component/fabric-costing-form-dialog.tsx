@@ -60,6 +60,7 @@ type FabricCostingFormDialogProps = {
 }
 
 const INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
+const MASTER_INPUT_CLASS = "h-8"
 
 function optionFrom(value: string, label: string) {
   return value ? { value, label: label || value } : null
@@ -238,15 +239,16 @@ export function FabricCostingFormDialog({
                 </div>
               ) : null}
 
-              <Card className="border-slate-200/80 dark:border-white/10">
-                <CardHeader className="pb-2">
+              <Card size="sm" className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-1">
                   <CardTitle className="text-sm">Master Info</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.7fr)_minmax(340px,2fr)_minmax(130px,0.7fr)_minmax(150px,0.8fr)_minmax(160px,0.8fr)]">
+                <CardContent className="space-y-2">
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.7fr)_minmax(340px,2fr)_minmax(130px,0.7fr)_minmax(150px,0.8fr)_minmax(160px,0.8fr)]">
                     <div className="space-y-1.5">
                       <FieldLabel>Cost name</FieldLabel>
                       <Input
+                        className={MASTER_INPUT_CLASS}
                         value={values.costName}
                         onChange={(event) => patchValues({ costName: event.target.value })}
                         placeholder="Input cost name"
@@ -264,12 +266,14 @@ export function FabricCostingFormDialog({
                         loadItems={loadMaterialOptions}
                         placeholder="Search fabric material"
                         disabled={disabled}
+                        className={MASTER_INPUT_CLASS}
                         showClear
                       />
                     </div>
                     <div className="space-y-1.5">
                       <FieldLabel required>Target Qty</FieldLabel>
                       <Input
+                        className={MASTER_INPUT_CLASS}
                         type="number"
                         step="0.0001"
                         value={values.qty}
@@ -287,6 +291,7 @@ export function FabricCostingFormDialog({
                         loadItems={loadUnitOptions}
                         placeholder="Search unit"
                         disabled
+                        className={MASTER_INPUT_CLASS}
                         showClear
                       />
                     </div>
@@ -300,6 +305,7 @@ export function FabricCostingFormDialog({
                         loadItems={loadCurrencyOptions}
                         placeholder="Search currency"
                         disabled={disabled}
+                        className={MASTER_INPUT_CLASS}
                         showClear
                       />
                     </div>
