@@ -280,6 +280,32 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           //       ],
           //     },
           {
+            label: "Costing & Budget",
+            href: "/merchandising/production/costing-budget",
+            children: [
+              {
+                label: "Fabric Costing",
+                href: "/merchandising/production/costing-budget/fabric-costing",
+                permissionMenuName: "Fabric Costing",
+              },
+              {
+                label: "GMT Costing",
+                href: "/merchandising/production/costing-budget/gmt-costing",
+                permissionMenuName: "GMT Costing",
+              },
+              {
+                label: "Booking",
+                href: "/merchandising/production/costing-budget/booking",
+                permissionMenuName: "Booking",
+              },
+              {
+                label: "Budget Approval",
+                href: "/merchandising/production/costing-budget/budget-approval",
+                permissionMenuName: "Budget Approval",
+              },
+            ],
+          },
+          {
             label: "Orders",
             href: "/merchandising/production",
             children: [
