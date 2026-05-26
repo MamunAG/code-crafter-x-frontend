@@ -26,12 +26,6 @@ export type UserSummary = {
   display_name?: string | null
 }
 
-export type StyleSummary = {
-  id?: string | null
-  styleNo?: string | null
-  styleName?: string | null
-}
-
 export type MaterialSummary = {
   id?: string | null
   name?: string | null
@@ -87,8 +81,6 @@ export type FabricCostingCommonProcessRecord = {
 
 export type FabricCostingRecord = {
   id: string
-  styleId?: string | null
-  style?: StyleSummary | null
   fabricId?: string | null
   fabric?: MaterialSummary | null
   qty?: number | string | null
@@ -140,8 +132,6 @@ export type FabricCostingCommonProcessFormValues = {
 
 export type FabricCostingFormValues = {
   costName: string
-  styleId: string
-  styleLabel: string
   fabricId: string
   fabricLabel: string
   qty: string
@@ -156,7 +146,6 @@ export type FabricCostingFormValues = {
 export type FabricCostingFilterValues = {
   costName: string
   fabricId: string
-  styleId: string
   currencyId: string
   unitId: string
 }

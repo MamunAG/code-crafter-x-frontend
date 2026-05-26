@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ChevronLeft,
@@ -47,11 +47,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
-import { fetchMaterials } from "@/features/app-config/materials/material.service"
+import type { CurrencyRecord } from "@/features/app-config/currencies/currency.types"
+import { fetchMaterialGroups } from "@/features/app-config/material-groups/material-group.service"
+import type { MaterialGroupRecord } from "@/features/app-config/material-groups/material-group.types"
+import { fetchMaterial, fetchMaterials } from "@/features/app-config/materials/material.service"
 import { fetchUnits } from "@/features/app-config/units/unit.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchFabricProcesses } from "@/features/merchandising/fabric-processes/fabric-process.service"
-import { fetchStyles } from "@/features/merchandising/styles/style.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
@@ -87,14 +89,11 @@ const EMPTY_ACCESS_RULES: AccessRules = { canView: false, canCreate: false, canU
 const DEFAULT_FILTERS: FabricCostingFilterValues = {
   costName: "",
   fabricId: "",
-  styleId: "",
   currencyId: "",
   unitId: "",
 }
 const DEFAULT_FORM_VALUES: FabricCostingFormValues = {
   costName: "",
-  styleId: "",
-  styleLabel: "",
   fabricId: "",
   fabricLabel: "",
   qty: "1",
@@ -108,12 +107,6 @@ const DEFAULT_FORM_VALUES: FabricCostingFormValues = {
 
 function normalizeAuthFailure(message: string) {
   return message.toLowerCase().includes("session expired") || message.toLowerCase().includes("unauthorized")
-}
-
-function formatStyleLabel(styleNo?: string | null, styleName?: string | null) {
-  const normalizedNo = styleNo?.trim() ?? ""
-  const normalizedName = styleName?.trim() ?? ""
-  return normalizedNo && normalizedName ? `${normalizedNo} - ${normalizedName}` : normalizedNo || normalizedName
 }
 
 function formatCurrencyLabel(currencyName?: string | null, currencyCode?: string | null, symbol?: string | null) {
@@ -156,15 +149,19 @@ function getTotalYarnPrice(record: FabricCostingRecord) {
   }, 0)
 }
 
+function toCurrencyOption(currency: CurrencyRecord | null | undefined): AppComboboxOption | null {
+  if (!currency) return null
+  return {
+    value: String(currency.id),
+    label: formatCurrencyLabel(currency.currencyName, currency.currencyCode, currency.symbol) || String(currency.id),
+  }
+}
+
 function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValues {
   return {
     costName: record.costName ?? "",
-    styleId: record.styleId ?? "",
-    styleLabel: formatStyleLabel(record.style?.styleNo, record.style?.styleName),
     fabricId: record.fabricId ?? "",
-    fabricLabel: record.fabric?.code?.trim()
-      ? `${record.fabric.code.trim()} - ${record.fabric.name?.trim() || ""}`.trim()
-      : record.fabric?.name ?? "",
+    fabricLabel: record.fabric?.name ?? "",
     qty: numberText(record.qty, "1"),
     unitId: record.unitId == null ? "" : String(record.unitId),
     unitLabel: record.unit?.name ?? "",
@@ -374,6 +371,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   const [draftFilters, setDraftFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
   const [selectedFilterFabric, setSelectedFilterFabric] = useState<AppComboboxOption | null>(null)
+  const [fabricMaterialGroupId, setFabricMaterialGroupId] = useState("")
+  const fabricUnitRequestIdRef = useRef(0)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
@@ -404,7 +403,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     return `Showing ${start}-${end} of ${deletedMeta.total}`
   }, [deletedMeta])
 
-  const filterCount = [activeFilters.costName, activeFilters.fabricId, activeFilters.styleId, activeFilters.currencyId, activeFilters.unitId].filter((value) => value.trim()).length
+  const filterCount = [activeFilters.costName, activeFilters.fabricId, activeFilters.currencyId, activeFilters.unitId].filter((value) => value.trim()).length
 
   const handleAuthFailure = useCallback(
     (message: string) => {
@@ -559,59 +558,83 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     }
   }, [accessRules?.canDelete, apiUrl, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
 
-  const loadStyleOptions = useCallback(
-    async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams) => {
-      const token = window.localStorage.getItem("access_token")
-      if (!token) throw new Error("Your session expired. Please sign in again.")
-      const data = await fetchStyles({
-        apiUrl,
-        accessToken: token,
-        organizationId: selectedOrganizationId || undefined,
-        page: optionPage,
-        limit: optionLimit,
-        filters: {
-          styleNo: query,
-          styleName: "",
-          productType: "",
-          buyerId: "",
-          itemType: "",
-          currencyId: "",
-          isActive: "true",
-        },
-      })
-      return {
-        items: data.items.map((style) => ({
-          value: style.id,
-          label: formatStyleLabel(style.styleNo, style.styleName) || style.id,
-        })),
-        hasNextPage: data.meta.hasNextPage,
-      }
-    },
-    [apiUrl, selectedOrganizationId],
-  )
+  const resolveFabricMaterialGroupId = useCallback(async () => {
+    if (fabricMaterialGroupId) {
+      return fabricMaterialGroupId
+    }
+
+    const token = window.localStorage.getItem("access_token")
+    if (!token) throw new Error("Your session expired. Please sign in again.")
+
+    const data = await fetchMaterialGroups({
+      apiUrl,
+      accessToken: token,
+      organizationId: selectedOrganizationId || undefined,
+      page: 1,
+      limit: 20,
+      filters: { name: "Fabric", description: "", isActive: "true" },
+    })
+
+    const fabricGroup = data.items.find(
+      (group: MaterialGroupRecord) => group.name.trim().toLowerCase() === "fabric",
+    )
+
+    const nextId = fabricGroup?.id ?? ""
+    setFabricMaterialGroupId(nextId)
+    return nextId
+  }, [apiUrl, fabricMaterialGroupId, selectedOrganizationId])
 
   const loadMaterialOptions = useCallback(
     async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams) => {
       const token = window.localStorage.getItem("access_token")
       if (!token) throw new Error("Your session expired. Please sign in again.")
+      const nextFabricGroupId = fabricMaterialGroupId || (await resolveFabricMaterialGroupId())
+      if (!nextFabricGroupId) return { items: [], hasNextPage: false }
       const data = await fetchMaterials({
         apiUrl,
         accessToken: token,
         organizationId: selectedOrganizationId || undefined,
         page: optionPage,
         limit: optionLimit,
-        filters: { name: query, code: "", description: "", isActive: "true" },
+        filters: {
+          name: query,
+          code: "",
+          description: "",
+          materialGroupId: nextFabricGroupId,
+          isActive: "true",
+        },
       })
       return {
         items: data.items.map((material) => ({
           value: material.id,
-          label: material.code?.trim() ? `${material.code.trim()} - ${material.name}` : material.name,
+          label: material.name,
         })),
         hasNextPage: data.meta.hasNextPage,
       }
     },
-    [apiUrl, selectedOrganizationId],
+    [apiUrl, fabricMaterialGroupId, resolveFabricMaterialGroupId, selectedOrganizationId],
   )
+
+  useEffect(() => {
+    let active = true
+
+    async function loadFabricMaterialGroup() {
+      try {
+        const nextId = await resolveFabricMaterialGroupId()
+        if (!active) return
+        setFabricMaterialGroupId(nextId)
+      } catch {
+        if (!active) return
+        setFabricMaterialGroupId("")
+      }
+    }
+
+    void loadFabricMaterialGroup()
+
+    return () => {
+      active = false
+    }
+  }, [resolveFabricMaterialGroupId, selectedOrganizationId])
 
   const loadUnitOptions = useCallback(
     async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams): Promise<AppComboboxLoadResult<AppComboboxOption>> => {
@@ -676,13 +699,107 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     [apiUrl, selectedOrganizationId],
   )
 
-  function handleCreate() {
+  const loadDefaultCurrencyOption = useCallback(async (): Promise<AppComboboxOption | null> => {
+    const token = window.localStorage.getItem("access_token")
+    if (!token) throw new Error("Your session expired. Please sign in again.")
+
+    const data = await fetchCurrencies({
+      apiUrl,
+      accessToken: token,
+      organizationId: selectedOrganizationId || undefined,
+      page: 1,
+      limit: 20,
+      filters: { currencyName: "", currencyCode: "USD", symbol: "" },
+    })
+
+    const usdCurrency =
+      data.items.find((currency) => currency.currencyCode?.trim().toUpperCase() === "USD") ??
+      data.items.find((currency) => currency.currencyName?.trim().toUpperCase() === "USD") ??
+      data.items[0] ??
+      null
+
+    return toCurrencyOption(usdCurrency)
+  }, [apiUrl, selectedOrganizationId])
+
+  const handleFabricChange = useCallback(
+    async (option: AppComboboxOption | null) => {
+      const requestId = fabricUnitRequestIdRef.current + 1
+      fabricUnitRequestIdRef.current = requestId
+
+      if (!option?.value) {
+        setEditorValues((current) => ({
+          ...current,
+          unitId: "",
+          unitLabel: "",
+        }))
+        return
+      }
+
+      try {
+        const token = window.localStorage.getItem("access_token")
+        if (!token) {
+          handleAuthFailure("Your session expired. Please sign in again.")
+          return
+        }
+
+        const material = await fetchMaterial({
+          apiUrl,
+          accessToken: token,
+          id: option.value,
+          organizationId: selectedOrganizationId || undefined,
+        })
+
+        if (requestId !== fabricUnitRequestIdRef.current) {
+          return
+        }
+
+        setEditorValues((current) => ({
+          ...current,
+          unitId: material.unitId == null ? "" : String(material.unitId),
+          unitLabel: material.unit?.name?.trim() ?? "",
+        }))
+      } catch (caughtError) {
+        if (requestId !== fabricUnitRequestIdRef.current) {
+          return
+        }
+
+        const message = caughtError instanceof Error ? caughtError.message : "Unable to load the fabric unit."
+        if (!handleAuthFailure(message)) {
+          setEditorValues((current) => ({
+            ...current,
+            unitId: "",
+            unitLabel: "",
+          }))
+        }
+      }
+    },
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
+  )
+
+  async function handleCreate() {
     setEditorMode("create")
     setEditingId(null)
-    setEditorValues(DEFAULT_FORM_VALUES)
     setEditorErrors([])
-    setEditorLoading(false)
     setEditorOpen(true)
+    setEditorLoading(true)
+
+    try {
+      const defaultCurrency = await loadDefaultCurrencyOption()
+      await resolveFabricMaterialGroupId()
+      setEditorValues({
+        ...DEFAULT_FORM_VALUES,
+        currencyId: defaultCurrency?.value ?? "",
+        currencyLabel: defaultCurrency?.label ?? "",
+      })
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Unable to load the default currency."
+      if (!handleAuthFailure(message)) {
+        toast.error(message)
+        setEditorValues(DEFAULT_FORM_VALUES)
+      }
+    } finally {
+      setEditorLoading(false)
+    }
   }
 
   async function handleEdit(id: string) {
@@ -936,8 +1053,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] table-fixed text-left text-sm">
             <colgroup>
-              <col className="w-[22rem]" />
-              <col className="w-[12rem]" />
+              <col className="w-[20rem]" />
+              <col className="w-[16rem]" />
               <col className="w-[8rem]" />
               <col className="w-[8rem]" />
               <col className="w-[10rem]" />
@@ -948,7 +1065,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
             <thead className="border-b text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-semibold">Costing</th>
-                <th className="px-4 py-3 font-semibold">Style</th>
+                <th className="px-4 py-3 font-semibold">Fabric</th>
                 <th className="px-4 py-3 font-semibold">Qty</th>
                 <th className="px-4 py-3 font-semibold">Currency</th>
                 <th className="px-4 py-3 font-semibold">Yarns</th>
@@ -973,14 +1090,10 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
                           <p className="break-words text-sm font-semibold text-slate-950 dark:text-white">
                             {getCostingLabel(record)}
                           </p>
-                          <p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">
-                            {record.fabric?.code ? `${record.fabric.code} - ` : ""}
-                            {record.fabric?.name ?? "No fabric"}
-                          </p>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-xs font-medium">
-                        {formatStyleLabel(record.style?.styleNo, record.style?.styleName) || "-"}
+                        {record.fabric?.name ?? "No fabric"}
                       </td>
                       <td className="px-4 py-4 text-xs">
                         <span className="font-semibold">{numberText(record.qty, "1")}</span>
@@ -1166,11 +1279,11 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         submitting={editorSubmitting}
         values={editorValues}
         errors={editorErrors}
-        loadStyleOptions={loadStyleOptions}
         loadMaterialOptions={loadMaterialOptions}
         loadUnitOptions={loadUnitOptions}
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
+        onFabricChange={handleFabricChange}
         onValuesChange={setEditorValues}
         onOpenChange={setEditorOpen}
         onSubmit={() => void handleSubmit()}

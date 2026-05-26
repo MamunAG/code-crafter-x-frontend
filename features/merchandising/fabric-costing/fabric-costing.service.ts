@@ -57,13 +57,11 @@ async function readJsonResponse<T>(response: Response) {
 function appendFilterParams(url: URL, filters: Partial<FabricCostingFilterValues>) {
   const costName = filters.costName?.trim() ?? ""
   const fabricId = filters.fabricId?.trim() ?? ""
-  const styleId = filters.styleId?.trim() ?? ""
   const currencyId = filters.currencyId?.trim() ?? ""
   const unitId = filters.unitId?.trim() ?? ""
 
   if (costName) url.searchParams.set("costName", costName)
   if (fabricId) url.searchParams.set("fabricId", fabricId)
-  if (styleId) url.searchParams.set("styleId", styleId)
   if (currencyId) url.searchParams.set("currencyId", currencyId)
   if (unitId) url.searchParams.set("unitId", unitId)
 }
@@ -86,7 +84,6 @@ function normalizeNumber(value: string, fallback = 0) {
 function buildPayload(values: FabricCostingFormValues) {
   return {
     costName: optionalString(values.costName),
-    styleId: optionalString(values.styleId),
     fabricId: optionalString(values.fabricId),
     qty: normalizeNumber(values.qty, 1),
     unitId: optionalNumber(values.unitId),

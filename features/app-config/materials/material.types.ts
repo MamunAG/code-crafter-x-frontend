@@ -71,6 +71,7 @@ export type MaterialFilterValues = {
   name: string
   code: string
   description: string
+  materialGroupId?: string
   isActive: string
 }
 

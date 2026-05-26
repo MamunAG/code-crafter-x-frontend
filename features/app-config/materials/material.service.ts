@@ -170,6 +170,9 @@ function appendFilterParams(url: URL, filters: Partial<MaterialFilterValues>) {
   if (filters.description?.trim()) {
     url.searchParams.set("description", filters.description.trim())
   }
+  if (filters.materialGroupId?.trim()) {
+    url.searchParams.set("materialGroupId", filters.materialGroupId.trim())
+  }
   if (filters.isActive?.trim()) {
     url.searchParams.set("isActive", filters.isActive.trim())
   }

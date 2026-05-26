@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 
 import {
@@ -39,11 +39,11 @@ type FabricCostingFormDialogProps = {
   submitting: boolean
   values: FabricCostingFormValues
   errors: FabricCostingFormError[]
-  loadStyleOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadMaterialOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadUnitOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  onFabricChange?: (option: AppComboboxOption | null) => void
   onValuesChange: (values: FabricCostingFormValues) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
@@ -62,7 +62,7 @@ function newYarn(): FabricCostingYarnFormValues {
     yarnLabel: "",
     percentagePerUnitFabric: "0",
     yarnPricePerUnit: "0",
-    totalYarnConsumption: "0",
+    totalYarnConsumption: "",
     totalYarnPrice: "0",
     yarnWiseProcesses: [],
   }
@@ -96,6 +96,17 @@ function FieldLabel({ children, required = false }: { children: ReactNode; requi
   )
 }
 
+function toNumber(value: string | number | null | undefined) {
+  const numericValue = Number(value ?? 0)
+  return Number.isFinite(numericValue) ? numericValue : 0
+}
+
+function formatCostAmount(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 4,
+  }).format(value)
+}
+
 export function FabricCostingFormDialog({
   open,
   mode,
@@ -103,16 +114,41 @@ export function FabricCostingFormDialog({
   submitting,
   values,
   errors,
-  loadStyleOptions,
   loadMaterialOptions,
   loadUnitOptions,
   loadCurrencyOptions,
   loadProcessOptions,
+  onFabricChange,
   onValuesChange,
   onOpenChange,
   onSubmit,
 }: FabricCostingFormDialogProps) {
   const disabled = loading || submitting
+  const calculatedFabricCost = useMemo(() => {
+    const qty = toNumber(values.qty)
+
+    const yarnCost = values.yarns.reduce((total, yarn) => {
+      const explicitTotal = toNumber(yarn.totalYarnPrice)
+      const fallbackTotal = toNumber(yarn.yarnPricePerUnit) * toNumber(yarn.totalYarnConsumption)
+      const yarnBaseCost = explicitTotal > 0 ? explicitTotal : fallbackTotal
+
+      const yarnProcessCost = yarn.yarnWiseProcesses.reduce((processTotal, process) => {
+        const rate = toNumber(process.rateUnitFabric)
+        const wastage = toNumber(process.wastagePercentage)
+        return processTotal + rate * qty * (1 + wastage / 100)
+      }, 0)
+
+      return total + yarnBaseCost + yarnProcessCost
+    }, 0)
+
+    const commonProcessCost = values.commonProcesses.reduce((total, process) => {
+      const rate = toNumber(process.ratePerUnitFabric)
+      const wastage = toNumber(process.wastagePercentage)
+      return total + rate * qty * (1 + wastage / 100)
+    }, 0)
+
+    return yarnCost + commonProcessCost
+  }, [values.commonProcesses, values.qty, values.yarns])
 
   function patchValues(patch: Partial<FabricCostingFormValues>) {
     onValuesChange({ ...values, ...patch })
@@ -176,7 +212,7 @@ export function FabricCostingFormDialog({
                 </div>
               ) : null}
 
-              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.75fr)_minmax(340px,2fr)_minmax(120px,0.65fr)_minmax(140px,0.75fr)_minmax(150px,0.75fr)]">
                 <div className="space-y-2">
                   <FieldLabel>Cost name</FieldLabel>
                   <Input
@@ -187,25 +223,13 @@ export function FabricCostingFormDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <FieldLabel>Style</FieldLabel>
-                  <AppCombobox
-                    value={optionFrom(values.styleId, values.styleLabel)}
-                    onValueChange={(option) =>
-                      patchValues({ styleId: option?.value ?? "", styleLabel: option?.label ?? "" })
-                    }
-                    loadItems={loadStyleOptions}
-                    placeholder="Search style"
-                    disabled={disabled}
-                    showClear
-                  />
-                </div>
-                <div className="space-y-2">
                   <FieldLabel>Fabric</FieldLabel>
                   <AppCombobox
                     value={optionFrom(values.fabricId, values.fabricLabel)}
-                    onValueChange={(option) =>
+                    onValueChange={(option) => {
                       patchValues({ fabricId: option?.value ?? "", fabricLabel: option?.label ?? "" })
-                    }
+                      onFabricChange?.(option)
+                    }}
                     loadItems={loadMaterialOptions}
                     placeholder="Search fabric material"
                     disabled={disabled}
@@ -219,6 +243,7 @@ export function FabricCostingFormDialog({
                     step="0.0001"
                     value={values.qty}
                     onChange={(event) => patchValues({ qty: event.target.value })}
+                    readOnly
                     disabled={disabled}
                   />
                 </div>
@@ -231,7 +256,7 @@ export function FabricCostingFormDialog({
                     }
                     loadItems={loadUnitOptions}
                     placeholder="Search unit"
-                    disabled={disabled}
+                    disabled
                     showClear
                   />
                 </div>
@@ -589,13 +614,24 @@ export function FabricCostingFormDialog({
         )}
 
         <DialogFooter className="shrink-0 border-t px-4 py-4 dark:border-white/10 sm:px-6">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting} className="w-full sm:w-auto">
-            Cancel
-          </Button>
-          <Button type="button" onClick={onSubmit} disabled={disabled} className="w-full sm:w-auto">
-            {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            {mode === "create" ? "Save costing" : "Update costing"}
-          </Button>
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Fabric Cost:</span>
+              <span className="text-base font-semibold text-slate-950 dark:text-white">
+                {values.currencyLabel ? `${values.currencyLabel} ` : ""}
+                {formatCostAmount(calculatedFabricCost)}
+              </span>
+            </div>
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button type="button" onClick={onSubmit} disabled={disabled} className="w-full sm:w-auto">
+                {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                {mode === "create" ? "Save costing" : "Update costing"}
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

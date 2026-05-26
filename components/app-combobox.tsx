@@ -110,6 +110,7 @@ export function AppCombobox<T extends AppComboboxOption>({
   const hasLoadedInitialRef = useRef(false)
   const requestIdRef = useRef(0)
   const ignoreNextInputChangeRef = useRef(false)
+  const optionCacheRef = useRef(new Map<string, T>())
   const resolvedOpen = open ?? uncontrolledOpen
   const handleOpenChange = onOpenChange ?? setUncontrolledOpen
   const resolvedDisabled = disabled || loading
@@ -125,14 +126,27 @@ export function AppCombobox<T extends AppComboboxOption>({
         return null
       }
 
-      return resolvedItems.find((item) => item.value === itemValue) ?? null
+      if (value?.value === itemValue) {
+        return value
+      }
+
+      return resolvedItems.find((item) => item.value === itemValue) ?? optionCacheRef.current.get(itemValue) ?? null
     },
-    [resolvedItems],
+    [resolvedItems, value],
   )
 
   useEffect(() => {
     setInputValue(value?.label ?? "")
+    if (value?.value) {
+      optionCacheRef.current.set(value.value, value)
+    }
   }, [value?.label, value?.value])
+
+  useEffect(() => {
+    for (const item of resolvedItems) {
+      optionCacheRef.current.set(item.value, item)
+    }
+  }, [resolvedItems])
 
   const runLoad = useCallback(
     async (query: string, page: number, limit: number, replace = true) => {
@@ -158,6 +172,10 @@ export function AppCombobox<T extends AppComboboxOption>({
           initialItemsRef.current = nextItems
           initialHasMoreRef.current = nextHasNextPage
           hasLoadedInitialRef.current = true
+        }
+
+        for (const item of nextItems) {
+          optionCacheRef.current.set(item.value, item)
         }
 
         setCurrentPage(page)
