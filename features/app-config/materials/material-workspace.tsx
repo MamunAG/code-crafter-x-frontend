@@ -532,7 +532,6 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         limit: lookupLimit,
         filters: {
           name: "",
-          shortName: query,
           isActive: "active",
         },
         organizationId: selectedOrganizationId || undefined,
@@ -541,7 +540,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
       return {
         items: response.items.map((unit: UnitRecord) => ({
           value: String(unit.id),
-          label: unit.shortName || unit.name,
+          label: unit.name,
         })),
         hasNextPage: response.meta.hasNextPage,
       }
@@ -840,7 +839,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         if (material.unitId != null && material.unit?.name) {
           const selectedUnitOption = {
             value: String(material.unitId),
-            label: material.unit.shortName || material.unit.name,
+            label: material.unit.name,
           }
           setUnitOptions((currentOptions) =>
             currentOptions.some(
@@ -1198,7 +1197,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
           <Card className="overflow-hidden border-white/60 bg-white/85 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
             <CardContent className="p-4 sm:p-8 sm:py-2">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <p className="text-sm font-medium tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
                     App configuration
                   </p>
@@ -1234,12 +1233,13 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    type="button"
-                    variant="outline"
+                  <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
                     onClick={triggerRefresh}
                     className="rounded-xl"
+                    disabled={uploadingTemplate}
                   >
                     <RefreshCcw className="size-3.5" />
                     Refresh
@@ -1249,6 +1249,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
                       type="button"
                       onClick={openCreateDialog}
                       className="rounded-xl"
+                      disabled={uploadingTemplate}
                     >
                       <Plus className="size-3.5" />
                       New material
@@ -1256,6 +1257,12 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
                   ) : null}
                 </div>
               </div>
+              {uploadingTemplate ? (
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Uploading materials. Please wait.
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -1284,6 +1291,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
                             "restore"
                           )
                         }
+                        disabled={uploadingTemplate}
                       >
                         <Undo2 className="size-3.5" />
                         Restore
@@ -1300,6 +1308,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
                             "permanent"
                           )
                         }
+                        disabled={uploadingTemplate}
                       >
                         <Trash2 className="size-3.5" />
                         Delete permanently
@@ -1331,6 +1340,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
             canDelete={Boolean(accessRules?.canDelete)}
             downloadingTemplate={downloadingTemplate}
             uploadingTemplate={uploadingTemplate}
+            busy={uploadingTemplate}
           />
 
           <DeletedMaterialsSection
@@ -1347,6 +1357,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
             onOpenAction={openPendingActionDialog}
             canRestore={Boolean(accessRules?.canUpdate)}
             canPermanentlyDelete={Boolean(accessRules?.canDelete)}
+            busy={uploadingTemplate}
           />
         </div>
       </ScrollArea>
@@ -1388,6 +1399,7 @@ export function MaterialWorkspace({ apiUrl }: { apiUrl: string }) {
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
+        disabled={uploadingTemplate}
         onChange={(event) => void uploadTemplate(event.target.files?.[0])}
       />
 

@@ -46,11 +46,10 @@ type ValidationSummaryEntry = {
 }
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
-const UNIT_FIELD_ORDER: UnitFieldName[] = ["name", "shortName", "isActive"]
+const UNIT_FIELD_ORDER: UnitFieldName[] = ["name", "isActive"]
 
 const unitFormSchema = z.object({
   name: z.string().trim().min(1, "Unit name is required."),
-  shortName: z.string().trim().min(1, "Unit short name is required."),
   isActive: z.boolean(),
 })
 
@@ -85,9 +84,7 @@ function buildValidationSummary(errors: FieldErrors<UnitFormValues>) {
       label:
         field === "name"
           ? "Unit name"
-          : field === "shortName"
-            ? "Unit short name"
-            : "Active",
+          : "Active",
       message,
     })
   }
@@ -248,30 +245,6 @@ export function UnitFormDialog({
                           aria-invalid={Boolean(errors.name)}
                         />
                         <FieldErrorMessage message={getErrorMessage(errors.name?.message)} />
-                      </div>
-                    )}
-                  />
-
-                  <Controller
-                    name="shortName"
-                    control={control}
-                    render={({ field }) => (
-                      <div id="unit-field-shortName" className="space-y-2">
-                        <label htmlFor={field.name} className="text-sm font-medium">
-                          Unit short name <span className="text-destructive">*</span>
-                        </label>
-                        <Input
-                          {...field}
-                          id={field.name}
-                          ref={field.ref}
-                          value={field.value}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          placeholder="Input unit short name"
-                          required
-                          aria-invalid={Boolean(errors.shortName)}
-                        />
-                        <FieldErrorMessage message={getErrorMessage(errors.shortName?.message)} />
                       </div>
                     )}
                   />

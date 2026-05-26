@@ -74,6 +74,96 @@ async function readJsonResponse<T>(response: Response) {
   return payload
 }
 
+type MaterialUploadMissingSetup = {
+  units?: string[]
+  materialGroups?: string[]
+}
+
+type MaterialUploadErrorReport = {
+  missing?: MaterialUploadMissingSetup
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function extractResponseMessage(payload: unknown) {
+  if (!isRecord(payload)) {
+    return ""
+  }
+
+  const message = payload.message
+
+  return typeof message === "string" ? message : ""
+}
+
+function findMaterialUploadReport(
+  payload: unknown,
+  depth = 0
+): MaterialUploadErrorReport | undefined {
+  if (!isRecord(payload) || depth > 3) {
+    return undefined
+  }
+
+  if (isRecord(payload.uploadReport)) {
+    return payload.uploadReport as MaterialUploadErrorReport
+  }
+
+  if (isRecord(payload.data)) {
+    const directReport = findMaterialUploadReport(payload.data, depth + 1)
+    if (directReport) {
+      return directReport
+    }
+  }
+
+  if (isRecord(payload.message)) {
+    const nestedReport = findMaterialUploadReport(payload.message, depth + 1)
+    if (nestedReport) {
+      return nestedReport
+    }
+  }
+
+  if (isRecord(payload.error)) {
+    return findMaterialUploadReport(payload.error, depth + 1)
+  }
+
+  return undefined
+}
+
+function formatMissingSetupList(values?: string[]) {
+  const items = [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))]
+
+  if (!items.length) {
+    return ""
+  }
+
+  return items.join(", ")
+}
+
+function buildMaterialUploadErrorMessage(
+  fallbackMessage: string,
+  report?: MaterialUploadErrorReport
+) {
+  const units = formatMissingSetupList(report?.missing?.units)
+  const groups = formatMissingSetupList(report?.missing?.materialGroups)
+
+  const parts: string[] = []
+
+  if (units) {
+    parts.push(`Units missing: ${units}.`)
+  }
+
+  if (groups) {
+    parts.push(`Material groups missing: ${groups}.`)
+  }
+
+  if (!parts.length) {
+    return fallbackMessage
+  }
+
+  return `${fallbackMessage} ${parts.join(" ")}`
+}
+
 function appendFilterParams(url: URL, filters: Partial<MaterialFilterValues>) {
   if (filters.name?.trim()) url.searchParams.set("name", filters.name.trim())
   if (filters.code?.trim()) url.searchParams.set("code", filters.code.trim())
@@ -342,15 +432,40 @@ export async function uploadMaterialTemplate({
     body: formData,
   })
 
-  const payload = await readJsonResponse<{ inserted: number; skipped: number }>(
-    response
-  )
+  let payload: unknown = null
 
-  if (!payload.data) {
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401) {
+    throw new Error("Your session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new Error(
+      extractResponseMessage(payload) ||
+        "You do not have permission to upload materials."
+    )
+  }
+
+  const uploadReport = findMaterialUploadReport(payload)
+
+  const successPayload = isRecord(payload) ? (payload as ApiResponse<{ inserted: number; skipped: number }>) : null
+
+  if (!response.ok || !successPayload?.success) {
+    const message = extractResponseMessage(payload) || "Unable to upload the material template right now."
+
+    throw new Error(buildMaterialUploadErrorMessage(message, uploadReport))
+  }
+
+  if (!successPayload.data) {
     throw new Error("The material upload completed without a summary.")
   }
 
-  return payload.data
+  return successPayload.data
 }
 
 export async function softDeleteMaterial({

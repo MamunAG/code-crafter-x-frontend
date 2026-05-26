@@ -29,7 +29,6 @@ export type PaginatedResponse<T> = {
 export type UnitRecord = {
   id: number
   name: string
-  shortName: string
   isActive?: boolean | null
   created_by_id?: string | null
   updated_by_id?: string | null
@@ -44,12 +43,10 @@ export type UnitRecord = {
 
 export type UnitFilterValues = {
   name: string
-  shortName: string
   isActive: "all" | "active" | "inactive"
 }
 
 export type UnitFormValues = {
   name: string
-  shortName: string
   isActive: boolean
 }

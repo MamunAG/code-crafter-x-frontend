@@ -163,15 +163,6 @@ export function UnitTableSection({
         },
       },
       {
-        id: "shortName",
-        header: "Short name",
-        cell: ({ row }) => (
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
-            {row.original.shortName}
-          </span>
-        ),
-      },
-      {
         id: "status",
         header: "Status",
         cell: ({ row }) => {
@@ -332,7 +323,6 @@ export function UnitTableSection({
                           </span>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{unit.name}</p>
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">Short: {unit.shortName}</p>
                           </div>
                         </div>
                       </div>

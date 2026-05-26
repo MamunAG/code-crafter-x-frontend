@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ import {
 type AppDataTableProps<TData> = {
   table: TanStackTable<TData>
   isLoading?: boolean
+  controlsDisabled?: boolean
   emptyState?: ReactNode
   pageSummary?: string
   page?: number
@@ -42,13 +44,15 @@ type AppDataTableProps<TData> = {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
   loadingRows?: number
-  leadingColumnIds?: string[]
+  leadingColumnIds?: string[] 
   trailingColumnIds?: string[]
+  columnClassNames?: Record<string, string>
 }
 
 export function AppDataTable<TData>({
   table,
   isLoading = false,
+  controlsDisabled = false,
   emptyState = null,
   pageSummary = "",
   page = 1,
@@ -60,11 +64,13 @@ export function AppDataTable<TData>({
   loadingRows = 5,
   leadingColumnIds = ["color"],
   trailingColumnIds = ["actions"],
+  columnClassNames,
 }: AppDataTableProps<TData>) {
   const hasRows = table.getRowModel().rows.length > 0
   const safeTotalPages = Math.max(1, totalPages)
   const isFirstPage = page <= 1
   const isLastPage = page >= safeTotalPages
+  const areControlsDisabled = isLoading || controlsDisabled
   const isLeadingColumn = (columnId: string) => leadingColumnIds.includes(columnId)
   const isTrailingColumn = (columnId: string) => trailingColumnIds.includes(columnId)
 
@@ -85,11 +91,14 @@ export function AppDataTable<TData>({
                   <TableHead
                     key={header.id}
                     className={
-                      isLeadingColumn(header.column.id)
-                        ? "pl-4"
-                        : isTrailingColumn(header.column.id)
-                          ? "pr-4 text-right"
-                          : undefined
+                      cn(
+                        isLeadingColumn(header.column.id)
+                          ? "pl-4"
+                          : isTrailingColumn(header.column.id)
+                            ? "pr-4 text-right"
+                            : undefined,
+                        columnClassNames?.[header.column.id],
+                      )
                     }
                   >
                     {header.isPlaceholder
@@ -110,11 +119,14 @@ export function AppDataTable<TData>({
                   <TableCell
                     key={cell.id}
                     className={
-                      isLeadingColumn(cell.column.id)
-                        ? "pl-4"
-                        : isTrailingColumn(cell.column.id)
-                          ? "pr-4 text-right"
-                          : undefined
+                      cn(
+                        isLeadingColumn(cell.column.id)
+                          ? "pl-4"
+                          : isTrailingColumn(cell.column.id)
+                            ? "pr-4 text-right"
+                            : undefined,
+                        columnClassNames?.[cell.column.id],
+                      )
                     }
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -141,6 +153,7 @@ export function AppDataTable<TData>({
               <Select
                 value={String(pageSize)}
                 onValueChange={(value) => onPageSizeChange(Number(value))}
+                disabled={areControlsDisabled}
               >
                 <SelectTrigger size="sm" className="w-20 rounded-xl">
                   <SelectValue placeholder={String(pageSize)} />
@@ -165,7 +178,7 @@ export function AppDataTable<TData>({
               size="icon-sm"
               className="rounded-xl"
               onClick={() => onPageChange(1)}
-              disabled={isLoading || isFirstPage}
+              disabled={areControlsDisabled || isFirstPage}
             >
               <ChevronsLeft className="size-3.5" />
               <span className="sr-only">Go to first page</span>
@@ -176,7 +189,7 @@ export function AppDataTable<TData>({
               size="icon-sm"
               className="rounded-xl"
               onClick={() => onPageChange(Math.max(1, page - 1))}
-              disabled={isLoading || isFirstPage}
+              disabled={areControlsDisabled || isFirstPage}
             >
               <ChevronLeft className="size-3.5" />
               <span className="sr-only">Previous page</span>
@@ -187,7 +200,7 @@ export function AppDataTable<TData>({
               size="icon-sm"
               className="rounded-xl"
               onClick={() => onPageChange(Math.min(safeTotalPages, page + 1))}
-              disabled={isLoading || isLastPage}
+              disabled={areControlsDisabled || isLastPage}
             >
               <ChevronRight className="size-3.5" />
               <span className="sr-only">Next page</span>
@@ -198,7 +211,7 @@ export function AppDataTable<TData>({
               size="icon-sm"
               className="rounded-xl"
               onClick={() => onPageChange(safeTotalPages)}
-              disabled={isLoading || isLastPage}
+              disabled={areControlsDisabled || isLastPage}
             >
               <ChevronsRight className="size-3.5" />
               <span className="sr-only">Go to last page</span>

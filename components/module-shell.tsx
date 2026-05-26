@@ -17,7 +17,7 @@ export function ModuleShell({
   return (
     <main
       className={cn(
-        "flex h-svh flex-col overflow-hidden text-slate-900 dark:text-slate-100",
+        "flex h-svh flex-col overflow-x-hidden overflow-y-hidden text-slate-900 dark:text-slate-100",
         mainClassName,
       )}
     >

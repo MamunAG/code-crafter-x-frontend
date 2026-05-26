@@ -58,6 +58,7 @@ type DeletedMaterialsSectionProps = {
   onOpenAction: (material: MaterialRecord, mode: DeletedMaterialActionMode) => void
   canRestore: boolean
   canPermanentlyDelete: boolean
+  busy: boolean
 }
 
 function formatDate(value?: string | null) {
@@ -74,6 +75,19 @@ function getStatusLabel(material: MaterialRecord) {
 function getStatusTone(material: MaterialRecord) {
   if (material.deleted_at) return "destructive" as const
   return material.isActive === false ? "outline" as const : "secondary" as const
+}
+
+function getUserLabel(
+  user?: MaterialRecord["created_by_user"] | MaterialRecord["updated_by_user"] | null,
+  fallbackId?: string | null,
+) {
+  return (
+    user?.name?.trim() ||
+    user?.display_name?.trim() ||
+    user?.user_name?.trim() ||
+    fallbackId?.trim() ||
+    ""
+  )
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
@@ -102,6 +116,7 @@ export function DeletedMaterialsSection({
   onOpenAction,
   canRestore,
   canPermanentlyDelete,
+  busy,
 }: DeletedMaterialsSectionProps) {
   const deletedFilterCount = useMemo(
     () =>
@@ -137,19 +152,44 @@ export function DeletedMaterialsSection({
       cell: ({ row }) => <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{row.original.code || "-"}</span>,
     },
     {
-      id: "description",
-      header: "Description",
-      cell: ({ row }) => <span className="line-clamp-2 max-w-72 text-xs font-medium text-slate-700 dark:text-slate-200">{row.original.description || "-"}</span>,
-    },
-    {
       id: "status",
       header: "Status",
       cell: ({ row }) => <Badge variant={getStatusTone(row.original)} className="rounded-full px-3 py-1">{getStatusLabel(row.original)}</Badge>,
     },
     {
+      id: "created",
+      header: "Created",
+      cell: ({ row }) => {
+        const label = getUserLabel(row.original.created_by_user, row.original.created_by_id)
+
+        return (
+          <div className="space-y-1">
+            <p className="text-xs text-slate-700 dark:text-slate-200">
+              {formatDate(row.original.created_at)}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {label || "No creator metadata"}
+            </p>
+          </div>
+        )
+      },
+    },
+    {
       id: "deleted",
       header: "Deleted",
       cell: ({ row }) => <p className="text-xs text-slate-700 dark:text-slate-200">{formatDate(row.original.deleted_at)}</p>,
+    },
+    {
+      id: "updatedBy",
+      header: "Updated by",
+      cell: ({ row }) => {
+        const label = getUserLabel(row.original.updated_by_user, row.original.updated_by_id)
+        return label ? (
+          <p className="text-xs text-slate-700 dark:text-slate-200">{label}</p>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">No editor metadata</p>
+        )
+      },
     },
     {
       id: "actions",
@@ -165,7 +205,7 @@ export function DeletedMaterialsSection({
           <div className="pr-4 text-right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+                <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" disabled={busy}>
                   <MoreHorizontal className="size-3.5" />
                   <span className="sr-only">Open deleted item actions</span>
                 </Button>
@@ -184,7 +224,7 @@ export function DeletedMaterialsSection({
         )
       },
     },
-  ], [canPermanentlyDelete, canRestore, onOpenAction])
+  ], [busy, canPermanentlyDelete, canRestore, onOpenAction])
 
   const table = useReactTable({
     data,
@@ -248,6 +288,7 @@ export function DeletedMaterialsSection({
               value={filters.isActive || ALL_STATUS_VALUE}
               onValueChange={(value) => onFilterChange({ ...filters, isActive: value === ALL_STATUS_VALUE ? "" : value })}
               placeholder="All statuses"
+              disabled={busy}
               options={[
                 { value: ALL_STATUS_VALUE, label: "All statuses" },
                 { value: "true", label: "Active" },
@@ -256,11 +297,11 @@ export function DeletedMaterialsSection({
             />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
-            <Button type="submit" className="w-full rounded-xl sm:w-auto">
+            <Button type="submit" className="w-full rounded-xl sm:w-auto" disabled={busy}>
               <Search className="size-3.5" />
               Search
             </Button>
-            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={clearFilters}>
+            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={clearFilters} disabled={busy}>
               Reset
             </Button>
           </div>
@@ -298,7 +339,7 @@ export function DeletedMaterialsSection({
                         {canRestore || canPermanentlyDelete ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+                              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" disabled={busy}>
                                 <MoreHorizontal className="size-3.5" />
                                 <span className="sr-only">Open deleted item actions</span>
                               </Button>
@@ -322,7 +363,16 @@ export function DeletedMaterialsSection({
                       </div>
 
                       <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                        <p>Description: {material.description || "-"}</p>
+                        <div className="space-y-1">
+                          <p>Created: {formatDate(material.created_at)}</p>
+                          <p>
+                            {getUserLabel(material.created_by_user, material.created_by_id) || "No creator metadata"}
+                          </p>
+                        </div>
+                        <p>
+                          Updated by:{" "}
+                          {getUserLabel(material.updated_by_user, material.updated_by_id) || "No editor metadata"}
+                        </p>
                         <p>Deleted: {formatDate(material.deleted_at)}</p>
                       </div>
                     </article>
@@ -340,16 +390,16 @@ export function DeletedMaterialsSection({
               <div className="flex flex-col gap-3 border-t border-slate-200/70 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-slate-500 dark:text-slate-400">{deletedPageSummary}</p>
                 <div className="flex items-center justify-between gap-2">
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(1)} disabled={loading || page <= 1}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(1)} disabled={loading || busy || page <= 1}>
                     <ChevronsLeft className="size-3.5" />
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={loading || page <= 1}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={loading || busy || page <= 1}>
                     <ChevronLeft className="size-3.5" />
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(Math.min(meta?.totalPages ?? 1, page + 1))} disabled={loading || page >= (meta?.totalPages ?? 1)}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(Math.min(meta?.totalPages ?? 1, page + 1))} disabled={loading || busy || page >= (meta?.totalPages ?? 1)}>
                     <ChevronRight className="size-3.5" />
                   </Button>
-                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(meta?.totalPages ?? 1)} disabled={loading || page >= (meta?.totalPages ?? 1)}>
+                  <Button type="button" variant="outline" size="icon-sm" className="rounded-xl" onClick={() => onPageChange(meta?.totalPages ?? 1)} disabled={loading || busy || page >= (meta?.totalPages ?? 1)}>
                     <ChevronsRight className="size-3.5" />
                   </Button>
                 </div>
@@ -364,7 +414,11 @@ export function DeletedMaterialsSection({
                 totalPages={meta?.totalPages ?? 1}
                 pageSize={limit}
                 isLoading={loading}
+                controlsDisabled={busy}
                 pageSizeOptions={[5, 10, 25, 50]}
+                columnClassNames={{
+                  material: "w-[260px] min-w-[260px]",
+                }}
                 onPageChange={(nextPage) => onPageChange(nextPage)}
                 onPageSizeChange={(nextPageSize) => {
                   onLimitChange(nextPageSize)

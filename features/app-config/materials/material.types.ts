@@ -29,7 +29,6 @@ export type PaginatedResponse<T> = {
 export type MaterialLookupRecord = {
   id: string | number
   name: string
-  shortName?: string | null
 }
 
 export type FileSummary = {

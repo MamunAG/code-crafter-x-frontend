@@ -113,11 +113,11 @@ export function DeletedUnitsCard({
   }, [deletedMeta])
 
   const deletedFilterCount = useMemo(
-    () => [deletedDraftFilters.name, deletedDraftFilters.shortName, deletedDraftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
+    () => [deletedDraftFilters.name, deletedDraftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
     [deletedDraftFilters],
   )
 
-  const deletedFiltersActive = Boolean(deletedActiveFilters.name || deletedActiveFilters.shortName || deletedActiveFilters.isActive !== "all")
+  const deletedFiltersActive = Boolean(deletedActiveFilters.name || deletedActiveFilters.isActive !== "all")
 
   const deletedColumns = useMemo<ColumnDef<UnitRecord>[]>(
     () => [
@@ -127,7 +127,6 @@ export function DeletedUnitsCard({
         cell: ({ row }) => (
           <div className="pl-4">
             <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{row.original.name}</p>
-            <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">Short: {row.original.shortName}</p>
           </div>
         ),
       },
@@ -271,7 +270,7 @@ export function DeletedUnitsCard({
                 variant="outline"
                 className="w-full rounded-xl sm:w-auto"
                 onClick={() => {
-                  const cleared = { name: "", shortName: "", isActive: "all" as const }
+                  const cleared = { name: "", isActive: "all" as const }
                   onDeletedDraftFiltersChange(cleared)
                   onDeletedActiveFiltersChange(cleared)
                   onDeletedPageChange(1)
@@ -311,7 +310,6 @@ export function DeletedUnitsCard({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">{unit.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">Short: {unit.shortName}</p>
                         </div>
                         {canRestoreUnit || canPermanentlyDeleteUnit ? (
                           <DropdownMenu>

@@ -51,13 +51,11 @@ const EMPTY_ACCESS_RULES: UnitAccessRules = {
 
 const DEFAULT_FILTERS: UnitFilterValues = {
   name: "",
-  shortName: "",
   isActive: "all",
 }
 
 const DEFAULT_FORM_VALUES: UnitFormValues = {
   name: "",
-  shortName: "",
   isActive: true,
 }
 
@@ -397,7 +395,6 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
 
       setEditorInitialValues({
         name: record.name ?? "",
-        shortName: record.shortName ?? "",
         isActive: record.isActive !== false,
       })
     } catch (caughtError) {
@@ -1003,7 +1000,7 @@ export function UnitWorkspace({ apiUrl }: { apiUrl: string }) {
             page={page}
             limit={limit}
             loadingUnits={loadingUnits}
-            filtersActive={Boolean(activeFilters.name || activeFilters.shortName || activeFilters.isActive !== "all")}
+            filtersActive={Boolean(activeFilters.name || activeFilters.isActive !== "all")}
             onPageChange={setPage}
             onLimitChange={setLimit}
             onCreateUnit={openCreateDialog}

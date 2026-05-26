@@ -61,15 +61,10 @@ async function readJsonResponse<T>(response: Response) {
 
 function appendFilterParams(url: URL, filters: Partial<UnitFilterValues>) {
   const name = filters.name?.trim() ?? ""
-  const shortName = filters.shortName?.trim() ?? ""
   const isActive = filters.isActive ?? "all"
 
   if (name) {
     url.searchParams.set("name", name)
-  }
-
-  if (shortName) {
-    url.searchParams.set("shortName", shortName)
   }
 
   if (isActive === "active") {
@@ -161,7 +156,6 @@ export async function createUnit({
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      shortName: payload.shortName.trim(),
       isActive: payload.isActive,
     }),
   })
@@ -251,7 +245,6 @@ export async function updateUnit({
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      shortName: payload.shortName.trim(),
       isActive: payload.isActive,
     }),
   })

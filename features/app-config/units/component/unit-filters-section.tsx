@@ -28,7 +28,7 @@ export function UnitFiltersSection({
   onResetFilters,
 }: UnitFiltersSectionProps) {
   const filterCount = useMemo(
-    () => [draftFilters.name, draftFilters.shortName, draftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
+    () => [draftFilters.name, draftFilters.isActive !== "all" ? "x" : ""].filter((value) => value.trim()).length,
     [draftFilters],
   )
 
@@ -38,7 +38,7 @@ export function UnitFiltersSection({
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle className="text-base">Filters</CardTitle>
-            <CardDescription className="text-xs">Search by unit name, short name, or status.</CardDescription>
+            <CardDescription className="text-xs">Search by unit name or status.</CardDescription>
           </div>
           <Badge variant="outline" className="w-fit rounded-full px-2.5 py-0.5 text-[11px]">
             {filterCount} active filter{filterCount === 1 ? "" : "s"}
@@ -64,18 +64,6 @@ export function UnitFiltersSection({
               className="h-7 rounded-md px-2 text-xs"
               onChange={(event) => onDraftFiltersChange({ ...draftFilters, name: event.target.value })}
               placeholder="Input unit name"
-            />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="filterUnitShortName" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Short name
-            </label>
-            <Input
-              id="filterUnitShortName"
-              value={draftFilters.shortName}
-              className="h-7 rounded-md px-2 text-xs"
-              onChange={(event) => onDraftFiltersChange({ ...draftFilters, shortName: event.target.value })}
-              placeholder="Input unit short name"
             />
           </div>
           <div className="min-w-0 space-y-1">
