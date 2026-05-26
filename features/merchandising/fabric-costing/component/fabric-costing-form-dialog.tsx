@@ -9,7 +9,14 @@ import {
   type AppComboboxLoadResult,
   type AppComboboxOption,
 } from "@/components/app-combobox"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -22,8 +29,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
 
+import {
+  FABRIC_COSTING_SAMPLE_INPUT,
+  calculateFabricCost,
+  type FabricCostingInput,
+} from "../fabric-costing-calculation"
 import type {
   FabricCostingCommonProcessFormValues,
   FabricCostingFormError,
@@ -49,10 +60,30 @@ type FabricCostingFormDialogProps = {
   onSubmit: () => void
 }
 
-const INPUT_CLASS = "h-7 rounded-md px-2 text-[11px]"
+const INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
 
 function optionFrom(value: string, label: string) {
   return value ? { value, label: label || value } : null
+}
+
+function toNumber(value: string | number | null | undefined) {
+  const numericValue = Number(value ?? 0)
+  return Number.isFinite(numericValue) ? numericValue : 0
+}
+
+function formatQty(value: number) {
+  return value.toFixed(4)
+}
+
+function formatMoney(value: number) {
+  return value.toFixed(2)
+}
+
+function resolveCurrencySymbol(label: string) {
+  const normalized = label.trim().toUpperCase()
+  if (normalized.includes("USD")) return "$"
+  if (label.includes("$")) return "$"
+  return "$"
 }
 
 function newYarn(): FabricCostingYarnFormValues {
@@ -62,7 +93,6 @@ function newYarn(): FabricCostingYarnFormValues {
     yarnLabel: "",
     percentagePerUnitFabric: "0",
     yarnPricePerUnit: "0",
-    totalYarnConsumption: "",
     totalYarnPrice: "0",
     yarnWiseProcesses: [],
   }
@@ -96,15 +126,34 @@ function FieldLabel({ children, required = false }: { children: ReactNode; requi
   )
 }
 
-function toNumber(value: string | number | null | undefined) {
-  const numericValue = Number(value ?? 0)
-  return Number.isFinite(numericValue) ? numericValue : 0
-}
-
-function formatCostAmount(value: number) {
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 4,
-  }).format(value)
+function buildCalculationInput(values: FabricCostingFormValues): FabricCostingInput {
+  const currencySymbol = resolveCurrencySymbol(values.currencyLabel)
+  return {
+    targetQty: toNumber(values.qty),
+    currencySymbol,
+    commonWastages: values.commonProcesses.map((process) => ({
+      id: process.id,
+      name: process.processLabel || "Unnamed process",
+      wastagePercent: toNumber(process.wastagePercentage),
+    })),
+    materials: values.yarns.map((yarn) => ({
+      id: yarn.id,
+      name: yarn.yarnLabel || "Unnamed material",
+      ratioPercent: toNumber(yarn.percentagePerUnitFabric),
+      pricePerKg: toNumber(yarn.yarnPricePerUnit),
+      extraProcesses: yarn.yarnWiseProcesses.map((process) => ({
+        id: process.id,
+        name: process.processLabel || "Unnamed extra process",
+        wastagePercent: toNumber(process.wastagePercentage),
+        costPerKg: toNumber(process.rateUnitFabric),
+      })),
+    })),
+    processes: values.commonProcesses.map((process) => ({
+      id: process.id,
+      name: process.processLabel || "Unnamed process",
+      costPerKg: toNumber(process.ratePerUnitFabric),
+    })),
+  }
 }
 
 export function FabricCostingFormDialog({
@@ -124,31 +173,7 @@ export function FabricCostingFormDialog({
   onSubmit,
 }: FabricCostingFormDialogProps) {
   const disabled = loading || submitting
-  const calculatedFabricCost = useMemo(() => {
-    const qty = toNumber(values.qty)
-
-    const yarnCost = values.yarns.reduce((total, yarn) => {
-      const explicitTotal = toNumber(yarn.totalYarnPrice)
-      const fallbackTotal = toNumber(yarn.yarnPricePerUnit) * toNumber(yarn.totalYarnConsumption)
-      const yarnBaseCost = explicitTotal > 0 ? explicitTotal : fallbackTotal
-
-      const yarnProcessCost = yarn.yarnWiseProcesses.reduce((processTotal, process) => {
-        const rate = toNumber(process.rateUnitFabric)
-        const wastage = toNumber(process.wastagePercentage)
-        return processTotal + rate * qty * (1 + wastage / 100)
-      }, 0)
-
-      return total + yarnBaseCost + yarnProcessCost
-    }, 0)
-
-    const commonProcessCost = values.commonProcesses.reduce((total, process) => {
-      const rate = toNumber(process.ratePerUnitFabric)
-      const wastage = toNumber(process.wastagePercentage)
-      return total + rate * qty * (1 + wastage / 100)
-    }, 0)
-
-    return yarnCost + commonProcessCost
-  }, [values.commonProcesses, values.qty, values.yarns])
+  const calculation = useMemo(() => calculateFabricCost(buildCalculationInput(values)), [values])
 
   function patchValues(patch: Partial<FabricCostingFormValues>) {
     onValuesChange({ ...values, ...patch })
@@ -187,428 +212,691 @@ export function FabricCostingFormDialog({
     })
   }
 
+  function applySampleData() {
+    const sampleByName = new Map(
+      FABRIC_COSTING_SAMPLE_INPUT.processes.map((process) => [process.name.trim().toLowerCase(), process]),
+    )
+
+    patchValues({
+      qty: String(FABRIC_COSTING_SAMPLE_INPUT.targetQty),
+      yarns: FABRIC_COSTING_SAMPLE_INPUT.materials.map((material) => ({
+        id: crypto.randomUUID(),
+        yarnId: "",
+        yarnLabel: material.name,
+        percentagePerUnitFabric: String(material.ratioPercent),
+        yarnPricePerUnit: String(material.pricePerKg),
+        totalYarnPrice: "0",
+        yarnWiseProcesses: (material.extraProcesses ?? []).map((process) => ({
+          id: crypto.randomUUID(),
+          processId: "",
+          processLabel: process.name,
+          rateUnitFabric: String(process.costPerKg),
+          wastagePercentage: String(process.wastagePercent),
+        })),
+      })),
+      commonProcesses: FABRIC_COSTING_SAMPLE_INPUT.commonWastages.map((wastage) => {
+        const processMatch = sampleByName.get(wastage.name.trim().toLowerCase())
+        return {
+          id: crypto.randomUUID(),
+          processId: "",
+          processLabel: wastage.name,
+          ratePerUnitFabric: String(processMatch?.costPerKg ?? 0),
+          wastagePercentage: String(wastage.wastagePercent),
+        }
+      }),
+    })
+  }
+
+  const allErrors = [...errors.map((error) => error.message), ...calculation.validationErrors]
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[92dvh] w-[min(1320px,calc(100dvw-0.75rem))] max-w-none flex-col overflow-hidden p-0 sm:w-[min(1320px,calc(100dvw-1rem))] sm:max-w-none">
+      <DialogContent className="flex h-[94dvh] w-[min(1480px,calc(100dvw-0.75rem))] max-w-none flex-col overflow-hidden p-0 sm:w-[min(1480px,calc(100dvw-1rem))] sm:max-w-none">
         <DialogHeader className="border-b px-4 py-4 dark:border-white/10 sm:px-6 sm:py-5">
           <DialogTitle>{mode === "create" ? "Create fabric costing" : "Edit fabric costing"}</DialogTitle>
-          <DialogDescription>Map a fabric, currency, yarn consumption, and process cost details.</DialogDescription>
+          <DialogDescription>Dynamic costing with transparent quantity, wastage, and process formulas.</DialogDescription>
         </DialogHeader>
 
         {loading ? (
           <div className="space-y-4 p-4 sm:p-6">
             <Skeleton className="h-28 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-52 rounded-xl" />
             <Skeleton className="h-40 rounded-xl" />
           </div>
         ) : (
           <ScrollArea className="min-h-0 flex-1 overflow-hidden">
             <div className="space-y-5 p-4 sm:p-6">
-              {errors.length ? (
+              {allErrors.length ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-200">
-                  {errors.map((error) => (
-                    <p key={error.message}>{error.message}</p>
+                  {allErrors.map((message, index) => (
+                    <p key={`${message}-${index}`}>{message}</p>
                   ))}
                 </div>
               ) : null}
 
-              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.75fr)_minmax(340px,2fr)_minmax(120px,0.65fr)_minmax(140px,0.75fr)_minmax(150px,0.75fr)]">
-                <div className="space-y-2">
-                  <FieldLabel>Cost name</FieldLabel>
-                  <Input
-                    value={values.costName}
-                    onChange={(event) => patchValues({ costName: event.target.value })}
-                    placeholder="Input cost name"
-                    disabled={disabled}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel>Fabric</FieldLabel>
-                  <AppCombobox
-                    value={optionFrom(values.fabricId, values.fabricLabel)}
-                    onValueChange={(option) => {
-                      patchValues({ fabricId: option?.value ?? "", fabricLabel: option?.label ?? "" })
-                      onFabricChange?.(option)
-                    }}
-                    loadItems={loadMaterialOptions}
-                    placeholder="Search fabric material"
-                    disabled={disabled}
-                    showClear
-                  />
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel>Quantity</FieldLabel>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={values.qty}
-                    onChange={(event) => patchValues({ qty: event.target.value })}
-                    readOnly
-                    disabled={disabled}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel>Unit</FieldLabel>
-                  <AppCombobox
-                    value={optionFrom(values.unitId, values.unitLabel)}
-                    onValueChange={(option) =>
-                      patchValues({ unitId: option?.value ?? "", unitLabel: option?.label ?? "" })
-                    }
-                    loadItems={loadUnitOptions}
-                    placeholder="Search unit"
-                    disabled
-                    showClear
-                  />
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel required>Currency</FieldLabel>
-                  <AppCombobox
-                    value={optionFrom(values.currencyId, values.currencyLabel)}
-                    onValueChange={(option) =>
-                      patchValues({ currencyId: option?.value ?? "", currencyLabel: option?.label ?? "" })
-                    }
-                    loadItems={loadCurrencyOptions}
-                    placeholder="Search currency"
-                    disabled={disabled}
-                    showClear
-                  />
-                </div>
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Master Info</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.7fr)_minmax(340px,2fr)_minmax(130px,0.7fr)_minmax(150px,0.8fr)_minmax(160px,0.8fr)]">
+                    <div className="space-y-1.5">
+                      <FieldLabel>Cost name</FieldLabel>
+                      <Input
+                        value={values.costName}
+                        onChange={(event) => patchValues({ costName: event.target.value })}
+                        placeholder="Input cost name"
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <FieldLabel>Fabric</FieldLabel>
+                      <AppCombobox
+                        value={optionFrom(values.fabricId, values.fabricLabel)}
+                        onValueChange={(option) => {
+                          patchValues({ fabricId: option?.value ?? "", fabricLabel: option?.label ?? "" })
+                          onFabricChange?.(option)
+                        }}
+                        loadItems={loadMaterialOptions}
+                        placeholder="Search fabric material"
+                        disabled={disabled}
+                        showClear
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <FieldLabel required>Target Qty</FieldLabel>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={values.qty}
+                        onChange={(event) => patchValues({ qty: event.target.value })}
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <FieldLabel>Unit</FieldLabel>
+                      <AppCombobox
+                        value={optionFrom(values.unitId, values.unitLabel)}
+                        onValueChange={(option) =>
+                          patchValues({ unitId: option?.value ?? "", unitLabel: option?.label ?? "" })
+                        }
+                        loadItems={loadUnitOptions}
+                        placeholder="Search unit"
+                        disabled
+                        showClear
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <FieldLabel required>Currency</FieldLabel>
+                      <AppCombobox
+                        value={optionFrom(values.currencyId, values.currencyLabel)}
+                        onValueChange={(option) =>
+                          patchValues({ currencyId: option?.value ?? "", currencyLabel: option?.label ?? "" })
+                        }
+                        loadItems={loadCurrencyOptions}
+                        placeholder="Search currency"
+                        disabled={disabled}
+                        showClear
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" size="sm" onClick={applySampleData} disabled={disabled}>
+                      Load Example Data
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Fabric Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {calculation.input.currencySymbol}
+                      {formatMoney(calculation.finalCost)} / KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Finished Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.input.targetQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Total Yarn Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.totalYarnQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Common Wastage</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.totalCommonWastage)}%
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Required Process Qty</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                      {formatQty(calculation.requiredQty)} KG
+                    </p>
+                  </CardContent>
+                </Card>
               </section>
 
-              <section className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Yarns</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Add yarn consumption and yarn-wise processes.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => patchValues({ yarns: [...values.yarns, newYarn()] })}
-                    disabled={disabled}
-                  >
-                    <Plus className="size-3.5" />
-                    Add yarn
-                  </Button>
-                </div>
+              <section className="grid gap-3 md:grid-cols-3">
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Material Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.totalMaterialCost)}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Process Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.totalProcessCost)}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Final Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney(calculation.finalCost)}
+                  </CardContent>
+                </Card>
+              </section>
 
-                <div className="space-y-3">
-                  {values.yarns.map((yarn, yarnIndex) => (
-                    <div key={yarn.id} className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.6fr)_repeat(4,minmax(105px,0.7fr))_auto]">
-                        <div className="space-y-1.5">
-                          <FieldLabel>Yarn</FieldLabel>
-                          <AppCombobox
-                            value={optionFrom(yarn.yarnId, yarn.yarnLabel)}
-                            onValueChange={(option) =>
-                              updateYarn(yarn.id, {
-                                yarnId: option?.value ?? "",
-                                yarnLabel: option?.label ?? "",
-                              })
-                            }
-                            loadItems={loadMaterialOptions}
-                            placeholder="Search yarn material"
-                            disabled={disabled}
-                            showClear
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <FieldLabel>% / fabric</FieldLabel>
-                          <Input
-                            className={INPUT_CLASS}
-                            type="number"
-                            step="0.0001"
-                            value={yarn.percentagePerUnitFabric}
-                            onChange={(event) =>
-                              updateYarn(yarn.id, { percentagePerUnitFabric: event.target.value })
-                            }
-                            disabled={disabled}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <FieldLabel>Yarn price</FieldLabel>
-                          <Input
-                            className={INPUT_CLASS}
-                            type="number"
-                            step="0.0001"
-                            value={yarn.yarnPricePerUnit}
-                            onChange={(event) => updateYarn(yarn.id, { yarnPricePerUnit: event.target.value })}
-                            disabled={disabled}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <FieldLabel>Consumption</FieldLabel>
-                          <Input
-                            className={INPUT_CLASS}
-                            type="number"
-                            step="0.0001"
-                            value={yarn.totalYarnConsumption}
-                            onChange={(event) =>
-                              updateYarn(yarn.id, { totalYarnConsumption: event.target.value })
-                            }
-                            disabled={disabled}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <FieldLabel>Total price</FieldLabel>
-                          <Input
-                            className={INPUT_CLASS}
-                            type="number"
-                            step="0.0001"
-                            value={yarn.totalYarnPrice}
-                            onChange={(event) => updateYarn(yarn.id, { totalYarnPrice: event.target.value })}
-                            disabled={disabled}
-                          />
-                        </div>
-                        <div className="flex items-end justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() =>
-                              patchValues({ yarns: values.yarns.filter((item) => item.id !== yarn.id) })
-                            }
-                            disabled={disabled}
-                            aria-label={`Remove yarn row ${yarnIndex + 1}`}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 space-y-2 rounded-lg bg-slate-50 p-2.5 dark:bg-white/5">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Yarn processes</p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              updateYarn(yarn.id, {
-                                yarnWiseProcesses: [...yarn.yarnWiseProcesses, newYarnProcess()],
-                              })
-                            }
-                            disabled={disabled}
-                          >
-                            <Plus className="size-3.5" />
-                            Add process
-                          </Button>
-                        </div>
-                        {yarn.yarnWiseProcesses.length ? (
-                          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40 md:w-1/2">
-                            <table className="w-full table-fixed text-left text-[11px]">
-                              <colgroup>
-                                <col className="w-[62%]" />
-                                <col className="w-[16%]" />
-                                <col className="w-[14%]" />
-                                <col className="w-[8%]" />
-                              </colgroup>
-                              <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                                <tr>
-                                  <th className="px-2.5 py-1.5">Process</th>
-                                  <th className="px-2.5 py-1.5">Rate</th>
-                                  <th className="px-2.5 py-1.5">Wastage %</th>
-                                  <th className="px-1.5 pr-3 py-1.5 whitespace-nowrap text-center">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                                {yarn.yarnWiseProcesses.map((process) => (
-                                  <tr key={process.id} className="align-top">
-                                    <td className="px-2.5 py-2">
-                                      <AppCombobox
-                                        value={optionFrom(process.processId, process.processLabel)}
-                                        onValueChange={(option) =>
-                                          updateYarnProcess(yarn.id, process.id, {
-                                            processId: option?.value ?? "",
-                                            processLabel: option?.label ?? "",
-                                          })
-                                        }
-                                        loadItems={loadProcessOptions}
-                                        placeholder="Search process"
-                                        disabled={disabled}
-                                        showClear
-                                        className="min-w-0"
-                                      />
-                                    </td>
-                                    <td className="px-2.5 py-2">
-                                      <Input
-                                        className={INPUT_CLASS}
-                                        type="number"
-                                        step="0.0001"
-                                        value={process.rateUnitFabric}
-                                        onChange={(event) =>
-                                          updateYarnProcess(yarn.id, process.id, {
-                                            rateUnitFabric: event.target.value,
-                                          })
-                                        }
-                                        placeholder="Rate"
-                                        disabled={disabled}
-                                      />
-                                    </td>
-                                    <td className="px-2.5 py-2">
-                                      <Input
-                                        className={INPUT_CLASS}
-                                        type="number"
-                                        step="0.0001"
-                                        value={process.wastagePercentage}
-                                        onChange={(event) =>
-                                          updateYarnProcess(yarn.id, process.id, {
-                                            wastagePercentage: event.target.value,
-                                          })
-                                        }
-                                        placeholder="Wastage %"
-                                        disabled={disabled}
-                                      />
-                                    </td>
-                                    <td className="whitespace-nowrap px-1.5 py-2 text-center">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-7"
-                                        onClick={() =>
-                                          updateYarn(yarn.id, {
-                                            yarnWiseProcesses: yarn.yarnWiseProcesses.filter(
-                                              (item) => item.id !== process.id,
-                                            ),
-                                          })
-                                        }
-                                        disabled={disabled}
-                                        aria-label="Remove yarn process"
-                                      >
-                                        <Trash2 className="size-3.5" />
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 dark:text-slate-400">No yarn process rows added.</p>
-                        )}
-                      </div>
-                    </div>
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Visual Process Flow</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                  <p>{formatQty(calculation.input.targetQty)} KG Finished Fabric</p>
+                  <p>↓</p>
+                  <p>+{formatQty(calculation.totalCommonWastage)}% Common Wastage</p>
+                  <p>↓</p>
+                  <p>{formatQty(calculation.requiredQty)} KG Required Qty</p>
+                  <p>↓</p>
+                  <p className="font-medium">Material Split</p>
+                  {calculation.materialResults.map((material) => (
+                    <p key={material.id}>
+                      {material.name} {formatQty(material.ratioPercent)}% → {formatQty(material.actualQty)} KG →{" "}
+                      {calculation.input.currencySymbol}
+                      {formatMoney(material.totalCost)}
+                    </p>
                   ))}
+                  <p>↓</p>
+                  <p className="font-medium">Process Cost</p>
+                  {calculation.processResults.map((process) => (
+                    <p key={process.id}>
+                      {process.name} → {calculation.input.currencySymbol}
+                      {formatMoney(process.cost)}
+                    </p>
+                  ))}
+                </CardContent>
+              </Card>
 
-                  {!values.yarns.length ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-                      No yarn rows added.
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Common processes</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Add process costs that apply to the fabric costing.</p>
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Materials</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => patchValues({ yarns: [...values.yarns, newYarn()] })}
+                      disabled={disabled}
+                    >
+                      <Plus className="size-3.5" />
+                      Add material
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => patchValues({ commonProcesses: [...values.commonProcesses, newCommonProcess()] })}
-                    disabled={disabled}
-                  >
-                    <Plus className="size-3.5" />
-                    Add process
-                  </Button>
-                </div>
+                  {values.yarns.length ? (
+                    <div className="space-y-3">
+                      {values.yarns.map((yarn, yarnIndex) => {
+                        const extraWastage = yarn.yarnWiseProcesses.reduce(
+                          (sum, process) => sum + toNumber(process.wastagePercentage),
+                          0,
+                        )
+                        const baseQty = calculation.requiredQty * (toNumber(yarn.percentagePerUnitFabric) / 100)
+                        const actualQty =
+                          extraWastage >= 99 ? 0 : baseQty / (1 - extraWastage / 100)
+                        const totalPrice =
+                          actualQty * toNumber(yarn.yarnPricePerUnit) +
+                          yarn.yarnWiseProcesses.reduce(
+                            (sum, process) => sum + actualQty * toNumber(process.rateUnitFabric),
+                            0,
+                          )
 
-                {values.commonProcesses.length ? (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 md:w-1/2">
-                    <table className="w-full table-fixed text-left text-[11px]">
-                      <colgroup>
-                        <col className="w-[64%]" />
-                        <col className="w-[15%]" />
-                        <col className="w-[13%]" />
-                        <col className="w-[8%]" />
-                      </colgroup>
-                      <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                        return (
+                          <div key={yarn.id} className="rounded-lg border border-slate-200 p-3 dark:border-white/10">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.9fr)_repeat(5,minmax(110px,0.65fr))_auto]">
+                              <div className="space-y-1.5">
+                                <FieldLabel>Material</FieldLabel>
+                                <AppCombobox
+                                  value={optionFrom(yarn.yarnId, yarn.yarnLabel)}
+                                  onValueChange={(option) =>
+                                    updateYarn(yarn.id, {
+                                      yarnId: option?.value ?? "",
+                                      yarnLabel: option?.label ?? "",
+                                    })
+                                  }
+                                  loadItems={loadMaterialOptions}
+                                  placeholder="Search yarn material"
+                                  disabled={disabled}
+                                  showClear
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <FieldLabel>Ratio %</FieldLabel>
+                                <Input
+                                  className={INPUT_CLASS}
+                                  type="number"
+                                  step="0.0001"
+                                  value={yarn.percentagePerUnitFabric}
+                                  onChange={(event) =>
+                                    updateYarn(yarn.id, { percentagePerUnitFabric: event.target.value })
+                                  }
+                                  disabled={disabled}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <FieldLabel>Price / KG</FieldLabel>
+                                <Input
+                                  className={INPUT_CLASS}
+                                  type="number"
+                                  step="0.0001"
+                                  value={yarn.yarnPricePerUnit}
+                                  onChange={(event) =>
+                                    updateYarn(yarn.id, { yarnPricePerUnit: event.target.value })
+                                  }
+                                  disabled={disabled}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <FieldLabel>Base Qty</FieldLabel>
+                                <Input className={INPUT_CLASS} value={formatQty(baseQty)} readOnly disabled />
+                              </div>
+                              <div className="space-y-1.5">
+                                <FieldLabel>Actual Qty</FieldLabel>
+                                <Input className={INPUT_CLASS} value={formatQty(actualQty)} readOnly disabled />
+                              </div>
+                              <div className="space-y-1.5">
+                                <FieldLabel>Total Price</FieldLabel>
+                                <Input
+                                  className={INPUT_CLASS}
+                                  value={formatMoney(totalPrice)}
+                                  readOnly
+                                  disabled
+                                />
+                              </div>
+                              <div className="flex items-end justify-end">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                  onClick={() =>
+                                    patchValues({ yarns: values.yarns.filter((item) => item.id !== yarn.id) })
+                                  }
+                                  disabled={disabled}
+                                  aria-label={`Remove material row ${yarnIndex + 1}`}
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 rounded-lg bg-slate-50 p-2.5 dark:bg-white/5">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                  Extra Material Processes
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    updateYarn(yarn.id, {
+                                      yarnWiseProcesses: [...yarn.yarnWiseProcesses, newYarnProcess()],
+                                    })
+                                  }
+                                  disabled={disabled}
+                                >
+                                  <Plus className="size-3.5" />
+                                  Add extra process
+                                </Button>
+                              </div>
+                              {yarn.yarnWiseProcesses.length ? (
+                                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+                                  <table className="w-full table-fixed text-left text-[11px]">
+                                    <colgroup>
+                                      <col className="w-[54%]" />
+                                      <col className="w-[16%]" />
+                                      <col className="w-[16%]" />
+                                      <col className="w-[10%]" />
+                                      <col className="w-[4%]" />
+                                    </colgroup>
+                                    <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                                      <tr>
+                                        <th className="px-2.5 py-1.5">Process</th>
+                                        <th className="px-2.5 py-1.5">Cost / KG</th>
+                                        <th className="px-2.5 py-1.5">Wastage %</th>
+                                        <th className="px-2.5 py-1.5">Cost</th>
+                                        <th className="px-1.5 pr-3 py-1.5 text-center">Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                                      {yarn.yarnWiseProcesses.map((process) => (
+                                        <tr key={process.id} className="align-top">
+                                          <td className="px-2.5 py-2">
+                                            <AppCombobox
+                                              value={optionFrom(process.processId, process.processLabel)}
+                                              onValueChange={(option) =>
+                                                updateYarnProcess(yarn.id, process.id, {
+                                                  processId: option?.value ?? "",
+                                                  processLabel: option?.label ?? "",
+                                                })
+                                              }
+                                              loadItems={loadProcessOptions}
+                                              placeholder="Search process"
+                                              disabled={disabled}
+                                              showClear
+                                            />
+                                          </td>
+                                          <td className="px-2.5 py-2">
+                                            <Input
+                                              className={INPUT_CLASS}
+                                              type="number"
+                                              step="0.0001"
+                                              value={process.rateUnitFabric}
+                                              onChange={(event) =>
+                                                updateYarnProcess(yarn.id, process.id, {
+                                                  rateUnitFabric: event.target.value,
+                                                })
+                                              }
+                                              disabled={disabled}
+                                            />
+                                          </td>
+                                          <td className="px-2.5 py-2">
+                                            <Input
+                                              className={INPUT_CLASS}
+                                              type="number"
+                                              step="0.0001"
+                                              value={process.wastagePercentage}
+                                              onChange={(event) =>
+                                                updateYarnProcess(yarn.id, process.id, {
+                                                  wastagePercentage: event.target.value,
+                                                })
+                                              }
+                                              disabled={disabled}
+                                            />
+                                          </td>
+                                          <td className="px-2.5 py-2 text-[11px] text-slate-700 dark:text-slate-300">
+                                            {formatMoney(actualQty * toNumber(process.rateUnitFabric))}
+                                          </td>
+                                          <td className="whitespace-nowrap px-1.5 py-2 text-center">
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="size-7"
+                                              onClick={() =>
+                                                updateYarn(yarn.id, {
+                                                  yarnWiseProcesses: yarn.yarnWiseProcesses.filter(
+                                                    (item) => item.id !== process.id,
+                                                  ),
+                                                })
+                                              }
+                                              disabled={disabled}
+                                              aria-label="Remove extra process"
+                                            >
+                                              <Trash2 className="size-3.5" />
+                                            </Button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-500 dark:text-slate-400">No extra process rows added.</p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                      No material rows added.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Common Wastage + Process Cost</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() =>
+                        patchValues({ commonProcesses: [...values.commonProcesses, newCommonProcess()] })
+                      }
+                      disabled={disabled}
+                    >
+                      <Plus className="size-3.5" />
+                      Add common row
+                    </Button>
+                  </div>
+
+                  {values.commonProcesses.length ? (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+                      <table className="w-full table-fixed text-left text-[11px]">
+                        <colgroup>
+                          <col className="w-[48%]" />
+                          <col className="w-[18%]" />
+                          <col className="w-[18%]" />
+                          <col className="w-[12%]" />
+                          <col className="w-[4%]" />
+                        </colgroup>
+                        <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                          <tr>
+                            <th className="px-2.5 py-1.5">Process</th>
+                            <th className="px-2.5 py-1.5">Wastage %</th>
+                            <th className="px-2.5 py-1.5">Cost / KG</th>
+                            <th className="px-2.5 py-1.5">Cost</th>
+                            <th className="px-1.5 pr-3 py-1.5 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                          {values.commonProcesses.map((process) => (
+                            <tr key={process.id} className="align-top">
+                              <td className="px-2.5 py-2">
+                                <AppCombobox
+                                  value={optionFrom(process.processId, process.processLabel)}
+                                  onValueChange={(option) =>
+                                    updateCommonProcess(process.id, {
+                                      processId: option?.value ?? "",
+                                      processLabel: option?.label ?? "",
+                                    })
+                                  }
+                                  loadItems={loadProcessOptions}
+                                  placeholder="Search process"
+                                  disabled={disabled}
+                                  showClear
+                                />
+                              </td>
+                              <td className="px-2.5 py-2">
+                                <Input
+                                  className={INPUT_CLASS}
+                                  type="number"
+                                  step="0.0001"
+                                  value={process.wastagePercentage}
+                                  onChange={(event) =>
+                                    updateCommonProcess(process.id, { wastagePercentage: event.target.value })
+                                  }
+                                  disabled={disabled}
+                                />
+                              </td>
+                              <td className="px-2.5 py-2">
+                                <Input
+                                  className={INPUT_CLASS}
+                                  type="number"
+                                  step="0.0001"
+                                  value={process.ratePerUnitFabric}
+                                  onChange={(event) =>
+                                    updateCommonProcess(process.id, { ratePerUnitFabric: event.target.value })
+                                  }
+                                  disabled={disabled}
+                                />
+                              </td>
+                              <td className="px-2.5 py-2 text-[11px] text-slate-700 dark:text-slate-300">
+                                {formatMoney(calculation.requiredQty * toNumber(process.ratePerUnitFabric))}
+                              </td>
+                              <td className="whitespace-nowrap px-1.5 py-2 text-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-7"
+                                  onClick={() =>
+                                    patchValues({
+                                      commonProcesses: values.commonProcesses.filter((item) => item.id !== process.id),
+                                    })
+                                  }
+                                  disabled={disabled}
+                                  aria-label="Remove common process"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                      No common rows added.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Cost Breakdown Table</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-white/10">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                         <tr>
-                          <th className="px-2.5 py-1.5">Process</th>
-                          <th className="px-2.5 py-1.5">Rate</th>
-                          <th className="px-2.5 py-1.5">Wastage %</th>
-                          <th className="px-1.5 pr-3 py-1.5 whitespace-nowrap text-center">Action</th>
+                          <th className="px-3 py-2">Type</th>
+                          <th className="px-3 py-2">Name</th>
+                          <th className="px-3 py-2">Base Qty</th>
+                          <th className="px-3 py-2">Wastage %</th>
+                          <th className="px-3 py-2">Actual Qty</th>
+                          <th className="px-3 py-2">Rate</th>
+                          <th className="px-3 py-2">Cost</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                        {values.commonProcesses.map((process) => (
-                          <tr key={process.id} className="align-top">
-                            <td className="px-2.5 py-2">
-                              <AppCombobox
-                                value={optionFrom(process.processId, process.processLabel)}
-                                onValueChange={(option) =>
-                                  updateCommonProcess(process.id, {
-                                    processId: option?.value ?? "",
-                                    processLabel: option?.label ?? "",
-                                  })
-                                }
-                                loadItems={loadProcessOptions}
-                                placeholder="Search process"
-                                disabled={disabled}
-                                showClear
-                                className="min-w-0"
-                              />
-                            </td>
-                            <td className="px-2.5 py-2">
-                              <Input
-                                className={INPUT_CLASS}
-                                type="number"
-                                step="0.0001"
-                                value={process.ratePerUnitFabric}
-                                onChange={(event) =>
-                                  updateCommonProcess(process.id, { ratePerUnitFabric: event.target.value })
-                                }
-                                placeholder="Rate"
-                                disabled={disabled}
-                              />
-                            </td>
-                            <td className="px-2.5 py-2">
-                              <Input
-                                className={INPUT_CLASS}
-                                type="number"
-                                step="0.0001"
-                                value={process.wastagePercentage}
-                                onChange={(event) =>
-                                  updateCommonProcess(process.id, { wastagePercentage: event.target.value })
-                                }
-                                placeholder="Wastage %"
-                                disabled={disabled}
-                              />
-                            </td>
-                            <td className="whitespace-nowrap px-1.5 py-2 text-center">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-7"
-                                onClick={() =>
-                                  patchValues({
-                                    commonProcesses: values.commonProcesses.filter((item) => item.id !== process.id),
-                                  })
-                                }
-                                disabled={disabled}
-                                aria-label="Remove common process"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </Button>
+                        {calculation.breakdownRows.map((row) => (
+                          <tr key={row.id}>
+                            <td className="px-3 py-2">{row.type}</td>
+                            <td className="px-3 py-2">{row.name}</td>
+                            <td className="px-3 py-2">{formatQty(row.baseQty)}</td>
+                            <td className="px-3 py-2">{formatQty(row.wastagePercent)}</td>
+                            <td className="px-3 py-2">{formatQty(row.actualQty)}</td>
+                            <td className="px-3 py-2">{formatMoney(row.rate)}</td>
+                            <td className="px-3 py-2">
+                              {calculation.input.currencySymbol}
+                              {formatMoney(row.cost)}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                ) : null}
+                </CardContent>
+              </Card>
 
-                {!values.commonProcesses.length ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-                    No common process rows added.
-                  </div>
-                ) : null}
-              </section>
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Calculation Trace</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {calculation.breakdownRows.length ? (
+                    <Accordion type="multiple" className="rounded-lg border-slate-200 dark:border-white/10">
+                      {calculation.breakdownRows.map((row) => (
+                        <AccordionItem key={`trace-${row.id}`} value={`trace-${row.id}`}>
+                          <AccordionTrigger className="px-3 py-2 text-sm font-medium">
+                            {row.type}: {row.name} ({calculation.input.currencySymbol}
+                            {formatMoney(row.cost)})
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 pb-3">
+                            {row.traceLines.map((line, index) => (
+                              <p key={`${row.id}-line-${index}`}>{line}</p>
+                            ))}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  ) : (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No calculation trace yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200/80 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Formula View</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs dark:bg-white/5">
+{`totalCommonWastage = sum(commonWastages)
+requiredQty = targetQty / (1 - totalCommonWastage / 100)
+materialBaseQty = requiredQty * ratio / 100
+materialActualQty = materialBaseQty / (1 - extraWastage / 100)
+materialCost = materialActualQty * pricePerKg
+extraMaterialProcessCost = materialActualQty * extraProcessCostPerKg
+processCost = requiredQty * processCostPerKg`}
+                  </pre>
+                </CardContent>
+              </Card>
             </div>
           </ScrollArea>
         )}
@@ -616,10 +904,10 @@ export function FabricCostingFormDialog({
         <DialogFooter className="shrink-0 border-t px-4 py-4 dark:border-white/10 sm:px-6">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Fabric Cost:</span>
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Finished Fabric Cost:</span>
               <span className="text-base font-semibold text-slate-950 dark:text-white">
-                {values.currencyLabel ? `${values.currencyLabel} ` : ""}
-                {formatCostAmount(calculatedFabricCost)}
+                {calculation.input.currencySymbol}
+                {formatMoney(calculation.finalCost)} / KG
               </span>
             </div>
             <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">

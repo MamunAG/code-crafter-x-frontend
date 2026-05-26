@@ -65,7 +65,6 @@ export type FabricCostingYarnRecord = {
   yarn?: MaterialSummary | null
   percentagePerUnitFabric?: number | string | null
   yarnPricePerUnit?: number | string | null
-  totalYarnConsumption?: number | string | null
   totalYarnPrice?: number | string | null
   yarnWiseProcesses?: FabricCostingYarnProcessRecord[]
 }
@@ -117,7 +116,6 @@ export type FabricCostingYarnFormValues = {
   yarnLabel: string
   percentagePerUnitFabric: string
   yarnPricePerUnit: string
-  totalYarnConsumption: string
   totalYarnPrice: string
   yarnWiseProcesses: FabricCostingYarnProcessFormValues[]
 }

@@ -179,7 +179,6 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
         : yarn.yarn?.name ?? "",
       percentagePerUnitFabric: numberText(yarn.percentagePerUnitFabric),
       yarnPricePerUnit: numberText(yarn.yarnPricePerUnit),
-      totalYarnConsumption: numberText(yarn.totalYarnConsumption),
       totalYarnPrice: numberText(yarn.totalYarnPrice),
       yarnWiseProcesses: (yarn.yarnWiseProcesses ?? []).map((process) => ({
         id: process.id || crypto.randomUUID(),

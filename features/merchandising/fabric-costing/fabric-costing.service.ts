@@ -5,6 +5,7 @@ import type {
   FabricCostingRecord,
   PaginatedResponse,
 } from "./fabric-costing.types"
+import { calculateFabricCost, type FabricCostingInput } from "./fabric-costing-calculation"
 
 function buildApiUrl(apiUrl: string, path: string) {
   return new URL(path, apiUrl)
@@ -81,19 +82,53 @@ function normalizeNumber(value: string, fallback = 0) {
   return Number.isFinite(numericValue) ? numericValue : fallback
 }
 
+function buildCalculationInput(values: FabricCostingFormValues): FabricCostingInput {
+  return {
+    targetQty: normalizeNumber(values.qty, 1),
+    currencySymbol: "$",
+    commonWastages: values.commonProcesses.map((process) => ({
+      id: process.id,
+      name: process.processLabel || "Unnamed process",
+      wastagePercent: normalizeNumber(process.wastagePercentage),
+    })),
+    materials: values.yarns.map((yarn) => ({
+      id: yarn.id,
+      name: yarn.yarnLabel || "Unnamed material",
+      ratioPercent: normalizeNumber(yarn.percentagePerUnitFabric),
+      pricePerKg: normalizeNumber(yarn.yarnPricePerUnit),
+      extraProcesses: yarn.yarnWiseProcesses.map((process) => ({
+        id: process.id,
+        name: process.processLabel || "Unnamed extra process",
+        wastagePercent: normalizeNumber(process.wastagePercentage),
+        costPerKg: normalizeNumber(process.rateUnitFabric),
+      })),
+    })),
+    processes: values.commonProcesses.map((process) => ({
+      id: process.id,
+      name: process.processLabel || "Unnamed process",
+      costPerKg: normalizeNumber(process.ratePerUnitFabric),
+    })),
+  }
+}
+
 function buildPayload(values: FabricCostingFormValues) {
+  const qty = normalizeNumber(values.qty, 1)
+  const calculation = calculateFabricCost(buildCalculationInput(values))
+  const materialTotalsById = new Map(
+    calculation.materialResults.map((material) => [material.id, material.totalCost]),
+  )
+
   return {
     costName: optionalString(values.costName),
     fabricId: optionalString(values.fabricId),
-    qty: normalizeNumber(values.qty, 1),
+    qty,
     unitId: optionalNumber(values.unitId),
     currencyId: Number(values.currencyId),
     yarns: values.yarns.map((yarn) => ({
       yarnId: optionalString(yarn.yarnId),
       percentagePerUnitFabric: normalizeNumber(yarn.percentagePerUnitFabric),
       yarnPricePerUnit: normalizeNumber(yarn.yarnPricePerUnit),
-      totalYarnConsumption: normalizeNumber(yarn.totalYarnConsumption),
-      totalYarnPrice: normalizeNumber(yarn.totalYarnPrice),
+      totalYarnPrice: materialTotalsById.get(yarn.id) ?? 0,
       yarnWiseProcesses: yarn.yarnWiseProcesses.map((process) => ({
         processId: optionalNumber(process.processId),
         rateUnitFabric: normalizeNumber(process.rateUnitFabric),
