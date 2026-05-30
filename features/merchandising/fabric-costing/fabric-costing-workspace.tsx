@@ -54,6 +54,7 @@ import { fetchMaterial, fetchMaterials } from "@/features/app-config/materials/m
 import { fetchUnits } from "@/features/app-config/units/unit.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchFabricProcesses } from "@/features/merchandising/fabric-processes/fabric-process.service"
+import { fetchGmtCostScopes } from "@/features/merchandising/gmt-cost-scopes/gmt-cost-scope.service"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
@@ -187,6 +188,13 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
         rateUnitFabric: numberText(process.rateUnitFabric),
         wastagePercentage: numberText(process.wastagePercentage),
       })),
+      additionalMaterialCosts: (yarn.additionalMaterialCosts ?? []).map((additionalCost) => ({
+        id: additionalCost.id || crypto.randomUUID(),
+        gmtCostScopeId: additionalCost.gmtCostScopeId == null ? "" : String(additionalCost.gmtCostScopeId),
+        gmtCostScopeLabel: additionalCost.gmtCostScope?.name ?? "",
+        percentage: numberText(additionalCost.percentage),
+        directCost: numberText(additionalCost.directCost),
+      })),
     })),
     commonProcesses: (record.commonProcesses ?? []).map((process) => ({
       id: process.id || crypto.randomUUID(),
@@ -208,6 +216,27 @@ function normalizeFormErrors(values: FabricCostingFormValues): FabricCostingForm
     yarn.yarnWiseProcesses.forEach((process, processIndex) => {
       if (!process.processId.trim()) {
         errors.push({ message: `Yarn ${index + 1}, process ${processIndex + 1}: Process is required.` })
+      }
+    })
+    const scopeIds = new Set<string>()
+    yarn.additionalMaterialCosts.forEach((additionalCost, costIndex) => {
+      const prefix = `Yarn ${index + 1}, additional cost ${costIndex + 1}`
+      if (!additionalCost.gmtCostScopeId.trim()) {
+        errors.push({ message: `${prefix}: Cost scope is required.` })
+      } else if (scopeIds.has(additionalCost.gmtCostScopeId)) {
+        errors.push({ message: `${prefix}: Cost scope cannot be repeated for the same material.` })
+      }
+      scopeIds.add(additionalCost.gmtCostScopeId)
+      const percentage = Number(additionalCost.percentage || 0)
+      const directCost = Number(additionalCost.directCost || 0)
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        errors.push({ message: `${prefix}: Percentage must be between 0 and 100.` })
+      }
+      if (!Number.isFinite(directCost) || directCost < 0) {
+        errors.push({ message: `${prefix}: Direct cost cannot be negative.` })
+      }
+      if ((percentage > 0) === (directCost > 0)) {
+        errors.push({ message: `${prefix}: Enter either percentage or direct cost.` })
       }
     })
   })
@@ -692,6 +721,26 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
       })
       return {
         items: data.items.map((process) => ({ value: String(process.id), label: process.name })),
+        hasNextPage: data.meta.hasNextPage,
+      }
+    },
+    [apiUrl, selectedOrganizationId],
+  )
+
+  const loadGmtCostScopeOptions = useCallback(
+    async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams): Promise<AppComboboxLoadResult<AppComboboxOption>> => {
+      const token = window.localStorage.getItem("access_token")
+      if (!token) throw new Error("Your session expired. Please sign in again.")
+      const data = await fetchGmtCostScopes({
+        apiUrl,
+        accessToken: token,
+        organizationId: selectedOrganizationId || undefined,
+        page: optionPage,
+        limit: optionLimit,
+        filters: { name: query, isActive: "true" },
+      })
+      return {
+        items: data.items.map((scope) => ({ value: String(scope.id), label: scope.name })),
         hasNextPage: data.meta.hasNextPage,
       }
     },
@@ -1282,6 +1331,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         loadUnitOptions={loadUnitOptions}
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
+        loadGmtCostScopeOptions={loadGmtCostScopeOptions}
         onFabricChange={handleFabricChange}
         onValuesChange={setEditorValues}
         onOpenChange={setEditorOpen}

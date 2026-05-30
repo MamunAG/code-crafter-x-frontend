@@ -38,6 +38,7 @@ import type {
   FabricCostingCommonProcessFormValues,
   FabricCostingFormError,
   FabricCostingFormValues,
+  FabricCostingYarnAdditionalCostFormValues,
   FabricCostingYarnFormValues,
   FabricCostingYarnProcessFormValues,
 } from "../fabric-costing.types"
@@ -53,6 +54,7 @@ type FabricCostingFormDialogProps = {
   loadUnitOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  loadGmtCostScopeOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   onFabricChange?: (option: AppComboboxOption | null) => void
   onValuesChange: (values: FabricCostingFormValues) => void
   onOpenChange: (open: boolean) => void
@@ -79,6 +81,10 @@ function formatMoney(value: number) {
   return value.toFixed(2)
 }
 
+function formatMoney4(value: number) {
+  return value.toFixed(4)
+}
+
 function resolveCurrencySymbol(label: string) {
   const normalized = label.trim().toUpperCase()
   if (normalized.includes("USD")) return "$"
@@ -95,6 +101,17 @@ function newYarn(): FabricCostingYarnFormValues {
     yarnPricePerUnit: "0",
     totalYarnPrice: "0",
     yarnWiseProcesses: [],
+    additionalMaterialCosts: [],
+  }
+}
+
+function newAdditionalMaterialCost(): FabricCostingYarnAdditionalCostFormValues {
+  return {
+    id: crypto.randomUUID(),
+    gmtCostScopeId: "",
+    gmtCostScopeLabel: "",
+    percentage: "0",
+    directCost: "0",
   }
 }
 
@@ -147,6 +164,12 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
         wastagePercent: toNumber(process.wastagePercentage),
         costPerKg: toNumber(process.rateUnitFabric),
       })),
+      additionalCosts: yarn.additionalMaterialCosts.map((additionalCost) => ({
+        id: additionalCost.id,
+        name: additionalCost.gmtCostScopeLabel || "Unnamed additional cost",
+        percentage: toNumber(additionalCost.percentage),
+        directCost: toNumber(additionalCost.directCost),
+      })),
     })),
     processes: values.commonProcesses.map((process) => ({
       id: process.id,
@@ -167,6 +190,7 @@ export function FabricCostingFormDialog({
   loadUnitOptions,
   loadCurrencyOptions,
   loadProcessOptions,
+  loadGmtCostScopeOptions,
   onFabricChange,
   onValuesChange,
   onOpenChange,
@@ -204,6 +228,25 @@ export function FabricCostingFormDialog({
     })
   }
 
+  function updateAdditionalMaterialCost(
+    yarnId: string,
+    additionalCostId: string,
+    patch: Partial<FabricCostingYarnAdditionalCostFormValues>,
+  ) {
+    patchValues({
+      yarns: values.yarns.map((row) =>
+        row.id === yarnId
+          ? {
+              ...row,
+              additionalMaterialCosts: row.additionalMaterialCosts.map((additionalCost) =>
+                additionalCost.id === additionalCostId ? { ...additionalCost, ...patch } : additionalCost,
+              ),
+            }
+          : row,
+      ),
+    })
+  }
+
   function updateCommonProcess(rowId: string, patch: Partial<FabricCostingCommonProcessFormValues>) {
     patchValues({
       commonProcesses: values.commonProcesses.map((row) =>
@@ -216,7 +259,7 @@ export function FabricCostingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[94dvh] w-[min(1480px,calc(100dvw-0.75rem))] max-w-none flex-col overflow-hidden p-0 sm:w-[min(1480px,calc(100dvw-1rem))] sm:max-w-none">
+      <DialogContent className="flex h-[88dvh] w-[min(1280px,calc(100dvw-1.5rem))] max-w-none flex-col overflow-hidden p-0 sm:w-[min(1280px,calc(100dvw-2rem))] sm:max-w-none">
         <DialogHeader className="border-b px-4 py-4 dark:border-white/10 sm:px-6 sm:py-5">
           <DialogTitle>{mode === "create" ? "Create fabric costing" : "Edit fabric costing"}</DialogTitle>
           <DialogDescription>Dynamic costing with transparent quantity, wastage, and process formulas.</DialogDescription>
@@ -339,12 +382,22 @@ export function FabricCostingFormDialog({
                         const baseQty = calculation.requiredQty * (toNumber(yarn.percentagePerUnitFabric) / 100)
                         const actualQty =
                           extraWastage >= 99 ? 0 : baseQty / (1 - extraWastage / 100)
+                        const rawCost = actualQty * toNumber(yarn.yarnPricePerUnit)
+                        const additionalMaterialCost = yarn.additionalMaterialCosts.reduce(
+                          (sum, additionalCost) =>
+                            sum +
+                            (toNumber(additionalCost.directCost) > 0
+                              ? toNumber(additionalCost.directCost)
+                              : toNumber(yarn.yarnPricePerUnit) * (toNumber(additionalCost.percentage) / 100)),
+                          0,
+                        )
                         const totalPrice =
-                          actualQty * toNumber(yarn.yarnPricePerUnit) +
+                          rawCost +
                           yarn.yarnWiseProcesses.reduce(
                             (sum, process) => sum + actualQty * toNumber(process.rateUnitFabric),
                             0,
-                          )
+                          ) +
+                          additionalMaterialCost
 
                         return (
                           <div key={yarn.id} className="rounded-md border border-slate-200 p-2.5 dark:border-white/10">
@@ -425,7 +478,8 @@ export function FabricCostingFormDialog({
                               </div>
                             </div>
 
-                            <div className="mt-2 rounded-md bg-slate-50 p-2 dark:bg-white/5">
+                            <div className="mt-2 grid gap-2 xl:grid-cols-2">
+                            <div className="rounded-md bg-slate-50 p-2 dark:bg-white/5">
                               <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                                   Extra Material Processes
@@ -446,14 +500,14 @@ export function FabricCostingFormDialog({
                                 </Button>
                               </div>
                               {yarn.yarnWiseProcesses.length ? (
-                                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
                                   <table className="w-full table-fixed text-left text-[11px]">
                                     <colgroup>
-                                      <col className="w-[54%]" />
-                                      <col className="w-[16%]" />
-                                      <col className="w-[16%]" />
-                                      <col className="w-[10%]" />
-                                      <col className="w-[4%]" />
+                                      <col className="w-[46%]" />
+                                      <col className="w-[17%]" />
+                                      <col className="w-[17%]" />
+                                      <col className="w-[12%]" />
+                                      <col className="w-[8%]" />
                                     </colgroup>
                                     <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                                       <tr>
@@ -461,7 +515,7 @@ export function FabricCostingFormDialog({
                                         <th className="px-2 py-1.5">Cost / KG</th>
                                         <th className="px-2 py-1.5">Wastage %</th>
                                         <th className="px-2 py-1.5">Cost</th>
-                                        <th className="px-1.5 pr-3 py-1.5 text-center">Action</th>
+                                        <th className="px-1 py-1.5 text-center">Action</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200 dark:divide-white/10">
@@ -513,7 +567,7 @@ export function FabricCostingFormDialog({
                                           <td className="px-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-300">
                                             {formatMoney(actualQty * toNumber(process.rateUnitFabric))}
                                           </td>
-                                          <td className="whitespace-nowrap px-1.5 py-2 text-center">
+                                          <td className="whitespace-nowrap px-1 py-2 text-center">
                                             <Button
                                               type="button"
                                               variant="ghost"
@@ -540,6 +594,142 @@ export function FabricCostingFormDialog({
                               ) : (
                                 <p className="text-xs text-slate-500 dark:text-slate-400">No extra process rows added.</p>
                               )}
+                            </div>
+                            <div className="rounded-md bg-slate-50 p-2 dark:bg-white/5">
+                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                  Additional Material Cost
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    updateYarn(yarn.id, {
+                                      additionalMaterialCosts: [
+                                        ...yarn.additionalMaterialCosts,
+                                        newAdditionalMaterialCost(),
+                                      ],
+                                    })
+                                  }
+                                  disabled={disabled}
+                                >
+                                  <Plus className="size-3.5" />
+                                  Add additional cost
+                                </Button>
+                              </div>
+                              {yarn.additionalMaterialCosts.length ? (
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+                                  <table className="w-full table-fixed text-left text-[11px]">
+                                    <colgroup>
+                                      <col className="w-[38%]" />
+                                      <col className="w-[18%]" />
+                                      <col className="w-[18%]" />
+                                      <col className="w-[18%]" />
+                                      <col className="w-[8%]" />
+                                    </colgroup>
+                                    <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                                      <tr>
+                                        <th className="px-2 py-1.5">Cost Scope</th>
+                                        <th className="px-2 py-1.5">Percentage %</th>
+                                        <th className="px-2 py-1.5">Direct Cost</th>
+                                        <th className="px-2 py-1.5">Cost</th>
+                                        <th className="px-1 py-1.5 text-center">Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                                      {yarn.additionalMaterialCosts.map((additionalCost) => {
+                                        const cost =
+                                          toNumber(additionalCost.directCost) > 0
+                                            ? toNumber(additionalCost.directCost)
+                                            : toNumber(yarn.yarnPricePerUnit) * (toNumber(additionalCost.percentage) / 100)
+                                        return (
+                                          <tr key={additionalCost.id} className="align-top">
+                                            <td className="px-2 py-1.5">
+                                              <AppCombobox
+                                                value={optionFrom(
+                                                  additionalCost.gmtCostScopeId,
+                                                  additionalCost.gmtCostScopeLabel,
+                                                )}
+                                                onValueChange={(option) =>
+                                                  updateAdditionalMaterialCost(yarn.id, additionalCost.id, {
+                                                    gmtCostScopeId: option?.value ?? "",
+                                                    gmtCostScopeLabel: option?.label ?? "",
+                                                  })
+                                                }
+                                                loadItems={loadGmtCostScopeOptions}
+                                                placeholder="Search cost scope"
+                                                disabled={disabled}
+                                                showClear
+                                              />
+                                            </td>
+                                            <td className="px-2 py-1.5">
+                                              <Input
+                                                className={INPUT_CLASS}
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.0001"
+                                                value={additionalCost.percentage}
+                                                onChange={(event) =>
+                                                  updateAdditionalMaterialCost(yarn.id, additionalCost.id, {
+                                                    percentage: event.target.value,
+                                                    ...(toNumber(event.target.value) > 0 ? { directCost: "0" } : {}),
+                                                  })
+                                                }
+                                                disabled={disabled}
+                                              />
+                                            </td>
+                                            <td className="px-2 py-1.5">
+                                              <Input
+                                                className={INPUT_CLASS}
+                                                type="number"
+                                                min="0"
+                                                step="0.0001"
+                                                value={additionalCost.directCost}
+                                                onChange={(event) =>
+                                                  updateAdditionalMaterialCost(yarn.id, additionalCost.id, {
+                                                    directCost: event.target.value,
+                                                    ...(toNumber(event.target.value) > 0 ? { percentage: "0" } : {}),
+                                                  })
+                                                }
+                                                disabled={disabled}
+                                              />
+                                            </td>
+                                            <td className="px-2 py-2 text-[11px] text-slate-700 dark:text-slate-300">
+                                              {formatMoney4(cost)}
+                                            </td>
+                                            <td className="whitespace-nowrap px-1 py-2 text-center">
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-7"
+                                                onClick={() =>
+                                                  updateYarn(yarn.id, {
+                                                    additionalMaterialCosts: yarn.additionalMaterialCosts.filter(
+                                                      (item) => item.id !== additionalCost.id,
+                                                    ),
+                                                  })
+                                                }
+                                                disabled={disabled}
+                                                aria-label="Remove additional material cost"
+                                              >
+                                                <Trash2 className="size-3.5" />
+                                              </Button>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  No additional material costs added.
+                                </p>
+                              )}
+                            </div>
                             </div>
                           </div>
                         )
@@ -666,6 +856,13 @@ export function FabricCostingFormDialog({
                 </CardContent>
               </Card>
 
+              <Accordion type="single" collapsible className="rounded-xl border border-slate-200/80 dark:border-white/10">
+                <AccordionItem value="advanced-analysis" className="border-b-0">
+                  <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+                    Additional analysis and breakdowns
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    <div className="space-y-3">
               <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <Card className="border-slate-200/80 dark:border-white/10">
                   <CardHeader className="pb-2">
@@ -674,7 +871,7 @@ export function FabricCostingFormDialog({
                   <CardContent>
                     <p className="text-xl font-semibold text-slate-950 dark:text-white">
                       {calculation.input.currencySymbol}
-                      {formatMoney(calculation.finalCost)} / KG
+                      {formatMoney4(calculation.finalCost)} / KG
                     </p>
                   </CardContent>
                 </Card>
@@ -720,7 +917,7 @@ export function FabricCostingFormDialog({
                 </Card>
               </section>
 
-              <section className="grid gap-3 md:grid-cols-3">
+              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Card className="border-slate-200/80 dark:border-white/10">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Material Cost</CardTitle>
@@ -741,11 +938,20 @@ export function FabricCostingFormDialog({
                 </Card>
                 <Card className="border-slate-200/80 dark:border-white/10">
                   <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Additional Material Cost</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
+                    {calculation.input.currencySymbol}
+                    {formatMoney4(calculation.totalAdditionalMaterialCost)}
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/80 dark:border-white/10">
+                  <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Final Cost</CardTitle>
                   </CardHeader>
                   <CardContent className="text-2xl font-semibold text-slate-950 dark:text-white">
                     {calculation.input.currencySymbol}
-                    {formatMoney(calculation.finalCost)}
+                    {formatMoney4(calculation.finalCost)}
                   </CardContent>
                 </Card>
               </section>
@@ -770,6 +976,19 @@ export function FabricCostingFormDialog({
                     </p>
                   ))}
                   <p>↓</p>
+                  <p className="font-medium">Additional Material Cost</p>
+                  {calculation.materialResults.flatMap((material) =>
+                    material.additionalCosts.map((additionalCost) => (
+                      <p key={`${material.id}-additional-${additionalCost.id}`}>
+                        {material.name}: {additionalCost.name} - {calculation.input.currencySymbol}
+                        {formatMoney4(
+                          additionalCost.directCost > 0
+                            ? additionalCost.directCost
+                            : material.pricePerKg * (additionalCost.percentage / 100),
+                        )}
+                      </p>
+                    )),
+                  )}
                   <p className="font-medium">Process Cost</p>
                   {calculation.processResults.map((process) => (
                     <p key={process.id}>
@@ -858,10 +1077,15 @@ materialBaseQty = requiredQty * ratio / 100
 materialActualQty = materialBaseQty / (1 - extraWastage / 100)
 materialCost = materialActualQty * pricePerKg
 extraMaterialProcessCost = materialActualQty * extraProcessCostPerKg
+additionalMaterialCost = directCost OR (pricePerKg * percentage / 100)
 processCost = requiredQty * processCostPerKg`}
                   </pre>
                 </CardContent>
               </Card>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           </ScrollArea>
         )}
@@ -872,7 +1096,7 @@ processCost = requiredQty * processCostPerKg`}
               <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Finished Fabric Cost:</span>
               <span className="text-base font-semibold text-slate-950 dark:text-white">
                 {calculation.input.currencySymbol}
-                {formatMoney(calculation.finalCost)} / KG
+                {formatMoney4(calculation.finalCost)} / KG
               </span>
             </div>
             <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">

@@ -11,12 +11,20 @@ export type ExtraMaterialProcess = {
   costPerKg: number
 }
 
+export type AdditionalMaterialCost = {
+  id: string
+  name: string
+  percentage: number
+  directCost: number
+}
+
 export type MaterialInput = {
   id: string
   name: string
   ratioPercent: number
   pricePerKg: number
   extraProcesses?: ExtraMaterialProcess[]
+  additionalCosts?: AdditionalMaterialCost[]
 }
 
 export type ProcessInput = {
@@ -33,7 +41,7 @@ export type FabricCostingInput = {
   processes: ProcessInput[]
 }
 
-export type BreakdownRowType = "Material" | "Extra Process" | "Process"
+export type BreakdownRowType = "Material" | "Extra Process" | "Additional Cost" | "Process"
 
 export type FabricCostBreakdownRow = {
   id: string
@@ -51,13 +59,16 @@ export type MaterialCostResult = {
   id: string
   name: string
   ratioPercent: number
+  pricePerKg: number
   baseQty: number
   actualQty: number
   rawCost: number
   extraProcessCost: number
+  additionalMaterialCost: number
   totalCost: number
   totalExtraWastage: number
   extraProcesses: ExtraMaterialProcess[]
+  additionalCosts: AdditionalMaterialCost[]
 }
 
 export type ProcessCostResult = {
@@ -75,6 +86,7 @@ export type FabricCostingResult = {
   requiredQty: number
   totalYarnQty: number
   totalMaterialCost: number
+  totalAdditionalMaterialCost: number
   totalProcessCost: number
   finalCost: number
   materialResults: MaterialCostResult[]
@@ -113,6 +125,7 @@ export const FABRIC_COSTING_SAMPLE_INPUT: FabricCostingInput = {
           costPerKg: 4,
         },
       ],
+      additionalCosts: [],
     },
     {
       id: "mat-yarn-2",
@@ -120,6 +133,7 @@ export const FABRIC_COSTING_SAMPLE_INPUT: FabricCostingInput = {
       ratioPercent: 5,
       pricePerKg: 12,
       extraProcesses: [],
+      additionalCosts: [],
     },
   ],
   processes: [
@@ -164,6 +178,19 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
         validationErrors.push(`Extra process rate for "${process.name}" cannot be negative.`)
       }
     }
+    for (const additionalCost of material.additionalCosts ?? []) {
+      const percentage = safeNumber(additionalCost.percentage)
+      const directCost = safeNumber(additionalCost.directCost)
+      if (percentage < 0 || percentage > 100) {
+        validationErrors.push(`Additional cost percentage for "${additionalCost.name}" must be between 0 and 100.`)
+      }
+      if (directCost < 0) {
+        validationErrors.push(`Additional direct cost for "${additionalCost.name}" cannot be negative.`)
+      }
+      if ((percentage > 0) === (directCost > 0)) {
+        validationErrors.push(`Enter either a percentage or a direct cost for "${additionalCost.name}".`)
+      }
+    }
   }
 
   for (const process of input.processes) {
@@ -198,7 +225,9 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
 
     const baseQty = requiredQty * (safeNumber(material.ratioPercent) / 100)
     const actualQty = materialFactor > 0 ? baseQty / materialFactor : 0
-    const rawCost = actualQty * safeNumber(material.pricePerKg)
+    const pricePerKg = safeNumber(material.pricePerKg)
+    const rawCost = actualQty * pricePerKg
+    const additionalCosts = material.additionalCosts ?? []
 
     breakdownRows.push({
       id: `${material.id}-raw`,
@@ -240,17 +269,48 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       })
     }
 
+    let additionalMaterialCost = 0
+    for (const additionalCost of additionalCosts) {
+      const percentage = safeNumber(additionalCost.percentage)
+      const directCost = safeNumber(additionalCost.directCost)
+      const cost = directCost > 0 ? directCost : pricePerKg * (percentage / 100)
+      additionalMaterialCost += cost
+      breakdownRows.push({
+        id: `${material.id}-additional-${additionalCost.id}`,
+        type: "Additional Cost",
+        name: additionalCost.name,
+        baseQty: actualQty,
+        wastagePercent: 0,
+        actualQty,
+        rate: directCost > 0 ? directCost : percentage,
+        cost,
+        traceLines: directCost > 0
+          ? [
+              `${material.name} Direct Additional Cost = ${directCost.toFixed(2)}`,
+              `Cost = ${cost.toFixed(2)}`,
+            ]
+          : [
+              `${material.name} Price / KG = ${pricePerKg.toFixed(4)}`,
+              `Percentage = ${percentage.toFixed(4)}%`,
+              `Cost = ${pricePerKg.toFixed(4)} * ${percentage.toFixed(4)}% = ${cost.toFixed(4)}`,
+            ],
+      })
+    }
+
     return {
       id: material.id,
       name: material.name,
       ratioPercent: safeNumber(material.ratioPercent),
+      pricePerKg,
       baseQty,
       actualQty,
       rawCost,
       extraProcessCost,
-      totalCost: rawCost + extraProcessCost,
+      additionalMaterialCost,
+      totalCost: rawCost + extraProcessCost + additionalMaterialCost,
       totalExtraWastage,
       extraProcesses,
+      additionalCosts,
     }
   })
 
@@ -286,6 +346,10 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
 
   const totalYarnQty = materialResults.reduce((sum, material) => sum + material.actualQty, 0)
   const totalMaterialCost = materialResults.reduce((sum, material) => sum + material.totalCost, 0)
+  const totalAdditionalMaterialCost = materialResults.reduce(
+    (sum, material) => sum + material.additionalMaterialCost,
+    0,
+  )
   const totalProcessCost = processResults.reduce((sum, process) => sum + process.cost, 0)
   const finalCost = targetQty > 0 ? (totalMaterialCost + totalProcessCost) / targetQty : 0
 
@@ -296,6 +360,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
     requiredQty,
     totalYarnQty,
     totalMaterialCost,
+    totalAdditionalMaterialCost,
     totalProcessCost,
     finalCost,
     materialResults,

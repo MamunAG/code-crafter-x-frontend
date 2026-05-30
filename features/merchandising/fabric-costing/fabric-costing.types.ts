@@ -49,6 +49,11 @@ export type FabricProcessSummary = {
   name?: string | null
 }
 
+export type GmtCostScopeSummary = {
+  id?: number | null
+  name?: string | null
+}
+
 export type FabricCostingYarnProcessRecord = {
   id: string
   fabricCostingYarnId?: string
@@ -67,6 +72,16 @@ export type FabricCostingYarnRecord = {
   yarnPricePerUnit?: number | string | null
   totalYarnPrice?: number | string | null
   yarnWiseProcesses?: FabricCostingYarnProcessRecord[]
+  additionalMaterialCosts?: FabricCostingYarnAdditionalCostRecord[]
+}
+
+export type FabricCostingYarnAdditionalCostRecord = {
+  id: string
+  fabricCostingYarnId?: string
+  gmtCostScopeId?: number | null
+  gmtCostScope?: GmtCostScopeSummary | null
+  percentage?: number | string | null
+  directCost?: number | string | null
 }
 
 export type FabricCostingCommonProcessRecord = {
@@ -83,6 +98,7 @@ export type FabricCostingRecord = {
   fabricId?: string | null
   fabric?: MaterialSummary | null
   qty?: number | string | null
+  finishedFabricCost?: number | string | null
   unitId?: number | null
   unit?: UnitSummary | null
   currencyId?: number | null
@@ -118,6 +134,15 @@ export type FabricCostingYarnFormValues = {
   yarnPricePerUnit: string
   totalYarnPrice: string
   yarnWiseProcesses: FabricCostingYarnProcessFormValues[]
+  additionalMaterialCosts: FabricCostingYarnAdditionalCostFormValues[]
+}
+
+export type FabricCostingYarnAdditionalCostFormValues = {
+  id: string
+  gmtCostScopeId: string
+  gmtCostScopeLabel: string
+  percentage: string
+  directCost: string
 }
 
 export type FabricCostingCommonProcessFormValues = {

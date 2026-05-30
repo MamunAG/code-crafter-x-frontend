@@ -223,6 +223,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 permissionMenuName: "Fabric Process Setup",
               },
               {
+                label: "GMT Cost Scope Setup",
+                href: "/merchandising/masters/gmt-cost-scopes",
+                permissionMenuName: "GMT Cost Scope Setup",
+              },
+              {
                 label: "Color Setup",
                 href: "/merchandising/masters/colors",
                 permissionMenuName: "Color Setup",

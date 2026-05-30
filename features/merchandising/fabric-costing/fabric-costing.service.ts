@@ -102,6 +102,12 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
         wastagePercent: normalizeNumber(process.wastagePercentage),
         costPerKg: normalizeNumber(process.rateUnitFabric),
       })),
+      additionalCosts: yarn.additionalMaterialCosts.map((additionalCost) => ({
+        id: additionalCost.id,
+        name: additionalCost.gmtCostScopeLabel || "Unnamed additional cost",
+        percentage: normalizeNumber(additionalCost.percentage),
+        directCost: normalizeNumber(additionalCost.directCost),
+      })),
     })),
     processes: values.commonProcesses.map((process) => ({
       id: process.id,
@@ -122,6 +128,7 @@ function buildPayload(values: FabricCostingFormValues) {
     costName: optionalString(values.costName),
     fabricId: optionalString(values.fabricId),
     qty,
+    finishedFabricCost: calculation.finalCost,
     unitId: optionalNumber(values.unitId),
     currencyId: Number(values.currencyId),
     yarns: values.yarns.map((yarn) => ({
@@ -133,6 +140,11 @@ function buildPayload(values: FabricCostingFormValues) {
         processId: optionalNumber(process.processId),
         rateUnitFabric: normalizeNumber(process.rateUnitFabric),
         wastagePercentage: normalizeNumber(process.wastagePercentage),
+      })),
+      additionalMaterialCosts: yarn.additionalMaterialCosts.map((additionalCost) => ({
+        gmtCostScopeId: Number(additionalCost.gmtCostScopeId),
+        percentage: normalizeNumber(additionalCost.percentage),
+        directCost: normalizeNumber(additionalCost.directCost),
       })),
     })),
     commonProcesses: values.commonProcesses.map((process) => ({
