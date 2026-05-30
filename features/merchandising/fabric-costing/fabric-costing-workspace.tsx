@@ -13,7 +13,6 @@ import {
   RefreshCcw,
   Search,
   Trash2,
-  Undo2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -45,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrencies } from "@/features/app-config/currencies/currency.service"
 import type { CurrencyRecord } from "@/features/app-config/currencies/currency.types"
@@ -59,6 +59,7 @@ import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
 import { FabricCostingFormDialog } from "./component/fabric-costing-form-dialog"
+import { DeleteFabricCostSection } from "./component/delete-fabric-cost-section"
 import {
   createFabricCosting,
   fetchFabricCosting,
@@ -141,13 +142,6 @@ function numberText(value?: string | number | null, fallback = "0") {
   const numericValue = Number(value)
   if (!Number.isFinite(numericValue)) return String(value)
   return Number.isInteger(numericValue) ? String(numericValue) : String(numericValue).replace(/\.?0+$/, "")
-}
-
-function getTotalYarnPrice(record: FabricCostingRecord) {
-  return (record.yarns ?? []).reduce((total, yarn) => {
-    const value = Number(yarn.totalYarnPrice ?? 0)
-    return Number.isFinite(value) ? total + value : total
-  }, 0)
 }
 
 function toCurrencyOption(currency: CurrencyRecord | null | undefined): AppComboboxOption | null {
@@ -398,6 +392,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   const [deletedError, setDeletedError] = useState("")
   const [draftFilters, setDraftFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
   const [activeFilters, setActiveFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
+  const [deletedDraftFilters, setDeletedDraftFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
+  const [deletedActiveFilters, setDeletedActiveFilters] = useState<FabricCostingFilterValues>(DEFAULT_FILTERS)
   const [selectedFilterFabric, setSelectedFilterFabric] = useState<AppComboboxOption | null>(null)
   const [fabricMaterialGroupId, setFabricMaterialGroupId] = useState("")
   const fabricUnitRequestIdRef = useRef(0)
@@ -423,13 +419,6 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     const end = Math.min(meta.page * meta.limit, meta.total)
     return `Showing ${start}-${end} of ${meta.total}`
   }, [meta])
-
-  const deletedPageSummary = useMemo(() => {
-    if (!deletedMeta || deletedMeta.total === 0) return "No deleted fabric costings"
-    const start = (deletedMeta.page - 1) * deletedMeta.limit + 1
-    const end = Math.min(deletedMeta.page * deletedMeta.limit, deletedMeta.total)
-    return `Showing ${start}-${end} of ${deletedMeta.total}`
-  }, [deletedMeta])
 
   const filterCount = [activeFilters.costName, activeFilters.fabricId, activeFilters.currencyId, activeFilters.unitId].filter((value) => value.trim()).length
 
@@ -546,7 +535,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     let active = true
     async function loadDeletedRecords() {
       if (loadingAccessRules) return
-      if (!accessRules?.canDelete) {
+      if (!accessRules?.canView) {
         setDeletedRecords([])
         setDeletedMeta(null)
         setLoadingDeletedRecords(false)
@@ -566,7 +555,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
           organizationId: selectedOrganizationId || undefined,
           page: deletedPage,
           limit: deletedLimit,
-          filters: DEFAULT_FILTERS,
+          filters: deletedActiveFilters,
           deletedOnly: true,
         })
         if (active) {
@@ -584,7 +573,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     return () => {
       active = false
     }
-  }, [accessRules?.canDelete, apiUrl, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
+  }, [accessRules?.canView, apiUrl, deletedActiveFilters, deletedLimit, deletedPage, handleAuthFailure, loadingAccessRules, refreshVersion, selectedOrganizationId])
 
   const resolveFabricMaterialGroupId = useCallback(async () => {
     if (fabricMaterialGroupId) {
@@ -1001,7 +990,9 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <ScrollArea className="h-full">
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <section className="rounded-3xl border bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-slate-950/70 sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -1099,15 +1090,14 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[760px] table-fixed text-left text-sm">
             <colgroup>
-              <col className="w-[20rem]" />
+              <col className="w-[14rem]" />
               <col className="w-[16rem]" />
-              <col className="w-[8rem]" />
-              <col className="w-[8rem]" />
+              <col className="w-[5rem]" />
+              <col className="w-[6rem]" />
               <col className="w-[10rem]" />
-              <col className="w-[13rem]" />
-              <col className="w-[13rem]" />
+              <col className="w-[10rem]" />
               <col className="w-[5rem]" />
             </colgroup>
             <thead className="border-b text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -1116,7 +1106,6 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
                 <th className="px-4 py-3 font-semibold">Fabric</th>
                 <th className="px-4 py-3 font-semibold">Qty</th>
                 <th className="px-4 py-3 font-semibold">Currency</th>
-                <th className="px-4 py-3 font-semibold">Yarns</th>
                 <th className="px-4 py-3 font-semibold">Created</th>
                 <th className="px-4 py-3 font-semibold">Updated</th>
                 <th className="px-4 py-3 text-right font-semibold">Actions</th>
@@ -1126,7 +1115,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
               {loadingRecords
                 ? Array.from({ length: 5 }).map((_, index) => (
                     <tr key={index}>
-                      <td className="px-4 py-4" colSpan={8}>
+                      <td className="px-4 py-4" colSpan={7}>
                         <Skeleton className="h-10 w-full" />
                       </td>
                     </tr>
@@ -1149,10 +1138,6 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
                       </td>
                       <td className="px-4 py-4 text-xs">
                         {record.currency?.currencyCode ?? record.currency?.currencyName ?? "-"}
-                      </td>
-                      <td className="px-4 py-4 text-xs">
-                        <p>{record.yarns?.length ?? 0} yarn rows</p>
-                        <p className="mt-1 text-slate-500 dark:text-slate-400">Total {numberText(getTotalYarnPrice(record))}</p>
                       </td>
                       <td className="px-4 py-4 text-xs">
                         <p className="font-medium">{formatDateTime(record.created_at)}</p>
@@ -1211,114 +1196,30 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         />
       </section>
 
-      {accessRules.canDelete ? (
-        <section className="overflow-hidden rounded-3xl border bg-white/85 shadow-sm dark:border-white/10 dark:bg-slate-950/70">
-          <div className="flex flex-col gap-3 border-b p-5 dark:border-white/10 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Recently deleted</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{deletedPageSummary}</p>
-            </div>
-            <Badge variant="outline">Deleted {deletedMeta?.total ?? deletedRecords.length}</Badge>
-          </div>
+      <DeleteFabricCostSection
+        deletedRecords={deletedRecords}
+        deletedMeta={deletedMeta}
+        deletedPage={deletedPage}
+        deletedLimit={deletedLimit}
+        loadingDeletedRecords={loadingDeletedRecords}
+        deletedError={deletedError}
+        deletedDraftFilters={deletedDraftFilters}
+        deletedActiveFilters={deletedActiveFilters}
+        loadMaterialOptions={loadMaterialOptions}
+        onDeletedDraftFiltersChange={setDeletedDraftFilters}
+        onDeletedActiveFiltersChange={setDeletedActiveFilters}
+        onDeletedPageChange={setDeletedPage}
+        onDeletedLimitChange={setDeletedLimit}
+        onOpenAction={(record, mode) => {
+          setPendingActionTarget(record)
+          setPendingActionMode(mode)
+        }}
+        canRestoreFabricCosting={accessRules.canUpdate}
+        canPermanentlyDeleteFabricCosting={accessRules.canDelete}
+      />
 
-          {deletedError ? (
-            <div className="p-4 text-sm text-red-600 dark:text-red-300">{deletedError}</div>
-          ) : null}
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] table-fixed text-left text-sm">
-              <colgroup>
-                <col className="w-[22rem]" />
-                <col className="w-[14rem]" />
-                <col className="w-[14rem]" />
-                <col className="w-[5rem]" />
-              </colgroup>
-              <thead className="border-b text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Costing</th>
-                  <th className="px-4 py-3 font-semibold">Deleted</th>
-                  <th className="px-4 py-3 font-semibold">Created</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y dark:divide-white/10">
-                {loadingDeletedRecords
-                  ? Array.from({ length: 3 }).map((_, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-4" colSpan={4}>
-                          <Skeleton className="h-10 w-full" />
-                        </td>
-                      </tr>
-                    ))
-                  : deletedRecords.map((record) => (
-                      <tr key={record.id}>
-                        <td className="px-4 py-4">
-                          <p className="break-words text-sm font-semibold">{getCostingLabel(record)}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{record.fabric?.name ?? "No fabric"}</p>
-                        </td>
-                        <td className="px-4 py-4 text-xs">
-                          <p className="font-medium">{formatDateTime(record.deleted_at)}</p>
-                          <p className="mt-1 text-slate-500 dark:text-slate-400">{getUserName(record.deleted_by_user)}</p>
-                        </td>
-                        <td className="px-4 py-4 text-xs">
-                          <p className="font-medium">{formatDateTime(record.created_at)}</p>
-                          <p className="mt-1 text-slate-500 dark:text-slate-400">{getUserName(record.created_by_user)}</p>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon" className="size-8">
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setPendingActionTarget(record)
-                                  setPendingActionMode("restore")
-                                }}
-                              >
-                                <Undo2 className="size-3.5" />
-                                Restore
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
-                                  setPendingActionTarget(record)
-                                  setPendingActionMode("permanent")
-                                }}
-                              >
-                                <Trash2 className="size-3.5" />
-                                Delete permanently
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-              </tbody>
-            </table>
-          </div>
-
-          {!loadingDeletedRecords && !deletedRecords.length ? (
-            <div className="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
-              No deleted fabric costings found.
-            </div>
-          ) : null}
-
-          <PageControls
-            meta={deletedMeta}
-            page={deletedPage}
-            limit={deletedLimit}
-            onPageChange={setDeletedPage}
-            onLimitChange={(nextLimit) => {
-              setDeletedLimit(nextLimit)
-              setDeletedPage(1)
-            }}
-          />
-        </section>
-      ) : null}
+        </div>
+      </ScrollArea>
 
       <FabricCostingFormDialog
         open={editorOpen}

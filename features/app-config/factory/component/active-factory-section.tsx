@@ -171,8 +171,8 @@ export function ActiveFactorySection({
 
         return (
           <div className="pl-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
                 {imageUrl ? (
                   <img
                     src={imageUrl}
@@ -212,7 +212,7 @@ export function ActiveFactorySection({
     {
       id: "status",
       header: "Status",
-      cell: ({ row }) => <Badge variant={getStatusTone(row.original)} className="rounded-full px-3 py-1">{getStatusLabel(row.original)}</Badge>,
+      cell: ({ row }) => <Badge variant={getStatusTone(row.original)} className="rounded-full px-2 py-0">{getStatusLabel(row.original)}</Badge>,
     },
     {
       id: "created",
@@ -248,7 +248,7 @@ export function ActiveFactorySection({
         <div className="pr-4 text-right">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+              <Button type="button" variant="ghost" size="icon-sm" className="size-7 rounded-full">
                 <MoreHorizontal className="size-3.5" />
                 <span className="sr-only">Open actions</span>
               </Button>
@@ -521,6 +521,16 @@ export function ActiveFactorySection({
             pageSize={limit}
             isLoading={loading}
             pageSizeOptions={[5, 10, 25, 50]}
+            columnClassNames={{
+              factory: "h-8 py-1",
+              code: "h-8 py-1",
+              contact: "h-8 py-1",
+              email: "h-8 py-1",
+              status: "h-8 py-1",
+              created: "h-8 py-1",
+              updated: "h-8 py-1",
+              actions: "h-8 py-1",
+            }}
             onPageChange={(nextPage) => onPageChange(nextPage)}
             onPageSizeChange={(nextPageSize) => {
               onLimitChange(nextPageSize)
