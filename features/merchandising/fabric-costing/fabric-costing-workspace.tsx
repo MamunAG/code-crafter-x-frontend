@@ -55,6 +55,7 @@ import { fetchUnits } from "@/features/app-config/units/unit.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchFabricProcesses } from "@/features/merchandising/fabric-processes/fabric-process.service"
 import { fetchGmtCostScopes } from "@/features/merchandising/gmt-cost-scopes/gmt-cost-scope.service"
+import { GmtCostScopeEntryDialog } from "@/features/merchandising/gmt-cost-scopes/component/gmt-cost-scope-entry-dialog"
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
@@ -398,6 +399,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   const [fabricMaterialGroupId, setFabricMaterialGroupId] = useState("")
   const fabricUnitRequestIdRef = useRef(0)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [gmtCostScopeManagerOpen, setGmtCostScopeManagerOpen] = useState(false)
+  const [gmtCostScopeOptionsVersion, setGmtCostScopeOptionsVersion] = useState(0)
   const [editorMode, setEditorMode] = useState<EditorMode>("create")
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSubmitting, setEditorSubmitting] = useState(false)
@@ -733,7 +736,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         hasNextPage: data.meta.hasNextPage,
       }
     },
-    [apiUrl, selectedOrganizationId],
+    [apiUrl, gmtCostScopeOptionsVersion, selectedOrganizationId],
   )
 
   const loadDefaultCurrencyOption = useCallback(async (): Promise<AppComboboxOption | null> => {
@@ -1233,10 +1236,19 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
         loadGmtCostScopeOptions={loadGmtCostScopeOptions}
+        onManageGmtCostScopes={() => setGmtCostScopeManagerOpen(true)}
         onFabricChange={handleFabricChange}
         onValuesChange={setEditorValues}
         onOpenChange={setEditorOpen}
         onSubmit={() => void handleSubmit()}
+      />
+
+      <GmtCostScopeEntryDialog
+        open={gmtCostScopeManagerOpen}
+        apiUrl={apiUrl}
+        organizationId={selectedOrganizationId || undefined}
+        onOpenChange={setGmtCostScopeManagerOpen}
+        onScopesChanged={() => setGmtCostScopeOptionsVersion((current) => current + 1)}
       />
 
       <DeleteConfirmDialog

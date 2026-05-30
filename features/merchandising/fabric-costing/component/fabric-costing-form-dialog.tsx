@@ -55,14 +55,15 @@ type FabricCostingFormDialogProps = {
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadGmtCostScopeOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  onManageGmtCostScopes?: () => void
   onFabricChange?: (option: AppComboboxOption | null) => void
   onValuesChange: (values: FabricCostingFormValues) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
 }
 
-const INPUT_CLASS = "h-8 rounded-md px-2 text-xs"
-const MASTER_INPUT_CLASS = "h-8"
+const INPUT_CLASS = "h-7 rounded-md px-2 text-xs"
+const MASTER_INPUT_CLASS = "h-7"
 
 function optionFrom(value: string, label: string) {
   return value ? { value, label: label || value } : null
@@ -191,6 +192,7 @@ export function FabricCostingFormDialog({
   loadCurrencyOptions,
   loadProcessOptions,
   loadGmtCostScopeOptions,
+  onManageGmtCostScopes,
   onFabricChange,
   onValuesChange,
   onOpenChange,
@@ -600,23 +602,37 @@ export function FabricCostingFormDialog({
                                   <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                                     Additional Material Cost
                                   </p>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      updateYarn(yarn.id, {
-                                        additionalMaterialCosts: [
-                                          ...yarn.additionalMaterialCosts,
-                                          newAdditionalMaterialCost(),
-                                        ],
-                                      })
-                                    }
-                                    disabled={disabled}
-                                  >
-                                    <Plus className="size-3.5" />
-                                    Add additional cost
-                                  </Button>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {onManageGmtCostScopes ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onManageGmtCostScopes}
+                                        disabled={disabled}
+                                      >
+                                        <Plus className="size-3.5" />
+                                        New cost scope
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        updateYarn(yarn.id, {
+                                          additionalMaterialCosts: [
+                                            ...yarn.additionalMaterialCosts,
+                                            newAdditionalMaterialCost(),
+                                          ],
+                                        })
+                                      }
+                                      disabled={disabled}
+                                    >
+                                      <Plus className="size-3.5" />
+                                      Add additional cost
+                                    </Button>
+                                  </div>
                                 </div>
                                 {yarn.additionalMaterialCosts.length ? (
                                   <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
