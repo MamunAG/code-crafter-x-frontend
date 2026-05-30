@@ -55,6 +55,7 @@ type FabricCostingFormDialogProps = {
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadGmtCostScopeOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
+  onManageFabricProcesses?: () => void
   onManageGmtCostScopes?: () => void
   onFabricChange?: (option: AppComboboxOption | null) => void
   onValuesChange: (values: FabricCostingFormValues) => void
@@ -192,6 +193,7 @@ export function FabricCostingFormDialog({
   loadCurrencyOptions,
   loadProcessOptions,
   loadGmtCostScopeOptions,
+  onManageFabricProcesses,
   onManageGmtCostScopes,
   onFabricChange,
   onValuesChange,
@@ -486,20 +488,34 @@ export function FabricCostingFormDialog({
                                   <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                                     Extra Material Processes
                                   </p>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      updateYarn(yarn.id, {
-                                        yarnWiseProcesses: [...yarn.yarnWiseProcesses, newYarnProcess()],
-                                      })
-                                    }
-                                    disabled={disabled}
-                                  >
-                                    <Plus className="size-3.5" />
-                                    Add extra process
-                                  </Button>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {onManageFabricProcesses ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onManageFabricProcesses}
+                                        disabled={disabled}
+                                      >
+                                        <Plus className="size-3.5" />
+                                        New process
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        updateYarn(yarn.id, {
+                                          yarnWiseProcesses: [...yarn.yarnWiseProcesses, newYarnProcess()],
+                                        })
+                                      }
+                                      disabled={disabled}
+                                    >
+                                      <Plus className="size-3.5" />
+                                      Add extra process
+                                    </Button>
+                                  </div>
                                 </div>
                                 {yarn.yarnWiseProcesses.length ? (
                                   <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">

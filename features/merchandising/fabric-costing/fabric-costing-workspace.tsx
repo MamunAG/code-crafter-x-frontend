@@ -54,6 +54,7 @@ import { fetchMaterial, fetchMaterials } from "@/features/app-config/materials/m
 import { fetchUnits } from "@/features/app-config/units/unit.service"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
 import { fetchFabricProcesses } from "@/features/merchandising/fabric-processes/fabric-process.service"
+import { FabricProcessEntryDialog } from "@/features/merchandising/fabric-processes/component/fabric-process-entry-dialog"
 import { fetchGmtCostScopes } from "@/features/merchandising/gmt-cost-scopes/gmt-cost-scope.service"
 import { GmtCostScopeEntryDialog } from "@/features/merchandising/gmt-cost-scopes/component/gmt-cost-scope-entry-dialog"
 import { parseStoredAuthUser } from "@/lib/auth-session"
@@ -399,6 +400,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   const [fabricMaterialGroupId, setFabricMaterialGroupId] = useState("")
   const fabricUnitRequestIdRef = useRef(0)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [fabricProcessManagerOpen, setFabricProcessManagerOpen] = useState(false)
+  const [fabricProcessOptionsVersion, setFabricProcessOptionsVersion] = useState(0)
   const [gmtCostScopeManagerOpen, setGmtCostScopeManagerOpen] = useState(false)
   const [gmtCostScopeOptionsVersion, setGmtCostScopeOptionsVersion] = useState(0)
   const [editorMode, setEditorMode] = useState<EditorMode>("create")
@@ -716,7 +719,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         hasNextPage: data.meta.hasNextPage,
       }
     },
-    [apiUrl, selectedOrganizationId],
+    [apiUrl, fabricProcessOptionsVersion, selectedOrganizationId],
   )
 
   const loadGmtCostScopeOptions = useCallback(
@@ -1236,11 +1239,20 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
         loadGmtCostScopeOptions={loadGmtCostScopeOptions}
+        onManageFabricProcesses={() => setFabricProcessManagerOpen(true)}
         onManageGmtCostScopes={() => setGmtCostScopeManagerOpen(true)}
         onFabricChange={handleFabricChange}
         onValuesChange={setEditorValues}
         onOpenChange={setEditorOpen}
         onSubmit={() => void handleSubmit()}
+      />
+
+      <FabricProcessEntryDialog
+        open={fabricProcessManagerOpen}
+        apiUrl={apiUrl}
+        organizationId={selectedOrganizationId || undefined}
+        onOpenChange={setFabricProcessManagerOpen}
+        onProcessesChanged={() => setFabricProcessOptionsVersion((current) => current + 1)}
       />
 
       <GmtCostScopeEntryDialog
