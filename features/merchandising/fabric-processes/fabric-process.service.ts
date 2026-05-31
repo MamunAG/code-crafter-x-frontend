@@ -138,9 +138,7 @@ export async function createFabricProcess({
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      processType: payload.processType,
       stage: payload.stage,
-      parentProcessId: payload.parentProcessId ? Number(payload.parentProcessId) : null,
       sortOrder: Number(payload.sortOrder || 0),
       isActive: payload.isActive,
     }),
@@ -173,9 +171,7 @@ export async function updateFabricProcess({
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
     body: JSON.stringify({
       name: payload.name.trim(),
-      processType: payload.processType,
       stage: payload.stage,
-      parentProcessId: payload.parentProcessId ? Number(payload.parentProcessId) : null,
       sortOrder: Number(payload.sortOrder || 0),
       isActive: payload.isActive,
     }),

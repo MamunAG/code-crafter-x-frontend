@@ -128,7 +128,7 @@ export function ActiveFabricProcessesSection({
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{fabricProcess.name}</p>
                   <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                    {fabricProcess.processType === "GROUP" ? "Group" : fabricProcess.parentProcess?.name ? `Step of ${fabricProcess.parentProcess.name}` : "Standalone step"} - {formatStage(fabricProcess.stage)}
+                    {formatStage(fabricProcess.stage)}
                   </p>
                 </div>
               </div>
@@ -282,7 +282,7 @@ export function ActiveFabricProcessesSection({
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{fabricProcess.name}</p>
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                            {fabricProcess.processType === "GROUP" ? "Group" : fabricProcess.parentProcess?.name ? `Step of ${fabricProcess.parentProcess.name}` : "Standalone step"} - {formatStage(fabricProcess.stage)}
+                            {formatStage(fabricProcess.stage)}
                           </p>
                         </div>
                         {canUpdateFabricProcess || canDeleteFabricProcess ? (

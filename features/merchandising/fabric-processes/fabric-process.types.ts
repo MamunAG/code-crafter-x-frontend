@@ -26,16 +26,12 @@ export type PaginatedResponse<T> = {
   meta: PaginationMeta
 }
 
-export type FabricProcessType = "GROUP" | "STEP"
 export type FabricProcessStage = "YARN_PREPARATION" | "YARN_TO_GREY" | "GREY_TO_FINISHED"
 
 export type FabricProcessRecord = {
   id: number
   name: string
-  processType: FabricProcessType
   stage: FabricProcessStage
-  parentProcessId?: number | null
-  parentProcess?: Pick<FabricProcessRecord, "id" | "name"> | null
   sortOrder: number
   isActive?: boolean
   created_by_id?: string | null
@@ -56,9 +52,7 @@ export type FabricProcessFilterValues = {
 
 export type FabricProcessFormValues = {
   name: string
-  processType: FabricProcessType
   stage: FabricProcessStage
-  parentProcessId: string
   sortOrder: string
   isActive: boolean
 }

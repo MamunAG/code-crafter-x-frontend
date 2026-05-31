@@ -86,7 +86,7 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
   return {
     targetQty: normalizeNumber(values.qty, 1),
     currencySymbol: "$",
-    commonWastages: values.commonProcesses.filter((process) => process.processType === "GROUP" || !process.parentProcessId).map((process) => ({
+    commonWastages: values.commonProcesses.map((process) => ({
       id: process.id,
       name: process.processLabel || "Unnamed process",
       wastagePercent: normalizeNumber(process.wastagePercentage),
@@ -111,7 +111,7 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
         directCost: normalizeNumber(additionalCost.directCost),
       })),
     })),
-    processes: values.commonProcesses.filter((process) => process.processType === "STEP").map((process) => ({
+    processes: values.commonProcesses.map((process) => ({
       id: process.id,
       name: process.processLabel || "Unnamed process",
       costPerKg: normalizeNumber(process.ratePerUnitFabric),

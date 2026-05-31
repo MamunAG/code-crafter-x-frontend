@@ -54,7 +54,6 @@ type FabricCostingFormDialogProps = {
   loadUnitOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadCurrencyOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   loadProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<FabricProcessOption>>
-  loadStepProcessOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<FabricProcessOption>>
   loadGmtCostScopeOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<AppComboboxOption>>
   onManageFabricProcesses?: () => void
   onManageGmtCostScopes?: () => void
@@ -65,9 +64,7 @@ type FabricCostingFormDialogProps = {
 }
 
 export type FabricProcessOption = AppComboboxOption & {
-  processType: "GROUP" | "STEP"
   processStage: "YARN_PREPARATION" | "YARN_TO_GREY" | "GREY_TO_FINISHED"
-  parentProcessId: string
   sortOrder: number
 }
 
@@ -130,9 +127,7 @@ function newYarnProcess(): FabricCostingYarnProcessFormValues {
     id: crypto.randomUUID(),
     processId: "",
     processLabel: "",
-    processType: "STEP",
     processStage: "GREY_TO_FINISHED",
-    parentProcessId: "",
     sortOrder: 0,
     rateUnitFabric: "0",
     wastagePercentage: "0",
@@ -144,9 +139,7 @@ function newCommonProcess(): FabricCostingCommonProcessFormValues {
     id: crypto.randomUUID(),
     processId: "",
     processLabel: "",
-    processType: "STEP",
     processStage: "GREY_TO_FINISHED",
-    parentProcessId: "",
     sortOrder: 0,
     ratePerUnitFabric: "0",
     wastagePercentage: "0",
@@ -166,7 +159,7 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
   return {
     targetQty: toNumber(values.qty),
     currencySymbol,
-    commonWastages: values.commonProcesses.filter((process) => process.processType === "GROUP" || !process.parentProcessId).map((process) => ({
+    commonWastages: values.commonProcesses.map((process) => ({
       id: process.id,
       name: process.processLabel || "Unnamed process",
       wastagePercent: toNumber(process.wastagePercentage),
@@ -191,7 +184,7 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
         directCost: toNumber(additionalCost.directCost),
       })),
     })),
-    processes: values.commonProcesses.filter((process) => process.processType === "STEP").map((process) => ({
+    processes: values.commonProcesses.map((process) => ({
       id: process.id,
       name: process.processLabel || "Unnamed process",
       costPerKg: toNumber(process.ratePerUnitFabric),
@@ -211,7 +204,6 @@ export function FabricCostingFormDialog({
   loadUnitOptions,
   loadCurrencyOptions,
   loadProcessOptions,
-  loadStepProcessOptions,
   loadGmtCostScopeOptions,
   onManageFabricProcesses,
   onManageGmtCostScopes,
@@ -566,13 +558,11 @@ export function FabricCostingFormDialog({
                                                 updateYarnProcess(yarn.id, process.id, {
                                                   processId: option?.value ?? "",
                                                   processLabel: option?.label ?? "",
-                                                  processType: option?.processType ?? "STEP",
                                                   processStage: option?.processStage ?? "GREY_TO_FINISHED",
-                                                  parentProcessId: option?.parentProcessId ?? "",
                                                   sortOrder: option?.sortOrder ?? 0,
                                                 })
                                               }
-                                              loadItems={loadStepProcessOptions}
+                                              loadItems={loadProcessOptions}
                                                 placeholder="Search process"
                                                 disabled={disabled}
                                                 showClear
@@ -822,8 +812,9 @@ export function FabricCostingFormDialog({
                     <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-white/10">
                       <table className="w-full table-fixed text-left text-[11px]">
                         <colgroup>
-                          <col className="w-[48%]" />
-                          <col className="w-[18%]" />
+                          <col className="w-[36%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[15%]" />
                           <col className="w-[18%]" />
                           <col className="w-[12%]" />
                           <col className="w-[4%]" />
@@ -833,15 +824,14 @@ export function FabricCostingFormDialog({
                             <th className="px-2 py-1.5">Process</th>
                             <th className="px-2 py-1.5">Wastage %</th>
                             <th className="px-2 py-1.5">Cost / KG</th>
+                            <th className="px-2 py-1.5">Grey fabric consumption</th>
                             <th className="px-2 py-1.5">Cost</th>
                             <th className="px-1.5 pr-3 py-1.5 text-center">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-white/10">
                           {values.commonProcesses.map((process) => {
-                            const isGroup = process.processType === "GROUP"
-                            const isGroupedStep = process.processType === "STEP" && Boolean(process.parentProcessId)
-                            const processCost = calculation.processResults.find((result) => result.id === process.id)?.cost ?? 0
+                            const processResult = calculation.processResults.find((result) => result.id === process.id)
                             return (
                             <tr key={process.id} className="align-top">
                               <td className="px-2 py-1.5">
@@ -851,12 +841,8 @@ export function FabricCostingFormDialog({
                                     updateCommonProcess(process.id, {
                                       processId: option?.value ?? "",
                                       processLabel: option?.label ?? "",
-                                      processType: option?.processType ?? "STEP",
                                       processStage: option?.processStage ?? "GREY_TO_FINISHED",
-                                      parentProcessId: option?.parentProcessId ?? "",
                                       sortOrder: option?.sortOrder ?? 0,
-                                      ratePerUnitFabric: option?.processType === "GROUP" ? "0" : process.ratePerUnitFabric,
-                                      wastagePercentage: option?.parentProcessId ? "0" : process.wastagePercentage,
                                     })
                                   }
                                   loadItems={loadProcessOptions}
@@ -866,7 +852,7 @@ export function FabricCostingFormDialog({
                                 />
                                 {process.processId ? (
                                   <p className="pt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                                    {process.processType === "GROUP" ? "Group wastage" : isGroupedStep ? "Child step cost" : "Standalone step"} - {process.processStage.replaceAll("_", " ").toLowerCase()}
+                                    {process.processStage.replaceAll("_", " ").toLowerCase()}
                                   </p>
                                 ) : null}
                               </td>
@@ -879,7 +865,7 @@ export function FabricCostingFormDialog({
                                   onChange={(event) =>
                                     updateCommonProcess(process.id, { wastagePercentage: event.target.value })
                                   }
-                                  disabled={disabled || isGroupedStep}
+                                  disabled={disabled}
                                 />
                               </td>
                               <td className="px-2 py-1.5">
@@ -891,11 +877,14 @@ export function FabricCostingFormDialog({
                                   onChange={(event) =>
                                     updateCommonProcess(process.id, { ratePerUnitFabric: event.target.value })
                                   }
-                                  disabled={disabled || isGroup}
+                                  disabled={disabled}
                                 />
                               </td>
                               <td className="px-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-300">
-                                {formatMoney(processCost)}
+                                {formatQty(processResult?.consumptionQty ?? 0)} KG
+                              </td>
+                              <td className="px-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-300">
+                                {formatMoney(processResult?.cost ?? 0)}
                               </td>
                               <td className="whitespace-nowrap px-1.5 py-2 text-center">
                                 <Button

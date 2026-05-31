@@ -53,9 +53,7 @@ const DEFAULT_FILTERS: FabricProcessFilterValues = {
 
 const DEFAULT_FORM_VALUES: FabricProcessFormValues = {
   name: "",
-  processType: "STEP",
   stage: "GREY_TO_FINISHED",
-  parentProcessId: "",
   sortOrder: "0",
   isActive: true,
 }
@@ -199,7 +197,6 @@ export function FabricProcessWorkspace({ apiUrl }: { apiUrl: string }) {
   const [accessError, setAccessError] = useState("")
 
   const [fabricProcesses, setFabricProcesses] = useState<FabricProcessRecord[]>([])
-  const [parentProcesses, setParentProcesses] = useState<FabricProcessRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
@@ -332,9 +329,7 @@ export function FabricProcessWorkspace({ apiUrl }: { apiUrl: string }) {
 
       setEditorInitialValues({
         name: record.name ?? "",
-        processType: record.processType ?? "STEP",
         stage: record.stage ?? "GREY_TO_FINISHED",
-        parentProcessId: record.parentProcessId == null ? "" : String(record.parentProcessId),
         sortOrder: String(record.sortOrder ?? 0),
         isActive: record.isActive !== false,
       })
@@ -387,28 +382,17 @@ export function FabricProcessWorkspace({ apiUrl }: { apiUrl: string }) {
           return
         }
 
-        const [response, parentResponse] = await Promise.all([
-          fetchFabricProcesses({
-            apiUrl,
-            accessToken: token,
-            organizationId: selectedOrganizationId || undefined,
-            page,
-            limit,
-            filters: activeFilters,
-          }),
-          fetchFabricProcesses({
-            apiUrl,
-            accessToken: token,
-            organizationId: selectedOrganizationId || undefined,
-            page: 1,
-            limit: 1000,
-            filters: { name: "", isActive: "true" },
-          }),
-        ])
+        const response = await fetchFabricProcesses({
+          apiUrl,
+          accessToken: token,
+          organizationId: selectedOrganizationId || undefined,
+          page,
+          limit,
+          filters: activeFilters,
+        })
 
         if (!active) return
         setFabricProcesses(response.items)
-        setParentProcesses(parentResponse.items.filter((process) => process.processType === "GROUP"))
         setMeta(response.meta)
       } catch (caughtError) {
         if (!active) return
@@ -777,7 +761,6 @@ export function FabricProcessWorkspace({ apiUrl }: { apiUrl: string }) {
         submitting={editorSubmitting}
         error={editorError}
         initialValues={editorInitialValues}
-        parentProcesses={parentProcesses.filter((process) => process.id !== editingId)}
         onOpenChange={(open) => {
           setEditorOpen(open)
           if (!open) {

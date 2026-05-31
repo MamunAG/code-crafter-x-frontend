@@ -181,9 +181,7 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
         id: process.id || crypto.randomUUID(),
         processId: process.processId == null ? "" : String(process.processId),
         processLabel: process.process?.name ?? "",
-        processType: process.process?.processType ?? "STEP",
         processStage: process.process?.stage ?? "GREY_TO_FINISHED",
-        parentProcessId: process.process?.parentProcessId == null ? "" : String(process.process.parentProcessId),
         sortOrder: process.process?.sortOrder ?? 0,
         rateUnitFabric: numberText(process.rateUnitFabric),
         wastagePercentage: numberText(process.wastagePercentage),
@@ -200,9 +198,7 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
       id: process.id || crypto.randomUUID(),
       processId: process.processId == null ? "" : String(process.processId),
       processLabel: process.process?.name ?? "",
-      processType: process.process?.processType ?? "STEP",
       processStage: process.process?.stage ?? "GREY_TO_FINISHED",
-      parentProcessId: process.process?.parentProcessId == null ? "" : String(process.process.parentProcessId),
       sortOrder: process.process?.sortOrder ?? 0,
       ratePerUnitFabric: numberText(process.ratePerUnitFabric),
       wastagePercentage: numberText(process.wastagePercentage),
@@ -248,12 +244,6 @@ function normalizeFormErrors(values: FabricCostingFormValues): FabricCostingForm
     const prefix = `Common process ${index + 1}`
     if (!process.processId.trim()) {
       errors.push({ message: `${prefix}: Process is required.` })
-    }
-    if (process.processType === "GROUP" && Number(process.ratePerUnitFabric || 0) > 0) {
-      errors.push({ message: `${prefix}: A process group can carry wastage only. Add child steps for costs.` })
-    }
-    if (process.parentProcessId && Number(process.wastagePercentage || 0) > 0) {
-      errors.push({ message: `${prefix}: Enter wastage on the parent group only.` })
     }
   })
   return errors
@@ -732,10 +722,8 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
       return {
         items: data.items.map((process) => ({
           value: String(process.id),
-          label: process.parentProcess?.name ? `${process.parentProcess.name} / ${process.name}` : process.name,
-          processType: process.processType,
+          label: process.name,
           processStage: process.stage,
-          parentProcessId: process.parentProcessId == null ? "" : String(process.parentProcessId),
           sortOrder: process.sortOrder ?? 0,
         })),
         hasNextPage: data.meta.hasNextPage,
@@ -743,14 +731,6 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
     },
     [apiUrl, fabricProcessOptionsVersion, selectedOrganizationId],
   )
-  const loadStepProcessOptions = useCallback(
-    async (params: AppComboboxLoadParams) => {
-      const result = await loadProcessOptions(params)
-      return { ...result, items: result.items.filter((process) => process.processType === "STEP") }
-    },
-    [loadProcessOptions],
-  )
-
   const loadGmtCostScopeOptions = useCallback(
     async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams): Promise<AppComboboxLoadResult<AppComboboxOption>> => {
       const token = window.localStorage.getItem("access_token")
@@ -1267,7 +1247,6 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         loadUnitOptions={loadUnitOptions}
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
-        loadStepProcessOptions={loadStepProcessOptions}
         loadGmtCostScopeOptions={loadGmtCostScopeOptions}
         onManageFabricProcesses={() => setFabricProcessManagerOpen(true)}
         onManageGmtCostScopes={() => setGmtCostScopeManagerOpen(true)}

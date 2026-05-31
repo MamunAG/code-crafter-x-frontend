@@ -81,6 +81,7 @@ export type ProcessCostResult = {
   name: string
   costPerKg: number
   wastagePercent: number
+  consumptionQty: number
   cost: number
 }
 
@@ -111,13 +112,20 @@ function equalHundred(value: number) {
   return Math.abs(value - 100) <= EPSILON
 }
 
-function applyWastagesBackward(quantity: number, wastages: CommonWastage[], stage: FabricProcessStage) {
+function applyWastagesBackward(
+  quantity: number,
+  wastages: CommonWastage[],
+  stage: FabricProcessStage,
+  consumptionQtyByProcessId?: Map<string, number>,
+) {
   return wastages
     .filter((wastage) => (wastage.stage ?? "GREY_TO_FINISHED") === stage)
     .sort((left, right) => safeNumber(right.sortOrder ?? 0) - safeNumber(left.sortOrder ?? 0))
     .reduce((requiredQty, wastage) => {
       const factor = 1 - safeNumber(wastage.wastagePercent) / 100
-      return factor > 0 ? requiredQty / factor : 0
+      const consumptionQty = factor > 0 ? requiredQty / factor : 0
+      consumptionQtyByProcessId?.set(wastage.id, consumptionQty)
+      return consumptionQty
     }, quantity)
 }
 
@@ -220,9 +228,10 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
     (sum, item) => sum + safeNumber(item.wastagePercent),
     0,
   )
-  const greyConsumption = applyWastagesBackward(targetQty, input.commonWastages, "GREY_TO_FINISHED")
-  const yarnToGreyQty = applyWastagesBackward(greyConsumption, input.commonWastages, "YARN_TO_GREY")
-  const requiredQty = applyWastagesBackward(yarnToGreyQty, input.commonWastages, "YARN_PREPARATION")
+  const consumptionQtyByProcessId = new Map<string, number>()
+  const greyConsumption = applyWastagesBackward(targetQty, input.commonWastages, "GREY_TO_FINISHED", consumptionQtyByProcessId)
+  const yarnToGreyQty = applyWastagesBackward(greyConsumption, input.commonWastages, "YARN_TO_GREY", consumptionQtyByProcessId)
+  const requiredQty = applyWastagesBackward(yarnToGreyQty, input.commonWastages, "YARN_PREPARATION", consumptionQtyByProcessId)
   const breakdownRows: FabricCostBreakdownRow[] = []
 
   const materialResults: MaterialCostResult[] = input.materials.map((material) => {
@@ -328,7 +337,9 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
   })
 
   const processResults: ProcessCostResult[] = input.processes.map((process) => {
-    const processQty = (process.stage ?? "GREY_TO_FINISHED") === "GREY_TO_FINISHED" ? greyConsumption : requiredQty
+    const stage = process.stage ?? "GREY_TO_FINISHED"
+    const processQty = consumptionQtyByProcessId.get(process.id) ??
+      (stage === "GREY_TO_FINISHED" ? greyConsumption : stage === "YARN_TO_GREY" ? yarnToGreyQty : requiredQty)
     const cost = processQty * safeNumber(process.costPerKg)
     const wastagePercent =
       input.commonWastages.find((wastage) => wastage.name.trim() === process.name.trim())?.wastagePercent ?? 0
@@ -354,6 +365,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       name: process.name,
       costPerKg: safeNumber(process.costPerKg),
       wastagePercent: safeNumber(wastagePercent),
+      consumptionQty: processQty,
       cost,
     }
   })
