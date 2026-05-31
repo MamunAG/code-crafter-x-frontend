@@ -66,7 +66,7 @@ export type MaterialCostResult = {
   ratioPercent: number
   pricePerKg: number
   greyConsumptionQty: number
-  yarnPreparationConsumptionQty: number
+  yarnDyeingConsumptionQty: number
   baseQty: number
   actualQty: number
   rawCost: number
@@ -253,8 +253,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
     }
 
     const greyConsumptionQty = greyConsumption * (safeNumber(material.ratioPercent) / 100)
-    const yarnPreparationShare = yarnPreparationQty * (safeNumber(material.ratioPercent) / 100)
-    const yarnPreparationConsumptionQty = materialFactor > 0 ? yarnPreparationShare / materialFactor : 0
+    const yarnDyeingConsumptionQty = yarnToGreyQty * (safeNumber(material.ratioPercent) / 100)
     const baseQty = requiredQty * (safeNumber(material.ratioPercent) / 100)
     const actualQty = materialFactor > 0 ? baseQty / materialFactor : 0
     const pricePerKg = safeNumber(material.pricePerKg)
@@ -335,7 +334,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       ratioPercent: safeNumber(material.ratioPercent),
       pricePerKg,
       greyConsumptionQty,
-      yarnPreparationConsumptionQty,
+      yarnDyeingConsumptionQty,
       baseQty,
       actualQty,
       rawCost,

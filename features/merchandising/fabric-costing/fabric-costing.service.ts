@@ -123,9 +123,7 @@ function buildCalculationInput(values: FabricCostingFormValues): FabricCostingIn
 function buildPayload(values: FabricCostingFormValues) {
   const qty = normalizeNumber(values.qty, 1)
   const calculation = calculateFabricCost(buildCalculationInput(values))
-  const materialTotalsById = new Map(
-    calculation.materialResults.map((material) => [material.id, material.totalCost]),
-  )
+  const materialResultsById = new Map(calculation.materialResults.map((material) => [material.id, material]))
 
   return {
     costName: optionalString(values.costName),
@@ -138,7 +136,10 @@ function buildPayload(values: FabricCostingFormValues) {
       yarnId: optionalString(yarn.yarnId),
       percentagePerUnitFabric: normalizeNumber(yarn.percentagePerUnitFabric),
       yarnPricePerUnit: normalizeNumber(yarn.yarnPricePerUnit),
-      totalYarnPrice: materialTotalsById.get(yarn.id) ?? 0,
+      greyFabricConsumptionQty: materialResultsById.get(yarn.id)?.greyConsumptionQty ?? 0,
+      yarnDyeingConsumptionQty: materialResultsById.get(yarn.id)?.yarnDyeingConsumptionQty ?? 0,
+      totalYarnConsumption: materialResultsById.get(yarn.id)?.actualQty ?? 0,
+      totalYarnPrice: materialResultsById.get(yarn.id)?.totalCost ?? 0,
       yarnWiseProcesses: yarn.yarnWiseProcesses.map((process) => ({
         processId: optionalNumber(process.processId),
         rateUnitFabric: normalizeNumber(process.rateUnitFabric),

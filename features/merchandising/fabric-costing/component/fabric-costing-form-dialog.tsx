@@ -398,9 +398,9 @@ export function FabricCostingFormDialog({
                         const greyConsumptionQty = calculation.materialResults.find(
                           (material) => material.id === yarn.id,
                         )?.greyConsumptionQty ?? 0
-                        const yarnPreparationConsumptionQty = calculation.materialResults.find(
+                        const yarnDyeingConsumptionQty = calculation.materialResults.find(
                           (material) => material.id === yarn.id,
-                        )?.yarnPreparationConsumptionQty ?? 0
+                        )?.yarnDyeingConsumptionQty ?? 0
                         const baseQty = calculation.requiredQty * (toNumber(yarn.percentagePerUnitFabric) / 100)
                         const actualQty =
                           extraWastage >= 99 ? 0 : baseQty / (1 - extraWastage / 100)
@@ -472,7 +472,7 @@ export function FabricCostingFormDialog({
                               </div>
                               <div className="space-y-1">
                                 <FieldLabel>YD Cons.</FieldLabel>
-                                <Input className={INPUT_CLASS} value={formatQty(yarnPreparationConsumptionQty)} readOnly disabled />
+                                <Input className={INPUT_CLASS} value={formatQty(yarnDyeingConsumptionQty)} readOnly disabled />
                               </div>
                               <div className="space-y-1">
                                 <FieldLabel>Base Qty</FieldLabel>
@@ -539,7 +539,7 @@ export function FabricCostingFormDialog({
                                       disabled={disabled}
                                     >
                                       <Plus className="size-3.5" />
-                                      Add extra process
+                                      Add Row
                                     </Button>
                                   </div>
                                 </div>
@@ -674,7 +674,7 @@ export function FabricCostingFormDialog({
                                       disabled={disabled}
                                     >
                                       <Plus className="size-3.5" />
-                                      Add additional cost
+                                      Add Row
                                     </Button>
                                   </div>
                                 </div>
@@ -862,11 +862,6 @@ export function FabricCostingFormDialog({
                                   disabled={disabled}
                                   showClear
                                 />
-                                {process.processId ? (
-                                  <p className="pt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                                    {process.processStage.replaceAll("_", " ").toLowerCase()}
-                                  </p>
-                                ) : null}
                               </td>
                               <td className="px-2 py-1.5">
                                 <Input
@@ -987,6 +982,16 @@ export function FabricCostingFormDialog({
                         </Card>
                         <Card className="border-slate-200/80 dark:border-white/10">
                           <CardHeader className="pb-2">
+                            <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Yarn To Grey Qty</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-xl font-semibold text-slate-950 dark:text-white">
+                              {formatQty(calculation.yarnToGreyQty)} KG
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card className="border-slate-200/80 dark:border-white/10">
+                          <CardHeader className="pb-2">
                             <CardTitle className="text-xs text-slate-500 dark:text-slate-400">Yarn Requirement Base</CardTitle>
                           </CardHeader>
                           <CardContent>
@@ -1004,7 +1009,8 @@ export function FabricCostingFormDialog({
                         <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
                           <div className="space-y-1 rounded-md bg-slate-50 p-3 font-mono text-xs dark:bg-white/5">
                             <p>Grey Consumption = apply summed Grey to Finished wastage backward from Target Qty</p>
-                            <p>YD Cons. = Yarn Preparation stage quantity * Material Ratio / (1 - summed yarn extra-process wastage)</p>
+                            <p>Yarn To Grey Qty = Grey Consumption / (1 - summed Yarn To Grey wastage / 100)</p>
+                            <p>YD Cons. = Yarn To Grey input quantity * Material Ratio / 100</p>
                             <p>Yarn Requirement Base = apply total common wastage backward from Target Qty</p>
                             <p>Material Base Qty = Required Qty * Material Ratio / 100</p>
                           </div>
@@ -1012,7 +1018,8 @@ export function FabricCostingFormDialog({
                             <p className="font-medium">Resolved staged quantity</p>
                             <p className="font-mono text-xs">
                               Target {formatQty(calculation.input.targetQty)} KG -&gt; Grey{" "}
-                              {formatQty(calculation.greyConsumption)} KG | Total common wastage -&gt; Yarn base{" "}
+                              {formatQty(calculation.greyConsumption)} KG | Yarn To Grey{" "}
+                              {formatQty(calculation.yarnToGreyQty)} KG | Total common wastage -&gt; Yarn base{" "}
                               {formatQty(calculation.requiredQty)} KG
                             </p>
                           </div>
@@ -1082,6 +1089,8 @@ export function FabricCostingFormDialog({
                           <p>↓</p>
                           <p>{formatQty(calculation.greyConsumption)} KG Grey Consumption</p>
                           <p>↓</p>
+                          <p>Summed Yarn To Grey wastage applied backward</p>
+                          <p>{formatQty(calculation.yarnToGreyQty)} KG Yarn To Grey Qty</p>
                           <p>Total common wastage applied backward from finished quantity</p>
                           <p>↓</p>
                           <p>{formatQty(calculation.requiredQty)} KG Yarn Requirement Base</p>
@@ -1191,7 +1200,8 @@ export function FabricCostingFormDialog({
                         <CardContent>
                           <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs dark:bg-white/5">
                             {`greyConsumption = apply summed GREY_TO_FINISHED wastage backward from targetQty
-yarnPreparationConsumptionQty = yarnPreparationQty * ratio / (1 - summed extraWastage / 100)
+yarnToGreyQty = greyConsumption / (1 - summed YARN_TO_GREY wastage / 100)
+yarnDyeingConsumptionQty = yarnToGreyQty * ratio / 100
 requiredQty = apply total common wastage backward from targetQty
 materialBaseQty = requiredQty * ratio / 100
 materialActualQty = materialBaseQty / (1 - extraWastage / 100)

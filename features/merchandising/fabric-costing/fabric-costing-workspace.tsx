@@ -154,6 +154,14 @@ function toCurrencyOption(currency: CurrencyRecord | null | undefined): AppCombo
   }
 }
 
+function formatProcessLabel(name: string, stage: FabricProcessOption["processStage"]) {
+  const stageLabel = stage
+    .split("_")
+    .map((word) => `${word.charAt(0)}${word.slice(1).toLowerCase()}`)
+    .join(" ")
+  return `${name} (${stageLabel})`
+}
+
 function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValues {
   return {
     costName: record.costName ?? "",
@@ -180,7 +188,9 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
       yarnWiseProcesses: (yarn.yarnWiseProcesses ?? []).map((process) => ({
         id: process.id || crypto.randomUUID(),
         processId: process.processId == null ? "" : String(process.processId),
-        processLabel: process.process?.name ?? "",
+        processLabel: process.process?.name
+          ? formatProcessLabel(process.process.name, process.process.stage ?? "GREY_TO_FINISHED")
+          : "",
         processStage: process.process?.stage ?? "GREY_TO_FINISHED",
         sortOrder: process.process?.sortOrder ?? 0,
         rateUnitFabric: numberText(process.rateUnitFabric),
@@ -197,7 +207,9 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
     commonProcesses: (record.commonProcesses ?? []).map((process) => ({
       id: process.id || crypto.randomUUID(),
       processId: process.processId == null ? "" : String(process.processId),
-      processLabel: process.process?.name ?? "",
+      processLabel: process.process?.name
+        ? formatProcessLabel(process.process.name, process.process.stage ?? "GREY_TO_FINISHED")
+        : "",
       processStage: process.process?.stage ?? "GREY_TO_FINISHED",
       sortOrder: process.process?.sortOrder ?? 0,
       ratePerUnitFabric: numberText(process.ratePerUnitFabric),
@@ -722,7 +734,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
       return {
         items: data.items.map((process) => ({
           value: String(process.id),
-          label: process.name,
+          label: formatProcessLabel(process.name, process.stage),
           processStage: process.stage,
           sortOrder: process.sortOrder ?? 0,
         })),
