@@ -47,6 +47,10 @@ export type CurrencySummary = {
 export type FabricProcessSummary = {
   id?: number | null
   name?: string | null
+  processType?: "GROUP" | "STEP"
+  stage?: "YARN_PREPARATION" | "YARN_TO_GREY" | "GREY_TO_FINISHED"
+  parentProcessId?: number | null
+  sortOrder?: number | null
 }
 
 export type GmtCostScopeSummary = {
@@ -122,6 +126,10 @@ export type FabricCostingYarnProcessFormValues = {
   id: string
   processId: string
   processLabel: string
+  processType: "GROUP" | "STEP"
+  processStage: "YARN_PREPARATION" | "YARN_TO_GREY" | "GREY_TO_FINISHED"
+  parentProcessId: string
+  sortOrder: number
   rateUnitFabric: string
   wastagePercentage: string
 }
@@ -149,6 +157,10 @@ export type FabricCostingCommonProcessFormValues = {
   id: string
   processId: string
   processLabel: string
+  processType: "GROUP" | "STEP"
+  processStage: "YARN_PREPARATION" | "YARN_TO_GREY" | "GREY_TO_FINISHED"
+  parentProcessId: string
+  sortOrder: number
   ratePerUnitFabric: string
   wastagePercentage: string
 }

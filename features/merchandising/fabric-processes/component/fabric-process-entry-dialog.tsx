@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { AppSelect } from "@/components/app-select"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -30,7 +31,7 @@ import {
   softDeleteFabricProcess,
   updateFabricProcess,
 } from "../fabric-process.service"
-import type { FabricProcessRecord } from "../fabric-process.types"
+import type { FabricProcessFormValues, FabricProcessRecord } from "../fabric-process.types"
 
 type FabricProcessEntryDialogProps = {
   open: boolean
@@ -40,10 +41,23 @@ type FabricProcessEntryDialogProps = {
   onProcessesChanged?: () => void | Promise<void>
 }
 
-const EMPTY_FORM = {
+const EMPTY_FORM: FabricProcessFormValues = {
   name: "",
+  processType: "STEP",
+  stage: "GREY_TO_FINISHED",
+  parentProcessId: "",
+  sortOrder: "0",
   isActive: true,
 }
+const PROCESS_TYPE_OPTIONS = [
+  { value: "STEP", label: "Process step" },
+  { value: "GROUP", label: "Process group" },
+]
+const STAGE_OPTIONS = [
+  { value: "YARN_PREPARATION", label: "Yarn preparation" },
+  { value: "YARN_TO_GREY", label: "Yarn to grey" },
+  { value: "GREY_TO_FINISHED", label: "Grey to finished" },
+]
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -128,7 +142,7 @@ export function FabricProcessEntryDialog({
           apiUrl,
           accessToken: token,
           organizationId,
-          payload: { name, isActive: formValues.isActive },
+          payload: { ...formValues, name },
         })
         toast.success("Fabric process saved successfully.")
       } else {
@@ -137,7 +151,7 @@ export function FabricProcessEntryDialog({
           accessToken: token,
           organizationId,
           id: editingId,
-          payload: { name, isActive: formValues.isActive },
+          payload: { ...formValues, name },
         })
         toast.success("Fabric process updated successfully.")
       }
@@ -195,7 +209,19 @@ export function FabricProcessEntryDialog({
       {
         accessorKey: "name",
         header: "Process",
-        cell: ({ row }) => <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.name}</span>,
+        cell: ({ row }) => (
+          <div>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{row.original.name}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {row.original.processType === "GROUP" ? "Group" : row.original.parentProcess?.name ? `Step of ${row.original.parentProcess.name}` : "Standalone step"}
+            </p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "stage",
+        header: "Stage",
+        cell: ({ row }) => <span className="text-[11px] text-slate-600 dark:text-slate-300">{row.original.stage.replaceAll("_", " ")}</span>,
       },
       {
         accessorKey: "isActive",
@@ -220,6 +246,10 @@ export function FabricProcessEntryDialog({
                 setEditingId(row.original.id)
                 setFormValues({
                   name: row.original.name,
+                  processType: row.original.processType,
+                  stage: row.original.stage,
+                  parentProcessId: row.original.parentProcessId == null ? "" : String(row.original.parentProcessId),
+                  sortOrder: String(row.original.sortOrder ?? 0),
                   isActive: row.original.isActive !== false,
                 })
                 setError("")
@@ -294,6 +324,64 @@ export function FabricProcessEntryDialog({
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Process type</Label>
+                    <AppSelect
+                      value={formValues.processType}
+                      onValueChange={(processType) =>
+                        setFormValues((current) => ({
+                          ...current,
+                          processType: processType as typeof current.processType,
+                          parentProcessId: processType === "GROUP" ? "" : current.parentProcessId,
+                        }))
+                      }
+                      options={PROCESS_TYPE_OPTIONS}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Parent group</Label>
+                    <AppSelect
+                      value={formValues.parentProcessId || "__none__"}
+                      onValueChange={(parentProcessId) =>
+                        setFormValues((current) => {
+                          const normalizedId = parentProcessId === "__none__" ? "" : parentProcessId
+                          const parent = processes.find((process) => String(process.id) === normalizedId)
+                          return { ...current, parentProcessId: normalizedId, stage: parent?.stage ?? current.stage }
+                        })
+                      }
+                      options={[
+                        { value: "__none__", label: "No parent group" },
+                        ...processes
+                          .filter((process) => process.processType === "GROUP" && process.id !== editingId)
+                          .map((process) => ({ value: String(process.id), label: process.name })),
+                      ]}
+                      disabled={formValues.processType === "GROUP"}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Production stage</Label>
+                    <AppSelect
+                      value={formValues.stage}
+                      onValueChange={(stage) => setFormValues((current) => ({ ...current, stage: stage as typeof current.stage }))}
+                      options={STAGE_OPTIONS}
+                      disabled={Boolean(formValues.parentProcessId)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fabric-process-entry-sort-order" className="text-xs font-semibold">Sort order</Label>
+                    <Input
+                      id="fabric-process-entry-sort-order"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formValues.sortOrder}
+                      onChange={(event) => setFormValues((current) => ({ ...current, sortOrder: event.target.value }))}
+                    />
+                  </div>
+
                   <div className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                     <Label htmlFor="fabric-process-entry-active" className="text-xs font-semibold">
                       Active
@@ -333,7 +421,7 @@ export function FabricProcessEntryDialog({
                   </div>
 
                   <ScrollArea className="min-h-0 w-full flex-1" viewportClassName="overflow-auto">
-                    <table className="w-full min-w-[560px] border-collapse text-xs">
+                    <table className="w-full min-w-[680px] border-collapse text-xs">
                       <thead>
                         {table.getHeaderGroups().map((headerGroup) => (
                           <tr key={headerGroup.id} className="h-9 border-b border-slate-200/70 dark:border-white/10">

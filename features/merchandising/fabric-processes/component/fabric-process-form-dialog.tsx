@@ -8,6 +8,7 @@ import { Controller, useForm, type FieldErrors } from "react-hook-form"
 import { z } from "zod"
 
 import { Button } from "@/components/ui/button"
+import { AppSelect } from "@/components/app-select"
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import type { FabricProcessFormValues } from "../fabric-process.types"
+import type { FabricProcessFormValues, FabricProcessRecord } from "../fabric-process.types"
 
 type FabricProcessEditorMode = "create" | "edit"
 
@@ -33,6 +34,7 @@ type FabricProcessFormDialogProps = {
   submitting: boolean
   error: string
   initialValues: FabricProcessFormValues
+  parentProcesses: FabricProcessRecord[]
   onOpenChange: (open: boolean) => void
   onSubmit: (values: FabricProcessFormValues) => void | Promise<void>
 }
@@ -46,10 +48,23 @@ type ValidationSummaryEntry = {
 }
 
 const MOBILE_MAX_SUMMARY_ERRORS = 3
-const FIELD_ORDER: FabricProcessFieldName[] = ["name", "isActive"]
+const FIELD_ORDER: FabricProcessFieldName[] = ["name", "processType", "parentProcessId", "stage", "sortOrder", "isActive"]
+const PROCESS_TYPE_OPTIONS = [
+  { value: "STEP", label: "Process step" },
+  { value: "GROUP", label: "Process group" },
+]
+const STAGE_OPTIONS = [
+  { value: "YARN_PREPARATION", label: "Yarn preparation" },
+  { value: "YARN_TO_GREY", label: "Yarn to grey" },
+  { value: "GREY_TO_FINISHED", label: "Grey to finished" },
+]
 
 const fabricProcessFormSchema = z.object({
   name: z.string().trim().min(1, "Fabric process name is required."),
+  processType: z.enum(["GROUP", "STEP"]),
+  parentProcessId: z.string(),
+  stage: z.enum(["YARN_PREPARATION", "YARN_TO_GREY", "GREY_TO_FINISHED"]),
+  sortOrder: z.string().refine((value) => Number.isInteger(Number(value)) && Number(value) >= 0, "Sort order must be zero or greater."),
   isActive: z.boolean(),
 })
 
@@ -73,7 +88,7 @@ function buildValidationSummary(errors: FieldErrors<FabricProcessFormValues>) {
 
     entries.push({
       field,
-      label: field === "name" ? "Fabric process name" : "Active",
+      label: field === "name" ? "Fabric process name" : field.replaceAll(/([A-Z])/g, " $1"),
       message,
     })
   }
@@ -101,6 +116,7 @@ export function FabricProcessFormDialog({
   submitting,
   error,
   initialValues,
+  parentProcesses,
   onOpenChange,
   onSubmit,
 }: FabricProcessFormDialogProps) {
@@ -118,6 +134,8 @@ export function FabricProcessFormDialog({
     formState: { errors },
     reset,
     setFocus,
+    setValue,
+    watch,
   } = useForm<FabricProcessFormValues>({
     resolver: zodResolver(fabricProcessFormSchema),
     defaultValues: initialValues,
@@ -136,6 +154,8 @@ export function FabricProcessFormDialog({
     ? validationSummary.slice(0, MOBILE_MAX_SUMMARY_ERRORS)
     : validationSummary
   const hiddenValidationCount = validationSummary.length - visibleValidationSummary.length
+  const processType = watch("processType")
+  const parentProcessId = watch("parentProcessId")
 
   function handleInvalidSubmit(formErrors: FieldErrors<FabricProcessFormValues>) {
     const firstInvalidField = getFirstInvalidField(formErrors)
@@ -211,6 +231,76 @@ export function FabricProcessFormDialog({
                           aria-invalid={Boolean(errors.name)}
                         />
                         <FieldErrorMessage message={getErrorMessage(errors.name?.message)} />
+                      </div>
+                    )}
+                  />
+
+                  <Controller
+                    name="processType"
+                    control={control}
+                    render={({ field }) => (
+                      <div id="fabric-process-field-processType" className="space-y-2">
+                        <label htmlFor={field.name} className="text-sm font-medium">Process type</label>
+                        <AppSelect
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value)
+                            if (value === "GROUP") setValue("parentProcessId", "")
+                          }}
+                          options={PROCESS_TYPE_OPTIONS}
+                          triggerId={field.name}
+                          triggerClassName="h-10"
+                        />
+                      </div>
+                    )}
+                  />
+
+                  <Controller
+                    name="parentProcessId"
+                    control={control}
+                    render={({ field }) => (
+                      <div id="fabric-process-field-parentProcessId" className="space-y-2">
+                        <label htmlFor={field.name} className="text-sm font-medium">Parent group</label>
+                        <AppSelect
+                          value={processType === "GROUP" ? "__none__" : field.value || "__none__"}
+                          onValueChange={(value) => {
+                            const normalizedValue = value === "__none__" ? "" : value
+                            field.onChange(normalizedValue)
+                            const parent = parentProcesses.find((process) => String(process.id) === normalizedValue)
+                            if (parent) setValue("stage", parent.stage)
+                          }}
+                          options={[
+                            { value: "__none__", label: "No parent group" },
+                            ...parentProcesses.map((process) => ({ value: String(process.id), label: process.name })),
+                          ]}
+                          triggerId={field.name}
+                          triggerClassName="h-10"
+                          disabled={processType === "GROUP"}
+                        />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Steps inherit the selected group production stage.</p>
+                      </div>
+                    )}
+                  />
+
+                  <Controller
+                    name="stage"
+                    control={control}
+                    render={({ field }) => (
+                      <div id="fabric-process-field-stage" className="space-y-2">
+                        <label htmlFor={field.name} className="text-sm font-medium">Production stage</label>
+                        <AppSelect value={field.value} onValueChange={field.onChange} options={STAGE_OPTIONS} triggerId={field.name} triggerClassName="h-10" disabled={Boolean(parentProcessId)} />
+                      </div>
+                    )}
+                  />
+
+                  <Controller
+                    name="sortOrder"
+                    control={control}
+                    render={({ field }) => (
+                      <div id="fabric-process-field-sortOrder" className="space-y-2">
+                        <label htmlFor={field.name} className="text-sm font-medium">Sort order</label>
+                        <Input {...field} id={field.name} type="number" min="0" step="1" aria-invalid={Boolean(errors.sortOrder)} />
+                        <FieldErrorMessage message={getErrorMessage(errors.sortOrder?.message)} />
                       </div>
                     )}
                   />

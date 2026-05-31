@@ -60,7 +60,7 @@ import { GmtCostScopeEntryDialog } from "@/features/merchandising/gmt-cost-scope
 import { parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 
-import { FabricCostingFormDialog } from "./component/fabric-costing-form-dialog"
+import { FabricCostingFormDialog, type FabricProcessOption } from "./component/fabric-costing-form-dialog"
 import { DeleteFabricCostSection } from "./component/delete-fabric-cost-section"
 import {
   createFabricCosting,
@@ -181,6 +181,10 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
         id: process.id || crypto.randomUUID(),
         processId: process.processId == null ? "" : String(process.processId),
         processLabel: process.process?.name ?? "",
+        processType: process.process?.processType ?? "STEP",
+        processStage: process.process?.stage ?? "GREY_TO_FINISHED",
+        parentProcessId: process.process?.parentProcessId == null ? "" : String(process.process.parentProcessId),
+        sortOrder: process.process?.sortOrder ?? 0,
         rateUnitFabric: numberText(process.rateUnitFabric),
         wastagePercentage: numberText(process.wastagePercentage),
       })),
@@ -196,6 +200,10 @@ function recordToFormValues(record: FabricCostingRecord): FabricCostingFormValue
       id: process.id || crypto.randomUUID(),
       processId: process.processId == null ? "" : String(process.processId),
       processLabel: process.process?.name ?? "",
+      processType: process.process?.processType ?? "STEP",
+      processStage: process.process?.stage ?? "GREY_TO_FINISHED",
+      parentProcessId: process.process?.parentProcessId == null ? "" : String(process.process.parentProcessId),
+      sortOrder: process.process?.sortOrder ?? 0,
       ratePerUnitFabric: numberText(process.ratePerUnitFabric),
       wastagePercentage: numberText(process.wastagePercentage),
     })),
@@ -237,8 +245,15 @@ function normalizeFormErrors(values: FabricCostingFormValues): FabricCostingForm
     })
   })
   values.commonProcesses.forEach((process, index) => {
+    const prefix = `Common process ${index + 1}`
     if (!process.processId.trim()) {
-      errors.push({ message: `Common process ${index + 1}: Process is required.` })
+      errors.push({ message: `${prefix}: Process is required.` })
+    }
+    if (process.processType === "GROUP" && Number(process.ratePerUnitFabric || 0) > 0) {
+      errors.push({ message: `${prefix}: A process group can carry wastage only. Add child steps for costs.` })
+    }
+    if (process.parentProcessId && Number(process.wastagePercentage || 0) > 0) {
+      errors.push({ message: `${prefix}: Enter wastage on the parent group only.` })
     }
   })
   return errors
@@ -703,7 +718,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
   )
 
   const loadProcessOptions = useCallback(
-    async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams): Promise<AppComboboxLoadResult<AppComboboxOption>> => {
+    async ({ query, page: optionPage, limit: optionLimit }: AppComboboxLoadParams): Promise<{ items: FabricProcessOption[]; hasNextPage: boolean }> => {
       const token = window.localStorage.getItem("access_token")
       if (!token) throw new Error("Your session expired. Please sign in again.")
       const data = await fetchFabricProcesses({
@@ -715,11 +730,25 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         filters: { name: query, isActive: "true" },
       })
       return {
-        items: data.items.map((process) => ({ value: String(process.id), label: process.name })),
+        items: data.items.map((process) => ({
+          value: String(process.id),
+          label: process.parentProcess?.name ? `${process.parentProcess.name} / ${process.name}` : process.name,
+          processType: process.processType,
+          processStage: process.stage,
+          parentProcessId: process.parentProcessId == null ? "" : String(process.parentProcessId),
+          sortOrder: process.sortOrder ?? 0,
+        })),
         hasNextPage: data.meta.hasNextPage,
       }
     },
     [apiUrl, fabricProcessOptionsVersion, selectedOrganizationId],
+  )
+  const loadStepProcessOptions = useCallback(
+    async (params: AppComboboxLoadParams) => {
+      const result = await loadProcessOptions(params)
+      return { ...result, items: result.items.filter((process) => process.processType === "STEP") }
+    },
+    [loadProcessOptions],
   )
 
   const loadGmtCostScopeOptions = useCallback(
@@ -1238,6 +1267,7 @@ export function FabricCostingWorkspace({ apiUrl }: { apiUrl: string }) {
         loadUnitOptions={loadUnitOptions}
         loadCurrencyOptions={loadCurrencyOptions}
         loadProcessOptions={loadProcessOptions}
+        loadStepProcessOptions={loadStepProcessOptions}
         loadGmtCostScopeOptions={loadGmtCostScopeOptions}
         onManageFabricProcesses={() => setFabricProcessManagerOpen(true)}
         onManageGmtCostScopes={() => setGmtCostScopeManagerOpen(true)}

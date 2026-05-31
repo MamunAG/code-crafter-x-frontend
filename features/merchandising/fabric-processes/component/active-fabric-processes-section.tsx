@@ -60,6 +60,10 @@ function fabricProcessBadgeTone(fabricProcess?: FabricProcessRecord | null) {
   return fabricProcess.isActive === false ? "outline" : "secondary"
 }
 
+function formatStage(stage: FabricProcessRecord["stage"]) {
+  return stage.replaceAll("_", " ").toLowerCase()
+}
+
 function EmptyState({ title, description, actionLabel, onAction }: { title: string; description: string; actionLabel: string; onAction: () => void }) {
   return (
     <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_80px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
@@ -123,7 +127,9 @@ export function ActiveFabricProcessesSection({
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-slate-950 dark:text-slate-50">{fabricProcess.name}</p>
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">ID #{fabricProcess.id}</p>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {fabricProcess.processType === "GROUP" ? "Group" : fabricProcess.parentProcess?.name ? `Step of ${fabricProcess.parentProcess.name}` : "Standalone step"} - {formatStage(fabricProcess.stage)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -275,7 +281,9 @@ export function ActiveFabricProcessesSection({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-50">{fabricProcess.name}</p>
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">ID #{fabricProcess.id}</p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {fabricProcess.processType === "GROUP" ? "Group" : fabricProcess.parentProcess?.name ? `Step of ${fabricProcess.parentProcess.name}` : "Standalone step"} - {formatStage(fabricProcess.stage)}
+                          </p>
                         </div>
                         {canUpdateFabricProcess || canDeleteFabricProcess ? (
                           <DropdownMenu>

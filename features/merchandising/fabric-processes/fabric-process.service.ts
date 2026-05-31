@@ -136,7 +136,14 @@ export async function createFabricProcess({
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/fabric-process"), {
     method: "POST",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify({ name: payload.name.trim(), isActive: payload.isActive }),
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      processType: payload.processType,
+      stage: payload.stage,
+      parentProcessId: payload.parentProcessId ? Number(payload.parentProcessId) : null,
+      sortOrder: Number(payload.sortOrder || 0),
+      isActive: payload.isActive,
+    }),
   })
 
   const payloadData = await readJsonResponse<FabricProcessRecord>(response)
@@ -164,7 +171,14 @@ export async function updateFabricProcess({
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/fabric-process/${id}`), {
     method: "PATCH",
     headers: buildRequestHeaders({ accessToken, organizationId, contentType: "application/json" }),
-    body: JSON.stringify({ name: payload.name.trim(), isActive: payload.isActive }),
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      processType: payload.processType,
+      stage: payload.stage,
+      parentProcessId: payload.parentProcessId ? Number(payload.parentProcessId) : null,
+      sortOrder: Number(payload.sortOrder || 0),
+      isActive: payload.isActive,
+    }),
   })
 
   const payloadData = await readJsonResponse<FabricProcessRecord>(response)
