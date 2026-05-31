@@ -65,6 +65,7 @@ export type MaterialCostResult = {
   name: string
   ratioPercent: number
   pricePerKg: number
+  greyConsumptionQty: number
   baseQty: number
   actualQty: number
   rawCost: number
@@ -81,7 +82,6 @@ export type ProcessCostResult = {
   name: string
   costPerKg: number
   wastagePercent: number
-  consumptionQty: number
   cost: number
 }
 
@@ -112,21 +112,15 @@ function equalHundred(value: number) {
   return Math.abs(value - 100) <= EPSILON
 }
 
-function applyWastagesBackward(
-  quantity: number,
-  wastages: CommonWastage[],
-  stage: FabricProcessStage,
-  consumptionQtyByProcessId?: Map<string, number>,
-) {
+function totalStageWastage(wastages: CommonWastage[], stage: FabricProcessStage) {
   return wastages
     .filter((wastage) => (wastage.stage ?? "GREY_TO_FINISHED") === stage)
-    .sort((left, right) => safeNumber(right.sortOrder ?? 0) - safeNumber(left.sortOrder ?? 0))
-    .reduce((requiredQty, wastage) => {
-      const factor = 1 - safeNumber(wastage.wastagePercent) / 100
-      const consumptionQty = factor > 0 ? requiredQty / factor : 0
-      consumptionQtyByProcessId?.set(wastage.id, consumptionQty)
-      return consumptionQty
-    }, quantity)
+    .reduce((sum, wastage) => sum + safeNumber(wastage.wastagePercent), 0)
+}
+
+function applyStageWastageBackward(quantity: number, wastages: CommonWastage[], stage: FabricProcessStage) {
+  const factor = 1 - totalStageWastage(wastages, stage) / 100
+  return factor > 0 ? quantity / factor : 0
 }
 
 export const FABRIC_COSTING_SAMPLE_INPUT: FabricCostingInput = {
@@ -190,6 +184,13 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
     }
   }
 
+  for (const stage of ["GREY_TO_FINISHED", "YARN_TO_GREY", "YARN_PREPARATION"] as const) {
+    const stageWastage = totalStageWastage(input.commonWastages, stage)
+    if (stageWastage >= 99) {
+      validationErrors.push(`Total ${stage.replaceAll("_", " ").toLowerCase()} wastage must be less than 99%.`)
+    }
+  }
+
   for (const material of input.materials) {
     if (safeNumber(material.pricePerKg) < 0) {
       validationErrors.push(`Material price for "${material.name}" cannot be negative.`)
@@ -228,10 +229,9 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
     (sum, item) => sum + safeNumber(item.wastagePercent),
     0,
   )
-  const consumptionQtyByProcessId = new Map<string, number>()
-  const greyConsumption = applyWastagesBackward(targetQty, input.commonWastages, "GREY_TO_FINISHED", consumptionQtyByProcessId)
-  const yarnToGreyQty = applyWastagesBackward(greyConsumption, input.commonWastages, "YARN_TO_GREY", consumptionQtyByProcessId)
-  const requiredQty = applyWastagesBackward(yarnToGreyQty, input.commonWastages, "YARN_PREPARATION", consumptionQtyByProcessId)
+  const greyConsumption = applyStageWastageBackward(targetQty, input.commonWastages, "GREY_TO_FINISHED")
+  const yarnToGreyQty = applyStageWastageBackward(greyConsumption, input.commonWastages, "YARN_TO_GREY")
+  const requiredQty = applyStageWastageBackward(yarnToGreyQty, input.commonWastages, "YARN_PREPARATION")
   const breakdownRows: FabricCostBreakdownRow[] = []
 
   const materialResults: MaterialCostResult[] = input.materials.map((material) => {
@@ -245,6 +245,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       validationErrors.push(`Total extra wastage for "${material.name}" must be less than 100%.`)
     }
 
+    const greyConsumptionQty = greyConsumption * (safeNumber(material.ratioPercent) / 100)
     const baseQty = requiredQty * (safeNumber(material.ratioPercent) / 100)
     const actualQty = materialFactor > 0 ? baseQty / materialFactor : 0
     const pricePerKg = safeNumber(material.pricePerKg)
@@ -324,6 +325,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       name: material.name,
       ratioPercent: safeNumber(material.ratioPercent),
       pricePerKg,
+      greyConsumptionQty,
       baseQty,
       actualQty,
       rawCost,
@@ -338,8 +340,7 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
 
   const processResults: ProcessCostResult[] = input.processes.map((process) => {
     const stage = process.stage ?? "GREY_TO_FINISHED"
-    const processQty = consumptionQtyByProcessId.get(process.id) ??
-      (stage === "GREY_TO_FINISHED" ? greyConsumption : stage === "YARN_TO_GREY" ? yarnToGreyQty : requiredQty)
+    const processQty = stage === "GREY_TO_FINISHED" ? greyConsumption : stage === "YARN_TO_GREY" ? yarnToGreyQty : requiredQty
     const cost = processQty * safeNumber(process.costPerKg)
     const wastagePercent =
       input.commonWastages.find((wastage) => wastage.name.trim() === process.name.trim())?.wastagePercent ?? 0
@@ -365,7 +366,6 @@ export function calculateFabricCost(input: FabricCostingInput): FabricCostingRes
       name: process.name,
       costPerKg: safeNumber(process.costPerKg),
       wastagePercent: safeNumber(wastagePercent),
-      consumptionQty: processQty,
       cost,
     }
   })

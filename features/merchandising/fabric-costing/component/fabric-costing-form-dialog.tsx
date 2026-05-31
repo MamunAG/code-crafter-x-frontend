@@ -395,6 +395,9 @@ export function FabricCostingFormDialog({
                           (sum, process) => sum + toNumber(process.wastagePercentage),
                           0,
                         )
+                        const greyConsumptionQty = calculation.materialResults.find(
+                          (material) => material.id === yarn.id,
+                        )?.greyConsumptionQty ?? 0
                         const baseQty = calculation.requiredQty * (toNumber(yarn.percentagePerUnitFabric) / 100)
                         const actualQty =
                           extraWastage >= 99 ? 0 : baseQty / (1 - extraWastage / 100)
@@ -417,7 +420,7 @@ export function FabricCostingFormDialog({
 
                         return (
                           <div key={yarn.id} className="rounded-md border border-slate-200 p-2.5 dark:border-white/10  bg-sky-50/80 dark:bg-sky-950/25">
-                            <div className="grid gap-2 rounded-md p-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.9fr)_repeat(5,minmax(110px,0.65fr))_auto]">
+                            <div className="grid gap-2 rounded-md p-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.9fr)_repeat(6,minmax(110px,0.65fr))_auto]">
                               <div className="space-y-1">
                                 <FieldLabel>Material</FieldLabel>
                                 <AppCombobox
@@ -459,6 +462,10 @@ export function FabricCostingFormDialog({
                                   }
                                   disabled={disabled}
                                 />
+                              </div>
+                              <div className="space-y-1">
+                                <FieldLabel>Grey Fabric Consumption</FieldLabel>
+                                <Input className={INPUT_CLASS} value={formatQty(greyConsumptionQty)} readOnly disabled />
                               </div>
                               <div className="space-y-1">
                                 <FieldLabel>Base Qty</FieldLabel>
@@ -812,9 +819,8 @@ export function FabricCostingFormDialog({
                     <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-white/10">
                       <table className="w-full table-fixed text-left text-[11px]">
                         <colgroup>
-                          <col className="w-[36%]" />
-                          <col className="w-[15%]" />
-                          <col className="w-[15%]" />
+                          <col className="w-[48%]" />
+                          <col className="w-[18%]" />
                           <col className="w-[18%]" />
                           <col className="w-[12%]" />
                           <col className="w-[4%]" />
@@ -824,7 +830,6 @@ export function FabricCostingFormDialog({
                             <th className="px-2 py-1.5">Process</th>
                             <th className="px-2 py-1.5">Wastage %</th>
                             <th className="px-2 py-1.5">Cost / KG</th>
-                            <th className="px-2 py-1.5">Grey fabric consumption</th>
                             <th className="px-2 py-1.5">Cost</th>
                             <th className="px-1.5 pr-3 py-1.5 text-center">Action</th>
                           </tr>
@@ -879,9 +884,6 @@ export function FabricCostingFormDialog({
                                   }
                                   disabled={disabled}
                                 />
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-300">
-                                {formatQty(processResult?.consumptionQty ?? 0)} KG
                               </td>
                               <td className="px-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-300">
                                 {formatMoney(processResult?.cost ?? 0)}
@@ -994,8 +996,8 @@ export function FabricCostingFormDialog({
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
                           <div className="space-y-1 rounded-md bg-slate-50 p-3 font-mono text-xs dark:bg-white/5">
-                            <p>Grey Consumption = apply Grey to Finished wastage backward from Target Qty</p>
-                            <p>Required Qty = apply earlier stage wastage backward from Grey Consumption</p>
+                            <p>Grey Consumption = apply summed Grey to Finished wastage backward from Target Qty</p>
+                            <p>Required Qty = apply each earlier stage&apos;s summed wastage backward from Grey Consumption</p>
                             <p>Material Base Qty = Required Qty * Material Ratio / 100</p>
                           </div>
                           <div className="space-y-1">
@@ -1068,11 +1070,11 @@ export function FabricCostingFormDialog({
                         <CardContent className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
                           <p>{formatQty(calculation.input.targetQty)} KG Finished Fabric</p>
                           <p>↓</p>
-                          <p>Grey to Finished wastage applied backward</p>
+                          <p>Summed Grey to Finished wastage applied backward</p>
                           <p>↓</p>
                           <p>{formatQty(calculation.greyConsumption)} KG Grey Consumption</p>
                           <p>↓</p>
-                          <p>Earlier stage wastage applied backward</p>
+                          <p>Each earlier stage&apos;s summed wastage applied backward</p>
                           <p>↓</p>
                           <p>{formatQty(calculation.requiredQty)} KG Yarn Requirement Base</p>
                           <p>↓</p>
@@ -1180,8 +1182,8 @@ export function FabricCostingFormDialog({
                         </CardHeader>
                         <CardContent>
                           <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs dark:bg-white/5">
-                            {`greyConsumption = apply GREY_TO_FINISHED wastages backward from targetQty
-requiredQty = apply earlier-stage wastages backward from greyConsumption
+                            {`greyConsumption = apply summed GREY_TO_FINISHED wastage backward from targetQty
+requiredQty = apply each earlier stage's summed wastage backward from greyConsumption
 materialBaseQty = requiredQty * ratio / 100
 materialActualQty = materialBaseQty / (1 - extraWastage / 100)
 materialCost = materialActualQty * pricePerKg
