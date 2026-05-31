@@ -277,7 +277,7 @@ export function FabricCostingFormDialog({
           </div>
         ) : (
           <ScrollArea className="min-h-0 flex-1 overflow-hidden">
-            <div className="space-y-5 p-4 sm:p-6">
+            <div className="space-y-5 p-4 sm:py-1 sm:px-6">
               {allErrors.length ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-200">
                   {allErrors.map((message, index) => (
@@ -287,9 +287,9 @@ export function FabricCostingFormDialog({
               ) : null}
 
               <Card size="sm" className="border-slate-200/80 dark:border-white/10">
-                <CardHeader className="pb-1">
+                {/* <CardHeader className="pb-1">
                   <CardTitle className="text-sm">Master Info</CardTitle>
-                </CardHeader>
+                </CardHeader> */}
                 <CardContent className="space-y-2">
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.7fr)_minmax(340px,2fr)_minmax(130px,0.7fr)_minmax(150px,0.8fr)_minmax(160px,0.8fr)]">
                     <div className="space-y-1.5">
@@ -777,7 +777,7 @@ export function FabricCostingFormDialog({
 
               <Card size="sm" className="border-slate-200/80 dark:border-white/10">
                 <CardHeader className="pb-1">
-                  <CardTitle className="text-sm">Common Wastage + Process Cost</CardTitle>
+                  <CardTitle className="text-sm">Common Wastage + Process Cost (All Mtls/Yarn)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex justify-end">
@@ -948,6 +948,39 @@ export function FabricCostingFormDialog({
                           </CardContent>
                         </Card>
                       </section>
+
+                      <Card className="border-slate-200/80 dark:border-white/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Material Base Qty Calculation</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                          <div className="space-y-1 rounded-md bg-slate-50 p-3 font-mono text-xs dark:bg-white/5">
+                            <p>Required Qty = Target Qty / (1 - Total Common Wastage / 100)</p>
+                            <p>Material Base Qty = Required Qty * Material Ratio / 100</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Required Qty</p>
+                            <p className="font-mono text-xs">
+                              {formatQty(calculation.input.targetQty)} KG / (1 -{" "}
+                              {formatQty(calculation.totalCommonWastage)} / 100) ={" "}
+                              {formatQty(calculation.requiredQty)} KG
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-medium">Material Base Qty</p>
+                            {calculation.materialResults.length ? (
+                              calculation.materialResults.map((material) => (
+                                <p key={`base-qty-${material.id}`} className="font-mono text-xs">
+                                  {material.name}: {formatQty(calculation.requiredQty)} KG *{" "}
+                                  {formatQty(material.ratioPercent)}% = {formatQty(material.baseQty)} KG
+                                </p>
+                              ))
+                            ) : (
+                              <p className="text-slate-500 dark:text-slate-400">No materials added yet.</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
 
                       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <Card className="border-slate-200/80 dark:border-white/10">
