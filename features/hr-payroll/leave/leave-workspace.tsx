@@ -1,0 +1,31 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { ActiveLeaveSection } from "./component/active-leave-section"
+import { DeletedLeaveSection } from "./component/deleted-leave-section"
+import { LeaveActionDialog, type LeaveActionValues } from "./component/leave-action-dialog"
+import { LeaveFormDialog, type LeaveFormValues } from "./component/leave-form-dialog"
+import { cancelLeave, createLeave, decideLeave, listLeave, loadLookupOptions } from "../operations/operations.service"
+import type { LeaveRequestRecord } from "../operations/operations.types"
+import { HrPageHeader } from "../shared/hr-page-header"
+import type { HrOption, HrPaginationMeta } from "../shared/hr.types"
+import { HrWorkspaceLayout } from "../shared/hr-workspace-layout"
+import { useHrWorkspace } from "../shared/use-hr-workspace"
+
+const DEFAULT_VALUES: LeaveFormValues = { employeeId: "", leaveTypeId: "", startDate: "", endDate: "", isHalfDay: false, reason: "", requiredApprovalLevels: 1 }
+const DEFAULT_ACTION: LeaveActionValues = { decision: "APPROVED", comment: "" }
+export function LeaveWorkspace({ apiUrl }: { apiUrl: string }) {
+  const { organizationId, context, handleError, refreshVersion, triggerRefresh } = useHrWorkspace(apiUrl)
+  const [records, setRecords] = useState<LeaveRequestRecord[]>([]); const [meta, setMeta] = useState<HrPaginationMeta | null>(null); const [loading, setLoading] = useState(true); const [page, setPage] = useState(1); const [limit, setLimit] = useState(10); const [search, setSearch] = useState("")
+  const [employees, setEmployees] = useState<HrOption[]>([]); const [leaveTypes, setLeaveTypes] = useState<HrOption[]>([])
+  const [open, setOpen] = useState(false); const [values, setValues] = useState<LeaveFormValues>(DEFAULT_VALUES); const [submitting, setSubmitting] = useState(false); const [error, setError] = useState("")
+  const [actionMode, setActionMode] = useState<"decision" | "cancel" | null>(null); const [target, setTarget] = useState<LeaveRequestRecord | null>(null); const [actionValues, setActionValues] = useState<LeaveActionValues>(DEFAULT_ACTION); const [actionError, setActionError] = useState("")
+  const load = useCallback(async () => { if (!organizationId) { setRecords([]); setLoading(false); return } setLoading(true); try { const [result, lookups] = await Promise.all([listLeave(context(), page, limit, search), loadLookupOptions(context(), ["employees", "leaveTypes"])]); setRecords(result.items); setMeta(result.meta); setEmployees(lookups.employees.map((item) => ({ value: item.id, label: `${item.employeeCode ?? ""} · ${item.employeeName ?? item.id}` }))); setLeaveTypes(lookups.leaveTypes.map((item) => ({ value: item.id, label: `${item.code ?? ""} · ${item.name ?? item.id}` }))) } catch (caught) { handleError(caught, "Unable to load leave requests.") } finally { setLoading(false) } }, [context, handleError, limit, organizationId, page, search])
+  useEffect(() => { const pending = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(pending) }, [load, refreshVersion])
+  const submit = async () => { if (!values.employeeId || !values.leaveTypeId || !values.startDate || !values.endDate) { setError("Employee, leave type, and date range are required."); return } setSubmitting(true); setError(""); try { await createLeave(context(), { ...values, reason: values.reason.trim() || undefined }); toast.success("Leave request submitted successfully."); setOpen(false); setValues(DEFAULT_VALUES); triggerRefresh() } catch (caught) { setError(handleError(caught, "Unable to submit the leave request.", false)) } finally { setSubmitting(false) } }
+  const act = async () => { if (!target || !actionMode) return; setSubmitting(true); setActionError(""); try { const payload = { rowVersion: target.rowVersion ?? 1, comment: actionValues.comment.trim() || undefined }; if (actionMode === "decision") await decideLeave(context(), target.id, { ...payload, decision: actionValues.decision }); else await cancelLeave(context(), target.id, payload); toast.success(actionMode === "decision" ? "Leave decision recorded." : "Leave request cancelled."); setActionMode(null); setTarget(null); triggerRefresh() } catch (caught) { setActionError(handleError(caught, "Unable to update the leave request.", false)) } finally { setSubmitting(false) } }
+  const active = useMemo(() => records.filter((item) => item.status !== "CANCELLED"), [records]); const cancelled = useMemo(() => records.filter((item) => item.status === "CANCELLED"), [records]); const pending = records.filter((item) => item.status === "PENDING").length
+  const openAction = (record: LeaveRequestRecord, mode: "decision" | "cancel") => { setTarget(record); setActionMode(mode); setActionValues(DEFAULT_ACTION); setActionError("") }
+  return <HrWorkspaceLayout><HrPageHeader title="Leave Management" description="Submit leave requests, apply multi-level decisions, and retain a complete cancellation history." badges={[{ label: `${meta?.total ?? records.length} total`, variant: "secondary" }, { label: `${pending} pending` }, { label: `${cancelled.length} cancelled on page` }]} onRefresh={triggerRefresh} onCreate={() => { setValues(DEFAULT_VALUES); setError(""); setOpen(true) }} createLabel="New request" /><ActiveLeaveSection data={active} meta={meta} loading={loading} page={page} limit={limit} search={search} employees={employees} leaveTypes={leaveTypes} onSearchChange={setSearch} onPageChange={setPage} onLimitChange={setLimit} onCreate={() => setOpen(true)} onDecision={(record) => openAction(record, "decision")} onCancel={(record) => openAction(record, "cancel")} /><DeletedLeaveSection data={cancelled} employees={employees} /><LeaveFormDialog open={open} values={values} employees={employees} leaveTypes={leaveTypes} submitting={submitting} error={error} onOpenChange={setOpen} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))} onSubmit={submit} /><LeaveActionDialog open={Boolean(actionMode)} mode={actionMode ?? "decision"} values={actionValues} submitting={submitting} error={actionError} onOpenChange={(next) => { if (!next) setActionMode(null) }} onChange={(name, value) => setActionValues((current) => ({ ...current, [name]: value }))} onSubmit={act} /></HrWorkspaceLayout>
+}
