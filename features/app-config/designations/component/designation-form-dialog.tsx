@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -34,10 +34,12 @@ export function DesignationFormDialog({
   onSubmit,
 }: DesignationFormDialogProps) {
   const [draft, setDraft] = useState(initialValues)
+  const [previousInitialValues, setPreviousInitialValues] = useState(initialValues)
 
-  useEffect(() => {
-    if (open) setDraft(initialValues)
-  }, [initialValues, open])
+  if (initialValues !== previousInitialValues) {
+    setPreviousInitialValues(initialValues)
+    setDraft(initialValues)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

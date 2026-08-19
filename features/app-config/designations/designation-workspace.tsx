@@ -27,6 +27,8 @@ import {
   updateDesignation,
 } from "./designation.service"
 import type { DesignationFilterValues, DesignationFormValues, DesignationRecord, PaginationMeta } from "./designation.types"
+import AppAddNewButton from "@/components/app-add-new-button"
+import AppRefreshButton from "@/components/app-refresh-button"
 
 type DesignationEditorMode = "create" | "edit"
 type PendingDeleteMode = "restore" | "permanent"
@@ -148,7 +150,6 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
   const [loadingDesignations, setLoadingDesignations] = useState(true)
   const [loadingDeletedDesignations, setLoadingDeletedDesignations] = useState(true)
   const [error, setError] = useState("")
-  const [deletedError, setDeletedError] = useState("")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(() => (typeof window === "undefined" ? "" : readSelectedOrganizationId()))
 
@@ -216,7 +217,6 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
     setLoadingDesignations(true)
     setLoadingDeletedDesignations(true)
     setError("")
-    setDeletedError("")
 
     try {
       const token = window.localStorage.getItem("access_token")
@@ -238,7 +238,6 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to load designation data right now."
       if (!handleAuthFailure(message)) {
         setError(message)
-        setDeletedError(message)
         toast.error(message)
       }
     } finally {
@@ -249,7 +248,12 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    void loadDesignations()
+
+    const pendingLoad = window.setTimeout(() => {
+      void loadDesignations()
+    }, 0)
+
+    return () => window.clearTimeout(pendingLoad)
   }, [loadDesignations, refreshVersion])
 
   function openCreateDialog() {
@@ -467,7 +471,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">HR & Payroll · Core</p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight">Designation Setup</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage designation master data.</p>
               </div>
@@ -488,7 +492,7 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
             <CardContent className="p-4 sm:p-8 sm:py-2">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">HR & Payroll · Core</p>
                   <h1 className="mt-2 text-3xl font-semibold tracking-tight">Designation Setup</h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Create, review, and maintain designation records for the selected organization.
@@ -500,8 +504,8 @@ export function DesignationWorkspace({ apiUrl }: { apiUrl: string }) {
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="button" variant="outline" onClick={triggerRefresh} className="rounded-xl"><RefreshCcw className="size-3.5" />Refresh</Button>
-                  <Button type="button" onClick={openCreateDialog} className="rounded-xl"><Plus className="size-3.5" />New designation</Button>
+                  <AppRefreshButton triggerRefresh={triggerRefresh} title="Refresh" />
+                  <AppAddNewButton openCreateDialog={openCreateDialog} title="New designation" />
                 </div>
               </div>
             </CardContent>

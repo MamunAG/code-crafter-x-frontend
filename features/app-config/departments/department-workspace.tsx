@@ -467,7 +467,7 @@ export function DepartmentWorkspace({ apiUrl }: { apiUrl: string }) {
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">HR & Payroll · Core</p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight">Department Setup</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">Manage department master data.</p>
               </div>
@@ -488,7 +488,7 @@ export function DepartmentWorkspace({ apiUrl }: { apiUrl: string }) {
             <CardContent className="p-4 sm:p-8 sm:py-2">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">App Config</p>
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">HR & Payroll · Core</p>
                   <h1 className="mt-2 text-3xl font-semibold tracking-tight">Department Setup</h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Create, review, and maintain department records for the selected organization.

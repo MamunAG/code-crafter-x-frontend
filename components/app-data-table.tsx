@@ -44,6 +44,7 @@ type AppDataTableProps<TData> = {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
   loadingRows?: number
+  hideTable?: boolean
   leadingColumnIds?: string[] 
   trailingColumnIds?: string[]
   columnClassNames?: Record<string, string>
@@ -62,6 +63,7 @@ export function AppDataTable<TData>({
   onPageChange,
   onPageSizeChange,
   loadingRows = 5,
+  hideTable = false,
   leadingColumnIds = ["color"],
   trailingColumnIds = ["actions"],
   columnClassNames,
@@ -76,7 +78,7 @@ export function AppDataTable<TData>({
 
   return (
     <div className="overflow-hidden">
-      {isLoading ? (
+      {hideTable ? null : isLoading ? (
         <div className="space-y-3 p-4 sm:p-6">
           {Array.from({ length: loadingRows }).map((_, index) => (
             <Skeleton key={index} className="h-10 rounded-xl" />
