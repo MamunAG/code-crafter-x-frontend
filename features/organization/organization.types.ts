@@ -10,6 +10,7 @@ export type OrganizationRecord = {
   name: string
   address?: string | null
   contact?: string | null
+  isActive: boolean
   isDefault?: boolean
 }
 
@@ -26,6 +27,7 @@ export type OrganizationFormValues = {
   name: string
   address: string
   contact: string
+  isActive: boolean
   isDefault: boolean
 }
 

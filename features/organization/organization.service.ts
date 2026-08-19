@@ -53,6 +53,7 @@ export async function createOrganization({
       name: payload.name.trim(),
       address: payload.address.trim() || undefined,
       contact: payload.contact.trim() || undefined,
+      isActive: payload.isActive,
       isDefault: payload.isDefault,
     }),
   })
@@ -88,6 +89,7 @@ export async function updateOrganization({
       name: payload.name.trim(),
       address: payload.address.trim() || undefined,
       contact: payload.contact.trim() || undefined,
+      isActive: payload.isActive,
     }),
   })
 
@@ -160,6 +162,37 @@ export async function fetchUserOrganizations({
 
   if (!Array.isArray(responseData.data)) {
     throw new Error("The organization list was returned without data.")
+  }
+
+  return responseData.data
+}
+
+export async function fetchCurrentUserOrganizations({
+  apiUrl,
+  accessToken,
+}: {
+  apiUrl: string
+  accessToken: string
+}): Promise<OrganizationRecord[]> {
+  const response = await fetch(
+    buildApiUrl(apiUrl, "/api/v1/user-to-oranization-map/me/organizations"),
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  )
+
+  const responseData = await readJsonResponse<OrganizationRecord[]>(
+    response,
+    "Unable to load accessible organizations right now.",
+  )
+
+  if (!Array.isArray(responseData.data)) {
+    throw new Error("The accessible organization list was returned without data.")
   }
 
   return responseData.data

@@ -95,6 +95,10 @@ export function parseStoredAuthUser(rawUser: string | null) {
   }
 }
 
+export function isGlobalAdmin(user: AuthUser | null | undefined) {
+  return user?.role === "admin"
+}
+
 export function serializeAuthSessionCookie() {
   return `${AUTH_COOKIE_NAME}=1; path=/; max-age=${AUTH_COOKIE_MAX_AGE_SECONDS}; samesite=lax`
 }

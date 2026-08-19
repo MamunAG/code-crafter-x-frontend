@@ -181,6 +181,46 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 href: "/hr-payroll/core/department",
                 permissionMenuName: "Department Setup",
               },
+              {
+                label: "Employment Type Setup",
+                href: "/hr-payroll/core/employment-type",
+                permissionMenuName: "Employment Type Setup",
+              },
+              {
+                label: "Grade Setup",
+                href: "/hr-payroll/core/grade",
+                permissionMenuName: "Grade Setup",
+              },
+              {
+                label: "Pay Group Setup",
+                href: "/hr-payroll/core/pay-group",
+                permissionMenuName: "Pay Group Setup",
+              },
+              {
+                label: "Work Location Setup",
+                href: "/hr-payroll/core/work-location",
+                permissionMenuName: "Work Location Setup",
+              },
+              {
+                label: "Holiday Calendar Setup",
+                href: "/hr-payroll/core/holiday-calendar",
+                permissionMenuName: "Holiday Calendar Setup",
+              },
+              {
+                label: "Leave Type Setup",
+                href: "/hr-payroll/core/leave-type",
+                permissionMenuName: "Leave Type Setup",
+              },
+              {
+                label: "Salary Component Setup",
+                href: "/hr-payroll/core/salary-component",
+                permissionMenuName: "Salary Component Setup",
+              },
+              {
+                label: "Separation Reason Setup",
+                href: "/hr-payroll/core/separation-reason",
+                permissionMenuName: "Separation Reason Setup",
+              },
             ],
           },
           {

@@ -16,7 +16,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { fetchMenuPermissions } from "@/features/iam/menu-permissions/menu-permission.service"
-import { parseStoredAuthUser } from "@/lib/auth-session"
+import { isGlobalAdmin, parseStoredAuthUser } from "@/lib/auth-session"
 import { MENU_SEARCH_OPEN_EVENT } from "@/lib/app-hotkeys"
 import {
   readSelectedOrganizationId,
@@ -25,7 +25,6 @@ import {
 import {
   filterModuleNavigationByPermissions,
   MODULE_NAVIGATION,
-  type ModuleNavItem,
   type ModuleNavigationItem,
 } from "@/lib/module-navigation"
 import { cn } from "@/lib/utils"
@@ -84,13 +83,14 @@ export function MenuSearchDialog() {
 
   React.useEffect(() => {
     let active = true
+    const handleOpenSearch = () => setOpen(true)
 
     async function loadVisibleModules() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
       const accessToken = window.localStorage.getItem("access_token")
       const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
       const selectedOrganizationId = readSelectedOrganizationId()
-      const isAdmin = storedUser?.role === "admin"
+      const isAdmin = isGlobalAdmin(storedUser)
 
       if (!apiUrl || !accessToken || !storedUser?.id) {
         if (active) {
@@ -162,10 +162,6 @@ export function MenuSearchDialog() {
       window.removeEventListener(MENU_SEARCH_OPEN_EVENT, handleOpenSearch)
     }
   }, [])
-
-  function handleOpenSearch() {
-    setOpen(true)
-  }
 
   const entries = React.useMemo(
     () => visibleModules.flatMap((module) => flattenModuleEntries(module)),

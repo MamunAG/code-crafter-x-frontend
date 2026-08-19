@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 
 import { Loader2, LogOut } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -49,6 +48,7 @@ const DEFAULT_VALUES: OrganizationFormValues = {
   name: "",
   address: "",
   contact: "",
+  isActive: true,
   isDefault: false,
 }
 
@@ -69,7 +69,6 @@ export function OrganizationEntryDialog({
   showLogoutAction = false,
 }: OrganizationEntryDialogProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
-  const router = useRouter()
 
   const {
     register,
@@ -97,6 +96,7 @@ export function OrganizationEntryDialog({
             name: organization.name ?? "",
             address: organization.address ?? "",
             contact: organization.contact ?? "",
+            isActive: organization.isActive ?? true,
             isDefault: Boolean(organization.isDefault),
           }
         : DEFAULT_VALUES,
@@ -255,6 +255,31 @@ export function OrganizationEntryDialog({
                   })}
                 />
               </div>
+
+              <Controller
+                control={control}
+                name="isActive"
+                render={({ field }) => (
+                  <div className="flex items-start gap-3 rounded-xl border border-slate-200/70 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/5">
+                    <Checkbox
+                      id="organization-active"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                    />
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="organization-active"
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                      >
+                        Active organization
+                      </label>
+                      <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                        Only active organizations are available in the organization selector.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              />
 
               <Controller
                 control={control}

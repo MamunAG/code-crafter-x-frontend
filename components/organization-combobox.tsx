@@ -14,7 +14,7 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox"
 import { Button } from "@/components/ui/button"
-import { fetchUserOrganizations } from "@/features/organization/organization.service"
+import { fetchCurrentUserOrganizations } from "@/features/organization/organization.service"
 import { OrganizationEntryDialog } from "@/features/organization/organization-entry-dialog"
 import type { OrganizationRecord } from "@/features/organization/organization.types"
 import { parseStoredAuthUser } from "@/lib/auth-session"
@@ -57,25 +57,22 @@ export function OrganizationComboBox({
   useEffect(() => {
     const accessToken = window.localStorage.getItem("access_token")
     const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
-    const userId = storedUser?.id
     const instanceId = instanceIdRef.current
 
-    if (!accessToken || !userId) {
+    if (!accessToken || !storedUser?.id) {
       return
     }
 
     const authenticatedAccessToken = accessToken
-    const authenticatedUserId = userId
     let isMounted = true
 
     async function loadOrganizations() {
       setIsLoading(true)
 
       try {
-        const nextOrganizations = await fetchUserOrganizations({
+        const nextOrganizations = await fetchCurrentUserOrganizations({
           apiUrl,
           accessToken: authenticatedAccessToken,
-          userId: authenticatedUserId,
         })
         const nextOrganizationOptions = nextOrganizations.map((organization) => ({
           ...organization,

@@ -24,7 +24,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { fetchMenuPermissions } from "@/features/iam/menu-permissions/menu-permission.service"
-import { parseStoredAuthUser } from "@/lib/auth-session"
+import { isGlobalAdmin, parseStoredAuthUser } from "@/lib/auth-session"
 import { readSelectedOrganizationId, SELECTED_ORGANIZATION_CHANGED_EVENT } from "@/lib/organization-selection"
 import { cn } from "@/lib/utils"
 import {
@@ -72,7 +72,7 @@ export function ModuleNavMenu({ current, variant = "header" }: ModuleNavMenuProp
       const accessToken = window.localStorage.getItem("access_token")
       const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
       const selectedOrganizationId = readSelectedOrganizationId()
-      const isAdmin = storedUser?.role === "admin"
+      const isAdmin = isGlobalAdmin(storedUser)
 
       if (!apiUrl || !accessToken || !storedUser?.id) {
         if (active) {

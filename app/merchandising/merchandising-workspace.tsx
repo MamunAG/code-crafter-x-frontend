@@ -21,7 +21,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { fetchMenuPermissions } from "@/features/iam/menu-permissions/menu-permission.service"
-import { parseStoredAuthUser } from "@/lib/auth-session"
+import { isGlobalAdmin, parseStoredAuthUser } from "@/lib/auth-session"
 import {
   readSelectedOrganizationId,
   SELECTED_ORGANIZATION_CHANGED_EVENT,
@@ -184,7 +184,7 @@ export function MerchandisingWorkspace({ children }: { children?: ReactNode }) {
       const accessToken = window.localStorage.getItem("access_token")
       const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
       const selectedOrganizationId = readSelectedOrganizationId()
-      const isAdmin = storedUser?.role === "admin"
+      const isAdmin = isGlobalAdmin(storedUser)
 
       if (isAdmin) {
         if (active) {
