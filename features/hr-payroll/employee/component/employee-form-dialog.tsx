@@ -136,15 +136,15 @@ export function EmployeeFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-[100vw] max-w-[100vw] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl">
         <form
-          className="flex max-h-[calc(100vh-2rem)] flex-col"
+          className="flex h-full min-h-0 min-w-0 flex-col sm:max-h-[calc(100dvh-2rem)]"
           onSubmit={(event) => {
             event.preventDefault()
             onSubmit(draft)
           }}
         >
-          <div className="border-b border-slate-200/70 px-6 pb-4 pt-6 dark:border-white/10">
+          <div className="shrink-0 border-b border-slate-200/70 px-4 pb-4 pt-5 pr-12 dark:border-white/10 sm:px-6 sm:pb-4 sm:pt-6 sm:pr-12">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>{description}</DialogDescription>
@@ -157,11 +157,11 @@ export function EmployeeFormDialog({
             ) : null}
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-4 px-6 py-5">
+          <ScrollArea className="min-h-0 min-w-0 flex-1 overscroll-contain">
+            <div className="min-w-0 space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               <div className="space-y-2">
                 <FieldLabel>Employee image</FieldLabel>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:p-4">
                   <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:items-center">
                     <div className="overflow-hidden rounded-xl border border-dashed border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
                       {imagePreviewUrl ? (
@@ -463,17 +463,21 @@ export function EmployeeFormDialog({
             </div>
           </ScrollArea>
 
-          <div className="border-t border-slate-200/70 px-6 py-4 dark:border-white/10">
+          <div className="shrink-0 border-t border-slate-200/70 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading || submitting} className="rounded-xl">
+              <Button
+                type="submit"
+                disabled={loading || submitting}
+                className="w-full rounded-xl sm:w-auto"
+              >
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {mode === "create" ? "Save employee" : "Save changes"}
               </Button>

@@ -158,15 +158,15 @@ function FormField({
 }) {
   if (field.type === "boolean") {
     return (
-      <label className="flex min-h-10 items-center justify-between gap-3 rounded-xl border px-3">
-        <span className="text-sm font-medium">{field.label}</span>
+      <label className="flex min-h-10 min-w-0 items-center justify-between gap-3 rounded-xl border px-3">
+        <span className="min-w-0 text-sm font-medium">{field.label}</span>
         <Switch checked={value === true} onCheckedChange={onChange} disabled={disabled} />
       </label>
     )
   }
 
   return (
-    <label className={cn("space-y-1.5", field.type === "textarea" && "md:col-span-2")}>
+    <label className={cn("min-w-0 space-y-1.5", field.type === "textarea" && "sm:col-span-2")}>
       <span className="text-sm font-medium">{field.label}</span>
       {field.type === "textarea" ? (
         <Textarea
@@ -204,7 +204,7 @@ function CollectionEditor({
   const config = COLLECTIONS[collectionKey]
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h4 className="font-semibold">{config.title}</h4>
           <p className="text-xs text-muted-foreground">Add as many records as required.</p>
@@ -221,7 +221,7 @@ function CollectionEditor({
       </div>
       {records.length ? (
         records.map((record, index) => (
-          <div key={index} className="space-y-3 rounded-xl border bg-muted/20 p-4">
+          <div key={index} className="min-w-0 space-y-3 rounded-xl border bg-muted/20 p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {config.title} {index + 1}
@@ -237,7 +237,7 @@ function CollectionEditor({
                 <Trash2 />
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {config.fields.map((field) => (
                 <FormField
                   key={field.key}
@@ -356,21 +356,21 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
   const collectionKey = activeTab in COLLECTIONS ? (activeTab as CollectionKey) : null
 
   return (
-    <section className="space-y-4 rounded-2xl border p-4">
+    <section className="min-w-0 space-y-4 rounded-2xl border p-3 sm:p-4">
       <div>
         <h3 className="font-semibold">Extended employee profile</h3>
         <p className="text-xs text-muted-foreground">
           Personal, official, rule, qualification, nominee, and family information.
         </p>
       </div>
-      <div className="flex gap-1 overflow-x-auto border-b pb-2">
+      <div className="-mx-3 flex snap-x gap-1 overflow-x-auto border-b px-3 pb-2 sm:mx-0 sm:px-0">
         {TABS.map(([key, label]) => (
           <Button
             key={key}
             type="button"
             size="sm"
             variant={activeTab === key ? "secondary" : "ghost"}
-            className="shrink-0"
+            className="shrink-0 snap-start"
             onClick={() => setActiveTab(key)}
           >
             {label}
@@ -380,7 +380,7 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
 
       {activeTab === "personal" ? (
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <FormField field={{ key: "dateOfBirth", label: "Date of birth", type: "date" }} value={value.dateOfBirth} disabled={disabled} onChange={(next) => onChange({ ...value, dateOfBirth: String(next) })} />
             <FormField field={{ key: "maritalStatus", label: "Marital status" }} value={value.maritalStatus} disabled={disabled} onChange={(next) => onChange({ ...value, maritalStatus: String(next) })} />
             <FormField field={{ key: "taxIdentifier", label: "TIN / tax identifier" }} value={value.taxIdentifier} disabled={disabled} onChange={(next) => onChange({ ...value, taxIdentifier: String(next) })} />
@@ -390,7 +390,7 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
       ) : null}
 
       {activeTab === "official" ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {([
             ["employmentTypeId", "Employment type", setupOptions.employmentTypes],
             ["gradeId", "Grade", setupOptions.grades],
@@ -409,7 +409,7 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
       ) : null}
 
       {activeTab === "rules" ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           <FormField field={{ key: "taxStatus", label: "Tax status" }} value={value.taxStatus} disabled={disabled} onChange={(next) => onChange({ ...value, taxStatus: String(next) })} />
           <FormField field={{ key: "bankDetails", label: "Additional bank details", type: "textarea" }} value={value.bankDetails} disabled={disabled} onChange={(next) => onChange({ ...value, bankDetails: String(next) })} />
           {ruleFields.map((field) => <FormField key={field.key} field={field} value={profile.rules?.[field.key]} disabled={disabled} onChange={(next) => updateSection("rules", field.key, next)} />)}
@@ -417,7 +417,7 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
       ) : null}
 
       {activeTab === "custom" ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {["gradeInfo", "line", "floor", "jobType", "deviceCategory", "gazetteStatus", "birthRegistrationNo", "tinNo"].map((key) => <FormField key={key} field={{ key, label: key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()) }} value={profile.custom?.[key]} disabled={disabled} onChange={(next) => updateSection("custom", key, String(next))} />)}
         </div>
       ) : null}
