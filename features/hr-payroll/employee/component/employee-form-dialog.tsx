@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 
 import type { EmployeeFormValues } from "../employee.types"
+import { EmployeeExtendedProfileSections } from "./employee-extended-profile-sections"
 
 type FactoryOption = AppComboboxOption
 type DesignationOption = AppComboboxOption
@@ -37,6 +38,12 @@ type EmployeeFormDialogProps = {
   error: string
   mode: "create" | "edit"
   initialValues: EmployeeFormValues
+  setupOptions: {
+    employmentTypes: Array<{ value: string; label: string }>
+    grades: Array<{ value: string; label: string }>
+    payGroups: Array<{ value: string; label: string }>
+    workLocations: Array<{ value: string; label: string }>
+  }
   initialFactory: FactoryOption | null
   loadFactoryOptions: (params: AppComboboxLoadParams) => Promise<AppComboboxLoadResult<FactoryOption>>
   initialDesignation: DesignationOption | null
@@ -93,6 +100,7 @@ export function EmployeeFormDialog({
   error,
   mode,
   initialValues,
+  setupOptions,
   initialFactory,
   loadFactoryOptions,
   initialDesignation,
@@ -445,6 +453,13 @@ export function EmployeeFormDialog({
                   />
                 </div>
               </div>
+
+              <EmployeeExtendedProfileSections
+                value={draft}
+                setupOptions={setupOptions}
+                disabled={loading || submitting}
+                onChange={setDraft}
+              />
             </div>
           </ScrollArea>
 

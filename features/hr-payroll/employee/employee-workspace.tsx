@@ -26,6 +26,8 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchCurrentMenuPermission } from "@/features/iam/menu-permissions/menu-permission.service"
+import { MASTER_DATA_CONFIGS } from "@/features/hr-payroll/master-data/master-data.config"
+import { listMasterData } from "@/features/hr-payroll/master-data/master-data.service"
 import { createFactory, fetchFactories } from "@/features/app-config/factory/factory.service"
 import { createDepartment, fetchDepartments } from "@/features/app-config/departments/department.service"
 import { createDesignation, fetchDesignations } from "@/features/app-config/designations/designation.service"
@@ -129,6 +131,23 @@ const DEFAULT_FORM_VALUES: EmployeeFormValues = {
   nidNo: "",
   address: "",
   remarks: "",
+  employmentTypeId: "",
+  gradeId: "",
+  payGroupId: "",
+  workLocationId: "",
+  supervisorId: "",
+  dateOfBirth: "",
+  maritalStatus: "",
+  employmentStatus: "ACTIVE",
+  taxStatus: "",
+  taxIdentifier: "",
+  bankDetails: "",
+  emergencyContact: "",
+  probationEndDate: "",
+  confirmationDate: "",
+  contractEndDate: "",
+  separationDate: "",
+  profile: {},
   isActive: true,
 }
 
@@ -946,6 +965,10 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
   const [factoryOptions, setFactoryOptions] = useState<LookupOption[]>([])
   const [designationOptions, setDesignationOptions] = useState<LookupOption[]>([])
   const [departmentOptions, setDepartmentOptions] = useState<LookupOption[]>([])
+  const [employmentTypeOptions, setEmploymentTypeOptions] = useState<LookupOption[]>([])
+  const [gradeOptions, setGradeOptions] = useState<LookupOption[]>([])
+  const [payGroupOptions, setPayGroupOptions] = useState<LookupOption[]>([])
+  const [workLocationOptions, setWorkLocationOptions] = useState<LookupOption[]>([])
   const [lookupLoading, setLookupLoading] = useState(true)
   const [imagePreviewUrl, setImagePreviewUrl] = useState("")
   const [imageUploading, setImageUploading] = useState(false)
@@ -1119,6 +1142,10 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
           setFactoryOptions([])
           setDesignationOptions([])
           setDepartmentOptions([])
+          setEmploymentTypeOptions([])
+          setGradeOptions([])
+          setPayGroupOptions([])
+          setWorkLocationOptions([])
           setLookupLoading(false)
         }
         return
@@ -1151,7 +1178,18 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
           return items
         }
 
-        const [factoryRecords, designationRecords, departmentRecords] = await Promise.all([
+        const masterArgs = (config: (typeof MASTER_DATA_CONFIGS)[keyof typeof MASTER_DATA_CONFIGS]) =>
+          listMasterData({
+            apiUrl,
+            token,
+            organizationId: selectedOrganizationId,
+            config,
+            page: 1,
+            limit: 100,
+            search: "",
+            isActive: "true",
+          })
+        const [factoryRecords, designationRecords, departmentRecords, employmentTypes, grades, payGroups, workLocations] = await Promise.all([
           loadAll((pageNumber, pageLimit) =>
             fetchFactories({
               apiUrl,
@@ -1182,6 +1220,10 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
               organizationId: selectedOrganizationId,
             }),
           ),
+          masterArgs(MASTER_DATA_CONFIGS.employmentType),
+          masterArgs(MASTER_DATA_CONFIGS.grade),
+          masterArgs(MASTER_DATA_CONFIGS.payGroup),
+          masterArgs(MASTER_DATA_CONFIGS.workLocation),
         ])
 
         if (!active) {
@@ -1212,6 +1254,12 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
               label: optionLabelFromDepartment(department),
             })),
         )
+        const toOptions = (items: Array<{ id: string; code: string; name: string }>) =>
+          items.map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))
+        setEmploymentTypeOptions(toOptions(employmentTypes.items))
+        setGradeOptions(toOptions(grades.items))
+        setPayGroupOptions(toOptions(payGroups.items))
+        setWorkLocationOptions(toOptions(workLocations.items))
       } catch (caughtError) {
         if (!active) {
           return
@@ -1619,6 +1667,23 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
           nidNo: record.nidNo ?? "",
           address: record.address ?? "",
           remarks: record.remarks ?? "",
+          employmentTypeId: record.employmentTypeId ?? "",
+          gradeId: record.gradeId ?? "",
+          payGroupId: record.payGroupId ?? "",
+          workLocationId: record.workLocationId ?? "",
+          supervisorId: record.supervisorId ?? "",
+          dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth).slice(0, 10) : "",
+          maritalStatus: record.maritalStatus ?? "",
+          employmentStatus: record.employmentStatus ?? "ACTIVE",
+          taxStatus: record.taxStatus ?? "",
+          taxIdentifier: record.taxIdentifier ?? "",
+          bankDetails: record.bankDetails ?? "",
+          emergencyContact: record.emergencyContact ?? "",
+          probationEndDate: record.probationEndDate ? String(record.probationEndDate).slice(0, 10) : "",
+          confirmationDate: record.confirmationDate ? String(record.confirmationDate).slice(0, 10) : "",
+          contractEndDate: record.contractEndDate ? String(record.contractEndDate).slice(0, 10) : "",
+          separationDate: record.separationDate ? String(record.separationDate).slice(0, 10) : "",
+          profile: record.profile ?? {},
           isActive: record.isActive !== false,
         })
         setEditorFactory(
@@ -2292,6 +2357,12 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         loadDepartmentOptions={loadDepartmentOptions}
         initialGender={editorGender}
         initialValues={editorInitialValues}
+        setupOptions={{
+          employmentTypes: employmentTypeOptions,
+          grades: gradeOptions,
+          payGroups: payGroupOptions,
+          workLocations: workLocationOptions,
+        }}
         onOpenChange={(open) => {
           setEditorOpen(open)
 

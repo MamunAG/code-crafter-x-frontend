@@ -40,6 +40,31 @@ export type FileSummary = {
 
 export type EmployeeGender = "Male" | "Female" | "Others"
 
+export type EmployeeAddressProfile = {
+  address?: string
+  policeStation?: string
+  postalCode?: string
+  country?: string
+  district?: string
+}
+
+export type EmployeeProfileData = {
+  general?: Record<string, unknown> & {
+    presentAddress?: EmployeeAddressProfile
+    permanentAddress?: EmployeeAddressProfile
+  }
+  official?: Record<string, unknown>
+  rules?: Record<string, unknown>
+  custom?: Record<string, string>
+  emergencyContacts?: Array<Record<string, unknown>>
+  educationRecords?: Array<Record<string, unknown>>
+  professionalQualifications?: Array<Record<string, unknown>>
+  previousEmployment?: Array<Record<string, unknown>>
+  languages?: Array<Record<string, unknown>>
+  nominees?: Array<Record<string, unknown>>
+  familyMembers?: Array<Record<string, unknown>>
+}
+
 export type EmployeeFactorySummary = {
   id: string
   name?: string | null
@@ -73,6 +98,23 @@ export type EmployeeRecord = {
   nidNo?: string | null
   address?: string | null
   remarks?: string | null
+  employmentTypeId?: string | null
+  gradeId?: string | null
+  payGroupId?: string | null
+  workLocationId?: string | null
+  supervisorId?: string | null
+  dateOfBirth?: string | null
+  maritalStatus?: string | null
+  employmentStatus?: string | null
+  taxStatus?: string | null
+  taxIdentifier?: string | null
+  bankDetails?: string | null
+  emergencyContact?: string | null
+  probationEndDate?: string | null
+  confirmationDate?: string | null
+  contractEndDate?: string | null
+  separationDate?: string | null
+  profile?: EmployeeProfileData | null
   isActive?: boolean
   factory?: EmployeeFactorySummary | null
   image?: FileSummary | null
@@ -109,6 +151,23 @@ export type EmployeeFormValues = {
   nidNo: string
   address: string
   remarks: string
+  employmentTypeId: string
+  gradeId: string
+  payGroupId: string
+  workLocationId: string
+  supervisorId: string
+  dateOfBirth: string
+  maritalStatus: string
+  employmentStatus: string
+  taxStatus: string
+  taxIdentifier: string
+  bankDetails: string
+  emergencyContact: string
+  probationEndDate: string
+  confirmationDate: string
+  contractEndDate: string
+  separationDate: string
+  profile: EmployeeProfileData
   isActive: boolean
 }
 
