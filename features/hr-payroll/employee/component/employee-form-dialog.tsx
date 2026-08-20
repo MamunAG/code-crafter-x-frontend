@@ -19,7 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -157,21 +156,21 @@ export function EmployeeFormDialog({
             ) : null}
           </div>
 
-          <ScrollArea className="min-h-0 min-w-0 flex-1 overscroll-contain">
-            <div className="min-w-0 space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+            <div className="w-full min-w-0 max-w-full space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               <div className="space-y-2">
                 <FieldLabel>Employee image</FieldLabel>
                 <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:p-4">
-                  <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:items-center">
+                  <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4 md:grid-cols-[11rem_minmax(0,1fr)]">
                     <div className="overflow-hidden rounded-xl border border-dashed border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
                       {imagePreviewUrl ? (
                         <img
                           src={imagePreviewUrl}
                           alt="Uploaded employee preview"
-                          className="h-32 w-full object-contain p-2"
+                          className="h-20 w-full object-contain p-2 sm:h-28 md:h-32"
                         />
                       ) : (
-                        <div className="flex h-32 flex-col items-center justify-center gap-2 px-3 text-center text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex h-20 flex-col items-center justify-center gap-2 px-2 text-center text-xs text-slate-500 dark:text-slate-400 sm:h-28 md:h-32">
                           <Upload className="size-5" />
                           No image uploaded
                         </div>
@@ -184,7 +183,7 @@ export function EmployeeFormDialog({
                         variant="outline"
                         onClick={() => imageInputRef.current?.click()}
                         disabled={loading || submitting || imageUploading}
-                        className="rounded-xl"
+                        className="w-full rounded-xl sm:w-auto"
                       >
                         {imageUploading ? (
                           <Loader2 className="size-3.5 animate-spin" />
@@ -461,10 +460,10 @@ export function EmployeeFormDialog({
                 onChange={setDraft}
               />
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="shrink-0 border-t border-slate-200/70 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
-            <DialogFooter>
+            <DialogFooter className="grid grid-cols-2 gap-2 sm:flex">
               <Button
                 type="button"
                 variant="outline"

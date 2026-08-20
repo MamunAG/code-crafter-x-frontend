@@ -203,7 +203,7 @@ function CollectionEditor({
 }) {
   const config = COLLECTIONS[collectionKey]
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 max-w-full space-y-3 overflow-hidden">
       <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h4 className="font-semibold">{config.title}</h4>
@@ -356,10 +356,10 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
   const collectionKey = activeTab in COLLECTIONS ? (activeTab as CollectionKey) : null
 
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border p-3 sm:p-4">
-      <div>
+    <section className="min-w-0 max-w-full space-y-4 overflow-hidden rounded-2xl border p-3 sm:p-4">
+      <div className="min-w-0">
         <h3 className="font-semibold">Extended employee profile</h3>
-        <p className="text-xs text-muted-foreground">
+        <p className="max-w-full break-words text-xs text-muted-foreground">
           Personal, official, rule, qualification, nominee, and family information.
         </p>
       </div>
