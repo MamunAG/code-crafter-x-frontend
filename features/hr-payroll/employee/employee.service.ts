@@ -1,3 +1,5 @@
+import { requireSelectedOrganizationId } from "@/lib/organization-selection"
+
 import type {
   ApiResponse,
   EmployeeFilterValues,
@@ -58,6 +60,24 @@ function buildRequestHeaders({
   if (organizationId) headers["x-organization-id"] = organizationId
 
   return headers
+}
+
+function buildHrRequestHeaders({
+  accessToken,
+  organizationId,
+  contentType,
+}: {
+  accessToken: string
+  organizationId: string
+  contentType?: string
+}) {
+  const selectedOrganizationId = requireSelectedOrganizationId(organizationId)
+
+  return buildRequestHeaders({
+    accessToken,
+    organizationId: selectedOrganizationId,
+    contentType,
+  })
 }
 
 async function readJsonResponse<T>(response: Response) {
@@ -226,7 +246,7 @@ export async function fetchEmployees({
   limit: number
   filters: Partial<EmployeeFilterValues>
   deletedOnly?: boolean
-  organizationId?: string
+  organizationId: string
 }): Promise<PaginatedResponse<EmployeeRecord>> {
   const url = buildApiUrl(apiUrl, "/api/v1/hr/employee")
   url.searchParams.set("page", String(page))
@@ -237,7 +257,7 @@ export async function fetchEmployees({
 
   const response = await fetch(url, {
     method: "GET",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
@@ -252,10 +272,12 @@ export async function fetchEmployees({
 export async function uploadEmployeeImageFile({
   apiUrl,
   accessToken,
+  organizationId,
   file,
 }: {
   apiUrl: string
   accessToken: string
+  organizationId: string
   file: File
 }): Promise<BackendFileRecord> {
   const formData = new FormData()
@@ -263,7 +285,7 @@ export async function uploadEmployeeImageFile({
 
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/files/upload"), {
     method: "POST",
-    headers: buildRequestHeaders({ accessToken }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
     body: formData,
   })
 
@@ -307,11 +329,11 @@ export async function fetchEmployee({
   apiUrl: string
   accessToken: string
   id: string
-  organizationId?: string
+  organizationId: string
 }): Promise<EmployeeRecord> {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/employee/${id}`), {
     method: "GET",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
     cache: "no-store",
   })
 
@@ -332,11 +354,11 @@ export async function createEmployee({
   apiUrl: string
   accessToken: string
   payload: EmployeeFormValues
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/employee"), {
     method: "POST",
-    headers: buildRequestHeaders({
+    headers: buildHrRequestHeaders({
       accessToken,
       organizationId,
       contentType: "application/json",
@@ -359,11 +381,11 @@ export async function downloadEmployeeUploadTemplate({
 }: {
   apiUrl: string
   accessToken: string
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/employee/template/upload"), {
     method: "GET",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
   })
 
   if (response.status === 401) {
@@ -390,14 +412,14 @@ export async function uploadEmployeeTemplate({
   apiUrl: string
   accessToken: string
   file: File
-  organizationId?: string
+  organizationId: string
 }): Promise<EmployeeUploadReport> {
   const formData = new FormData()
   formData.append("file", file)
 
   const response = await fetch(buildApiUrl(apiUrl, "/api/v1/hr/employee/upload"), {
     method: "POST",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
     body: formData,
   })
 
@@ -452,11 +474,11 @@ export async function updateEmployee({
   accessToken: string
   id: string
   payload: EmployeeFormValues
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/employee/${id}`), {
     method: "PATCH",
-    headers: buildRequestHeaders({
+    headers: buildHrRequestHeaders({
       accessToken,
       organizationId,
       contentType: "application/json",
@@ -481,11 +503,11 @@ export async function softDeleteEmployee({
   apiUrl: string
   accessToken: string
   id: string
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/employee/${id}`), {
     method: "DELETE",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)
@@ -500,11 +522,11 @@ export async function restoreEmployee({
   apiUrl: string
   accessToken: string
   id: string
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/employee/${id}/restore`), {
     method: "POST",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)
@@ -519,11 +541,11 @@ export async function permanentlyDeleteEmployee({
   apiUrl: string
   accessToken: string
   id: string
-  organizationId?: string
+  organizationId: string
 }) {
   const response = await fetch(buildApiUrl(apiUrl, `/api/v1/hr/employee/${id}/permanent`), {
     method: "DELETE",
-    headers: buildRequestHeaders({ accessToken, organizationId }),
+    headers: buildHrRequestHeaders({ accessToken, organizationId }),
   })
 
   await readJsonResponse(response)

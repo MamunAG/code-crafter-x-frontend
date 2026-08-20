@@ -5,10 +5,10 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ActiveCompensationSection } from "./component/active-compensation-section"
 import {
-  CompensationFormDialog,
-  type CompensationFormValues,
+  CompensationEntryForm,
+  type CompensationEntryFormValues,
   type CompensationMode,
-} from "./component/compensation-form-dialog"
+} from "./component/compensation-entry-form"
 import { DeletedCompensationSection } from "./component/deleted-compensation-section"
 import {
   activateSalaryStructure,
@@ -41,7 +41,7 @@ const COMPONENT_EXAMPLE = JSON.stringify(
   null,
   2
 )
-function defaults(mode: CompensationMode): CompensationFormValues {
+function defaults(mode: CompensationMode): CompensationEntryFormValues {
   return mode === "structure"
     ? {
         code: "",
@@ -75,7 +75,7 @@ export function CompensationWorkspace({ apiUrl }: { apiUrl: string }) {
   const [search, setSearch] = useState("")
   const [mode, setMode] = useState<CompensationMode>("structure")
   const [open, setOpen] = useState(false)
-  const [values, setValues] = useState<CompensationFormValues>(() =>
+  const [values, setValues] = useState<CompensationEntryFormValues>(() =>
     defaults("structure")
   )
   const [submitting, setSubmitting] = useState(false)
@@ -216,7 +216,7 @@ export function CompensationWorkspace({ apiUrl }: { apiUrl: string }) {
         onActivate={setActivationTarget}
       />
       <DeletedCompensationSection data={assignments} employees={employees} />
-      <CompensationFormDialog
+      <CompensationEntryForm
         open={open}
         mode={mode}
         values={values}

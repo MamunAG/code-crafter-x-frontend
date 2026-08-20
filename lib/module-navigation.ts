@@ -207,11 +207,6 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
                 permissionMenuName: "Holiday Calendar Setup",
               },
               {
-                label: "Leave Type Setup",
-                href: "/hr-payroll/core/leave-type",
-                permissionMenuName: "Leave Type Setup",
-              },
-              {
                 label: "Salary Component Setup",
                 href: "/hr-payroll/core/salary-component",
                 permissionMenuName: "Salary Component Setup",
@@ -248,10 +243,24 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             permissionMenuName: "Attendance Management",
           },
           {
-            label: "Leave Management",
+            label: "Leave",
             href: "/hr-payroll/leave",
-            description: "Submit and approve employee leave requests.",
+            description: "End-to-end employee leave management.",
             permissionMenuName: "Leave Management",
+            children: [
+              { label: "Dashboard", href: "/hr-payroll/leave?view=dashboard", permissionMenuName: "Leave Management" },
+              { label: "My Applications", href: "/hr-payroll/leave?view=applications", permissionMenuName: "Leave Management" },
+              { label: "My Leave Balance", href: "/hr-payroll/leave?view=balance", permissionMenuName: "Leave Management" },
+              { label: "Approval Inbox", href: "/hr-payroll/leave?view=approvals", permissionMenuName: "Leave Management" },
+              { label: "Team Leave Calendar", href: "/hr-payroll/leave?view=calendar", permissionMenuName: "Leave Management" },
+              { label: "Leave Administration", href: "/hr-payroll/leave?view=administration", permissionMenuName: "Leave Management" },
+              { label: "Leave Reports", href: "/hr-payroll/reports", permissionMenuName: "HR Reports" },
+              { label: "Leave Types", href: "/hr-payroll/leave/leave-type", permissionMenuName: "Leave Type Setup" },
+              { label: "Leave Policies", href: "/hr-payroll/leave/policies", permissionMenuName: "Leave Management" },
+              { label: "Policy Assignments", href: "/hr-payroll/leave/policy-assignments", permissionMenuName: "Leave Management" },
+              { label: "Approval Workflows", href: "/hr-payroll/leave/workflows", permissionMenuName: "Leave Management" },
+              { label: "Workflow Assignments", href: "/hr-payroll/leave/workflow-assignments", permissionMenuName: "Leave Management" },
+            ],
           },
           {
             label: "Compensation Setup",

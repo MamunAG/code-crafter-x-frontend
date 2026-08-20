@@ -33,7 +33,10 @@ export type AppDataCustomFilterField = FilterFieldBase & {
   control: ReactNode
 }
 
-export type AppDataFilterField = AppDataTextFilterField | AppDataSelectFilterField | AppDataCustomFilterField
+export type AppDataFilterField =
+  | AppDataTextFilterField
+  | AppDataSelectFilterField
+  | AppDataCustomFilterField
 
 type AppDataFilterFormProps = {
   fields: AppDataFilterField[]
@@ -62,10 +65,16 @@ export function AppDataFilterForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <form
+      onSubmit={handleSubmit}
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
       {fields.map((field) => (
         <div key={field.id} className={field.className ?? "min-w-0 space-y-1"}>
-          <label htmlFor={field.id} className="text-xs font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor={field.id}
+            className="text-xs font-medium text-slate-700 dark:text-slate-300"
+          >
             {field.label}
           </label>
           {field.kind === "text" ? (
@@ -95,11 +104,20 @@ export function AppDataFilterForm({
           <Search className="size-3.5" />
           {submitLabel}
         </Button>
-        <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={onReset}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full rounded-xl sm:w-auto"
+          onClick={onReset}
+        >
           {resetLabel}
         </Button>
         {onCreate ? (
-          <Button type="button" className="w-full rounded-xl sm:w-auto" onClick={onCreate}>
+          <Button
+            type="button"
+            className="w-full rounded-xl sm:w-auto"
+            onClick={onCreate}
+          >
             <Plus className="size-3.5" />
             {createLabel}
           </Button>

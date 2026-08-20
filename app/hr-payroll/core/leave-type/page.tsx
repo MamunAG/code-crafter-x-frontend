@@ -1,3 +1,2 @@
-import { MASTER_DATA_CONFIGS, MasterDataWorkspace } from "@/features/hr-payroll/master-data"
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
-export default function LeaveTypePage() { return <MasterDataWorkspace apiUrl={API_URL} config={MASTER_DATA_CONFIGS.leaveType} /> }
+import { redirect } from "next/navigation"
+export default function LeaveTypePage() { redirect("/hr-payroll/leave/leave-type") }

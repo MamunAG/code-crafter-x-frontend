@@ -459,7 +459,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
         page: pageNumber,
         limit: pageLimit,
         filters: { employeeName: query, isActive: "true" },
-        organizationId: selectedOrganizationId || undefined,
+        organizationId: selectedOrganizationId,
       })
       return {
         items: response.items.map((employee) => ({
@@ -740,7 +740,7 @@ export function JobWorkspace({ apiUrl }: { apiUrl: string }) {
             apiUrl,
             accessToken: token,
             id: record.merchandiserId,
-            organizationId: selectedOrganizationId || undefined,
+            organizationId: selectedOrganizationId ?? "",
           })
           nextMerchandiser = {
             value: employee.id,

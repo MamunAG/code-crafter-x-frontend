@@ -4,6 +4,7 @@ import { initializeApp, getApps } from "firebase/app"
 import { getMessaging, getToken, isSupported, onMessage, type MessagePayload } from "firebase/messaging"
 
 type ForegroundMessageHandler = (payload: MessagePayload) => void
+export const FCM_TOKEN_STORAGE_KEY = "fcm_web_token"
 
 function getFirebaseConfig() {
   const config = {
@@ -68,10 +69,12 @@ export async function requestFirebaseMessagingToken() {
   const messaging = getMessaging(app)
   const serviceWorkerRegistration = await navigator.serviceWorker.register(buildServiceWorkerUrl())
 
-  return getToken(messaging, {
+  const token = await getToken(messaging, {
     vapidKey,
     serviceWorkerRegistration,
   })
+  if (token) window.localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token)
+  return token
 }
 
 export async function listenForForegroundMessages(handler: ForegroundMessageHandler) {

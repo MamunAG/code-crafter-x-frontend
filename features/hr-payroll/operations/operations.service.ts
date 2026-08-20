@@ -1,7 +1,7 @@
 import { hrDownload, hrRequest, type HrRequestContext } from "../shared/hr-api"
 import type { HrPaginatedResponse } from "../shared/hr.types"
 import type {
-  AttendanceResult, HrJobRecord, LeaveRequestRecord, LoanRecord, LookupRecord, PayrollRunRecord,
+  AttendanceResult, HrJobRecord, LeaveBalanceRecord, LeaveDashboard, LeaveLedgerRecord, LeavePreview, LeaveRequestRecord, LoanRecord, LookupRecord, PayrollRunRecord,
   ReportResult, RosterRecord, SalaryAssignmentRecord, SalaryStructureRecord, ShiftRecord, StatutoryRuleRecord,
 } from "./operations.types"
 
@@ -21,8 +21,44 @@ export function attendanceAction(context: HrRequestContext, path: string, payloa
   return hrRequest<AttendanceResult>(context, `/api/v1/hr/attendance/${path}`, { method: "POST", body: JSON.stringify(payload) })
 }
 
-export function listLeave(context: HrRequestContext, page: number, limit: number, search = "") {
-  return hrRequest<HrPaginatedResponse<LeaveRequestRecord>>(context, "/api/v1/hr/leave", { query: { page, limit, search } })
+export function listLeave(context: HrRequestContext, page: number, limit: number, search = "", filters: Record<string, string | number | boolean | undefined> = {}) {
+  return hrRequest<HrPaginatedResponse<LeaveRequestRecord>>(context, "/api/v1/hr/leave", { query: { page, limit, search, ...filters } })
+}
+
+export function listMyLeave(context: HrRequestContext, page: number, limit: number, filters: Record<string, string | number | boolean | undefined> = {}) {
+  return hrRequest<HrPaginatedResponse<LeaveRequestRecord>>(context, "/api/v1/hr/leave/my-applications", { query: { page, limit, ...filters } })
+}
+
+export function listApprovalInbox(context: HrRequestContext, page: number, limit: number, filters: Record<string, string | number | boolean | undefined> = {}) {
+  return hrRequest<HrPaginatedResponse<LeaveRequestRecord>>(context, "/api/v1/hr/leave/approval-inbox", { query: { page, limit, ...filters } })
+}
+
+export function getLeaveDashboard(context: HrRequestContext) {
+  return hrRequest<LeaveDashboard>(context, "/api/v1/hr/leave/dashboard")
+}
+
+export function previewLeave(context: HrRequestContext, payload: Record<string, unknown>) {
+  return hrRequest<LeavePreview>(context, "/api/v1/hr/leave/preview", { method: "POST", body: JSON.stringify(payload) })
+}
+
+export function getLeaveDetails(context: HrRequestContext, id: string) {
+  return hrRequest<LeaveRequestRecord>(context, `/api/v1/hr/leave/${id}`)
+}
+
+export function getLeaveBalances(context: HrRequestContext, employeeId: string, year?: number) {
+  return hrRequest<LeaveBalanceRecord[]>(context, `/api/v1/hr/leave/balances/${employeeId}`, { query: { year } })
+}
+
+export function getLeaveLedger(context: HrRequestContext, employeeId: string, page: number, limit: number) {
+  return hrRequest<HrPaginatedResponse<LeaveLedgerRecord>>(context, `/api/v1/hr/leave/ledger/${employeeId}`, { query: { page, limit } })
+}
+
+export function adjustLeaveBalance(context: HrRequestContext, payload: Record<string, unknown>) {
+  return hrRequest<LeaveBalanceRecord & { previousBalance: number; adjustment: number }>(context, "/api/v1/hr/leave/balances/adjust", { method: "POST", body: JSON.stringify(payload) })
+}
+
+export function resubmitLeave(context: HrRequestContext, id: string) {
+  return hrRequest<LeaveRequestRecord>(context, `/api/v1/hr/leave/${id}/resubmit`, { method: "POST" })
 }
 
 export function createLeave(context: HrRequestContext, payload: Record<string, unknown>) {

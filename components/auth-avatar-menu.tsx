@@ -11,6 +11,8 @@ import {
   getAuthInitials,
   clearStoredAuthSession,
 } from "@/lib/auth-session"
+import { removeFirebaseToken } from "@/features/notifications/notification.service"
+import { FCM_TOKEN_STORAGE_KEY } from "@/lib/firebase-client"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +27,14 @@ type AuthAvatarMenuProps = {
 }
 
 export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
-  function handleLogout() {
+  async function handleLogout() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    const accessToken = window.localStorage.getItem("access_token")
+    const fcmToken = window.localStorage.getItem(FCM_TOKEN_STORAGE_KEY)
+    if (apiUrl && accessToken && fcmToken) {
+      try { await removeFirebaseToken({ apiUrl, accessToken, token: fcmToken }) } catch { /* logout must still complete */ }
+    }
+    window.localStorage.removeItem(FCM_TOKEN_STORAGE_KEY)
     clearStoredAuthSession()
     document.cookie = clearAuthSessionCookie()
     document.cookie = clearAuthUserLabelCookie()
@@ -99,7 +108,7 @@ export function AuthAvatarMenu({ userLabel, imageUrl }: AuthAvatarMenuProps) {
           className="gap-2 rounded-md text-xs text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
           onSelect={(event) => {
             event.preventDefault()
-            handleLogout()
+            void handleLogout()
           }}
         >
           <LogOut className="size-3.5" />

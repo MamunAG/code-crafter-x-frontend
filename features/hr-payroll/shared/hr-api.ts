@@ -1,3 +1,5 @@
+import { requireSelectedOrganizationId } from "@/lib/organization-selection"
+
 import type { HrApiResponse } from "./hr.types"
 
 export type HrRequestContext = {
@@ -23,16 +25,21 @@ function errorMessage(payload: unknown, fallback: string) {
   return fallback
 }
 
+function requireOrganizationId(value: string) {
+  return requireSelectedOrganizationId(value)
+}
+
 export async function hrRequest<T>(
   context: HrRequestContext,
   path: string,
   options: RequestInit & { query?: Record<string, string | number | boolean | undefined> } = {},
 ): Promise<T> {
   const { query, ...requestOptions } = options
+  const organizationId = requireOrganizationId(context.organizationId)
   const headers = new Headers(requestOptions.headers)
   headers.set("Authorization", `Bearer ${context.accessToken}`)
   headers.set("Accept", "application/json")
-  headers.set("x-organization-id", context.organizationId)
+  headers.set("x-organization-id", organizationId)
   if (requestOptions.body && !(requestOptions.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json")
   }
@@ -64,10 +71,11 @@ export async function hrDownload(
   path: string,
   query?: Record<string, string | number | boolean | undefined>,
 ) {
+  const organizationId = requireOrganizationId(context.organizationId)
   const response = await fetch(buildHrUrl(context.apiUrl, path, query), {
     headers: {
       Authorization: `Bearer ${context.accessToken}`,
-      "x-organization-id": context.organizationId,
+      "x-organization-id": organizationId,
     },
   })
   if (response.status === 401) throw new Error("Your session expired. Please sign in again.")

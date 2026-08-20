@@ -25,18 +25,32 @@ export type RosterRecord = HrBaseRecord & {
 export type AttendanceResult = HrBaseRecord & Record<string, unknown>
 
 export type LeaveRequestRecord = HrBaseRecord & {
+  applicationNumber?: string | null
   employeeId: string
   leaveTypeId: string
   startDate: string
   endDate: string
   days: string
   isHalfDay: boolean
+  durationType?: string
   reason?: string | null
+  contactDuringLeave?: string | null
+  attachmentUrl?: string | null
   status: string
   approvalLevel: number
   requiredApprovalLevels: number
   approvalHistory?: Array<Record<string, unknown>>
+  dayBreakdown?: LeaveDayBreakdown[]
+  employee?: Record<string, unknown> | null
+  leaveType?: { id: string; name?: string; code?: string; settings?: Record<string, unknown> } | null
+  currentBalance?: number
 }
+
+export type LeaveDayBreakdown = { date: string; dayType: string; label?: string | null; duration?: string | null; chargedDays: number }
+export type LeavePreview = { currentBalance: number; calendarDays: number; weeklyOffDays: number; holidays: number; chargeableDays: number; balanceAfterApproval: number; dayBreakdown: LeaveDayBreakdown[]; policy: Record<string, unknown> & { leaveTypeName?: string } }
+export type LeaveBalanceRecord = HrBaseRecord & { employeeId: string; leaveTypeId: string; periodYear: number; opening: string; accrued: string; adjusted: string; carriedForward: string; used: string; encashed: string; expired: string; available: number; leaveType?: { name?: string; code?: string } }
+export type LeaveDashboard = { balances: Array<{ leaveTypeId: string; leaveTypeName: string; color?: unknown; opening: number; accrued: number; adjusted: number; carriedForward: number; used: number; encashed: number; expired: number; available: number; pending: number }>; recentApplications: LeaveRequestRecord[]; upcomingLeave: LeaveRequestRecord[]; returned: LeaveRequestRecord[] }
+export type LeaveLedgerRecord = { id: string; date: string; leaveTypeId: string; transactionType: string; reference: string; credit: number; debit: number; description?: string | null }
 
 export type SalaryStructureComponent = {
   id?: string
@@ -134,9 +148,11 @@ export type LookupRecord = {
   id: string
   employeeCode?: string
   employeeName?: string
+  email?: string
   code?: string
   name?: string
   displayName?: string
   isActive?: boolean
+  settings?: Record<string, unknown>
 }
 

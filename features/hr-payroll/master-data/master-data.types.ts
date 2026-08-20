@@ -31,7 +31,7 @@ export type FieldOption = { label: string; value: string }
 export type MasterDataField = {
   key: string
   label: string
-  kind: "text" | "number" | "select" | "boolean" | "weekday-multi" | "holidays"
+  kind: "text" | "date" | "number" | "select" | "boolean" | "weekday-multi" | "holidays" | "json" | "policy-rules" | "workflow-levels"
   description?: string
   placeholder?: string
   options?: FieldOption[]

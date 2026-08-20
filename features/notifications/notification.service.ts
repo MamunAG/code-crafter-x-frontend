@@ -144,3 +144,8 @@ export async function registerFirebaseToken({
 
   await readJsonResponse(response, "Unable to register this browser for push notifications.")
 }
+
+export async function removeFirebaseToken({ apiUrl, accessToken, token }: { apiUrl: string; accessToken: string; token: string }): Promise<void> {
+  const response = await fetch(buildApiUrl(apiUrl, "/api/v1/notifications/firebase-token"), { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ token }) })
+  await readJsonResponse(response, "Unable to unregister this browser from push notifications.")
+}

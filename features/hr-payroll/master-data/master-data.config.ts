@@ -9,6 +9,9 @@ export const MASTER_DATA_CONFIGS = {
     slug: "employment-type", apiPath: "employment-types", title: "Employment Type Setup", singular: "employment type",
     description: "Maintain employment categories and their default eligibility rules.", permissionMenuName: "Employment Type Setup",
     fields: [
+      { key: "description", label: "Description", kind: "text" },
+      { key: "color", label: "Color", kind: "text", placeholder: "#2563eb" },
+      { key: "sortOrder", label: "Sort order", kind: "number", min: 0, max: 9999, defaultValue: 0 },
       { key: "employmentCategory", label: "Employment category", kind: "select", defaultValue: "PERMANENT", options: ["PERMANENT", "CONTRACT", "TEMPORARY", "PROBATION", "INTERN", "CASUAL"].map((value) => ({ label: value.replaceAll("_", " "), value })) },
       { key: "defaultProbationDays", label: "Default probation days", kind: "number", min: 0, max: 730, defaultValue: 0 },
       ...yesNoEligibility,
@@ -56,6 +59,7 @@ export const MASTER_DATA_CONFIGS = {
     fields: [
       { key: "leaveClassification", label: "Classification", kind: "select", defaultValue: "PAID", options: ["PAID", "UNPAID"].map((value) => ({ label: value, value })) },
       { key: "dayUnit", label: "Unit", kind: "select", defaultValue: "DAY", options: ["DAY", "HOUR"].map((value) => ({ label: value, value })) },
+      { key: "hourlyAllowed", label: "Allow hourly leave", kind: "boolean", defaultValue: false },
       { key: "countCalendarDays", label: "Count calendar days", kind: "boolean", defaultValue: true },
       { key: "approvalLevels", label: "Approval levels", kind: "number", min: 1, max: 3, defaultValue: 1 },
       { key: "allowNegativeBalance", label: "Allow negative balance", kind: "boolean", defaultValue: false },
@@ -67,7 +71,37 @@ export const MASTER_DATA_CONFIGS = {
       { key: "encashable", label: "Encashable", kind: "boolean", defaultValue: false },
       { key: "halfDayAllowed", label: "Allow half day", kind: "boolean", defaultValue: true },
       { key: "attachmentRequired", label: "Attachment required", kind: "boolean", defaultValue: false },
+      { key: "documentationRequiredAfterDays", label: "Document required after days", kind: "number", min: 0, step: 0.5, defaultValue: 0 },
+      { key: "noticePeriodDays", label: "Advance notice days", kind: "number", min: 0, max: 730, defaultValue: 0 },
       { key: "maxConsecutiveDays", label: "Maximum consecutive days", kind: "number", min: 0, step: 0.5, defaultValue: 0 },
+    ],
+  },
+  leavePolicy: {
+    slug: "leave-policy", apiPath: "leave-policies", title: "Leave Policies", singular: "leave policy", description: "Manage effective-dated policies and backend-authoritative rules by leave type.", permissionMenuName: "Leave Management",
+    fields: [
+      { key: "effectiveFrom", label: "Effective from", kind: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+      { key: "effectiveTo", label: "Effective to", kind: "date" },
+      { key: "status", label: "Status", kind: "select", defaultValue: "DRAFT", options: ["DRAFT", "ACTIVE", "INACTIVE"].map((value) => ({ label: value, value })) },
+      { key: "rules", label: "Policy rules", kind: "policy-rules", defaultValue: [], description: "Entitlement, accrual, limits, notice, documentation, carry-forward, and eligibility rules." },
+    ],
+  },
+  leavePolicyAssignment: {
+    slug: "leave-policy-assignment", apiPath: "leave-policy-assignments", title: "Policy Assignments", singular: "policy assignment", description: "Assign effective-dated leave policies to employees and retain assignment history.", permissionMenuName: "Leave Management",
+    fields: [
+      { key: "employeeId", label: "Employee ID", kind: "text", placeholder: "Employee UUID" }, { key: "policyId", label: "Leave policy ID", kind: "text", placeholder: "Policy UUID" }, { key: "effectiveFrom", label: "Effective from", kind: "date", defaultValue: new Date().toISOString().slice(0, 10) }, { key: "effectiveTo", label: "Effective to", kind: "date" }, { key: "active", label: "Active", kind: "boolean", defaultValue: true },
+    ],
+  },
+  leaveWorkflow: {
+    slug: "leave-workflow", apiPath: "leave-workflows", title: "Approval Workflows", singular: "approval workflow", description: "Build ordered leave approval levels without adding a drag-and-drop dependency.", permissionMenuName: "Leave Management",
+    fields: [
+      { key: "active", label: "Active", kind: "boolean", defaultValue: true },
+      { key: "levels", label: "Workflow levels", kind: "workflow-levels", defaultValue: [{ levelNumber: 1, name: "Reporting Manager", approverType: "REPORTING_MANAGER", minimumApprovals: 1, mandatory: true, allowSelfApproval: false, canReject: true, canReturn: true, notifications: true }], description: "Ordered approval levels with conditional approver selectors." },
+    ],
+  },
+  leaveWorkflowAssignment: {
+    slug: "leave-workflow-assignment", apiPath: "leave-workflow-assignments", title: "Workflow Assignments", singular: "workflow assignment", description: "Assign workflows from company through employee scope with explicit resolution priority.", permissionMenuName: "Leave Management",
+    fields: [
+      { key: "targetType", label: "Target type", kind: "select", defaultValue: "COMPANY", options: ["COMPANY", "FACTORY", "DEPARTMENT", "SECTION", "DESIGNATION", "EMPLOYEE"].map((value) => ({ label: value, value })) }, { key: "targetId", label: "Target ID", kind: "text", placeholder: "Blank for company; UUID for other targets" }, { key: "workflowId", label: "Workflow ID", kind: "text", placeholder: "Workflow UUID" }, { key: "effectiveFrom", label: "Effective from", kind: "date" }, { key: "effectiveTo", label: "Effective to", kind: "date" }, { key: "priority", label: "Resolution priority", kind: "number", min: 1, max: 6, defaultValue: 1 },
     ],
   },
   salaryComponent: {

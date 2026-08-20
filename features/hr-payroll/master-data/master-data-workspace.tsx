@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import AppAddNewButton from "@/components/app-add-new-button"
 import { AppDataFilterForm } from "@/components/app-data-filter-form"
 import { AppDataSection } from "@/components/app-data-section"
@@ -245,6 +246,23 @@ function SettingsField({
     )
   }
 
+  if (field.kind === "json") {
+    return <div className="space-y-2 sm:col-span-2"><label className="text-sm font-medium">{field.label}</label><Textarea className="min-h-40 font-mono text-xs" value={typeof value === "string" ? value : JSON.stringify(value ?? [], null, 2)} disabled={disabled} placeholder={field.placeholder ?? "[]"} onChange={(event) => { const next = event.target.value; try { onChange(JSON.parse(next)) } catch { onChange(next) } }} />{field.description ? <p className="text-xs text-muted-foreground">{field.description}</p> : null}</div>
+  }
+
+  if (field.kind === "policy-rules") {
+    const rules = (Array.isArray(value) ? value : []) as Array<Record<string, unknown>>
+    const update = (index: number, key: string, next: unknown) => onChange(rules.map((rule, row) => row === index ? { ...rule, [key]: next } : rule))
+    return <div className="space-y-3 sm:col-span-2"><div className="flex items-center justify-between"><div><label className="text-sm font-medium">{field.label}</label><p className="text-xs text-muted-foreground">One effective rule card per leave type.</p></div><Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChange([...rules, { leaveTypeId: "", entitlement: 0, accrualFrequency: "NONE", maximumDays: 0, noticePeriodDays: 0, halfDayAllowed: true, allowNegativeBalance: false, documentationAfterDays: 0, carryForwardAllowed: false }])}><Plus/>Add rule</Button></div>{rules.map((rule, index) => <div key={index} className="grid gap-3 rounded-xl border p-4 sm:grid-cols-3"><Input placeholder="Leave type UUID" value={String(rule.leaveTypeId ?? "")} onChange={(event) => update(index, "leaveTypeId", event.target.value)} /><Input type="number" step="0.5" placeholder="Entitlement" value={String(rule.entitlement ?? "")} onChange={(event) => update(index, "entitlement", Number(event.target.value))} /><select className="h-9 rounded-md border bg-transparent px-3" value={String(rule.accrualFrequency ?? "NONE")} onChange={(event) => update(index, "accrualFrequency", event.target.value)}>{["NONE", "MONTHLY", "QUARTERLY", "YEARLY"].map((item) => <option key={item}>{item}</option>)}</select><Input type="number" step="0.5" placeholder="Maximum days" value={String(rule.maximumDays ?? "")} onChange={(event) => update(index, "maximumDays", Number(event.target.value))} /><Input type="number" placeholder="Notice days" value={String(rule.noticePeriodDays ?? "")} onChange={(event) => update(index, "noticePeriodDays", Number(event.target.value))} /><Input type="number" step="0.5" placeholder="Document after days" value={String(rule.documentationAfterDays ?? "")} onChange={(event) => update(index, "documentationAfterDays", Number(event.target.value))} /><label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(rule.halfDayAllowed)} onChange={(event) => update(index, "halfDayAllowed", event.target.checked)} />Half-day</label><label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(rule.allowNegativeBalance)} onChange={(event) => update(index, "allowNegativeBalance", event.target.checked)} />Negative balance</label><div className="flex justify-end"><Button type="button" variant="ghost" size="sm" onClick={() => onChange(rules.filter((_, row) => row !== index))}><X/>Remove</Button></div></div>)}</div>
+  }
+
+  if (field.kind === "workflow-levels") {
+    const levels = (Array.isArray(value) ? value : []) as Array<Record<string, unknown>>
+    const update = (index: number, key: string, next: unknown) => onChange(levels.map((level, row) => row === index ? { ...level, [key]: next } : level))
+    const move = (index: number, direction: -1 | 1) => { const target = index + direction; if (target < 0 || target >= levels.length) return; const next = [...levels]; [next[index], next[target]] = [next[target], next[index]]; onChange(next.map((level, row) => ({ ...level, levelNumber: row + 1 }))) }
+    return <div className="space-y-3 sm:col-span-2"><div className="flex items-center justify-between"><div><label className="text-sm font-medium">{field.label}</label><p className="text-xs text-muted-foreground">Ordered approval levels; use Up and Down to reorder.</p></div><Button type="button" variant="outline" size="sm" onClick={() => onChange([...levels, { levelNumber: levels.length + 1, name: `Level ${levels.length + 1}`, approverType: "REPORTING_MANAGER", minimumApprovals: 1, mandatory: true, allowSelfApproval: false, canReject: true, canReturn: true, notifications: true }])}><Plus/>Add level</Button></div>{levels.map((level, index) => { const approverType = String(level.approverType ?? "REPORTING_MANAGER"); return <div key={index} className="grid gap-3 rounded-xl border p-4 sm:grid-cols-3"><Input type="number" min={1} value={String(level.levelNumber ?? index + 1)} onChange={(event) => update(index, "levelNumber", Number(event.target.value))} /><Input placeholder="Level name" value={String(level.name ?? "")} onChange={(event) => update(index, "name", event.target.value)} /><select className="h-9 rounded-md border bg-transparent px-3" value={approverType} onChange={(event) => update(index, "approverType", event.target.value)}>{["SPECIFIC_USER", "ROLE", "REPORTING_MANAGER", "DEPARTMENT_HEAD", "SECTION_HEAD", "HR", "DESIGNATION"].map((item) => <option key={item}>{item.replaceAll("_", " ")}</option>)}</select>{approverType === "SPECIFIC_USER" ? <Input placeholder="User UUID" value={String(level.userId ?? "")} onChange={(event) => update(index, "userId", event.target.value)} /> : null}{approverType === "ROLE" ? <Input placeholder="Role UUID" value={String(level.roleId ?? "")} onChange={(event) => update(index, "roleId", event.target.value)} /> : null}{approverType === "DESIGNATION" ? <Input placeholder="Designation UUID" value={String(level.designationId ?? "")} onChange={(event) => update(index, "designationId", event.target.value)} /> : null}<Input type="number" min={1} placeholder="Minimum approvals" value={String(level.minimumApprovals ?? 1)} onChange={(event) => update(index, "minimumApprovals", Number(event.target.value))} /><div className="flex flex-wrap gap-3 sm:col-span-2">{[["mandatory", "Mandatory"], ["allowSelfApproval", "Self approval"], ["canReject", "Can reject"], ["canReturn", "Can return"], ["notifications", "Notifications"]].map(([key, label]) => <label key={key} className="flex items-center gap-1"><input type="checkbox" checked={Boolean(level[key])} onChange={(event) => update(index, key, event.target.checked)} />{label}</label>)}</div><div className="flex gap-2 sm:col-span-3"><Button type="button" size="sm" variant="outline" disabled={index === 0} onClick={() => move(index, -1)}>Move up</Button><Button type="button" size="sm" variant="outline" disabled={index === levels.length - 1} onClick={() => move(index, 1)}>Move down</Button><Button type="button" size="sm" variant="ghost" onClick={() => onChange(levels.filter((_, row) => row !== index).map((item, row) => ({ ...item, levelNumber: row + 1 })))}><X/>Remove</Button></div></div> })}</div>
+  }
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium">{field.label}</label>
@@ -264,7 +282,7 @@ function SettingsField({
         </select>
       ) : (
         <Input
-          type={field.kind === "number" ? "number" : "text"}
+          type={field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text"}
           min={field.min}
           max={field.max}
           step={field.step}
@@ -705,9 +723,7 @@ export function MasterDataWorkspace({
 }) {
   const router = useRouter()
   const uploadRef = useRef<HTMLInputElement>(null)
-  const [organizationId, setOrganizationId] = useState(() =>
-    typeof window === "undefined" ? "" : readSelectedOrganizationId()
-  )
+  const [organizationId, setOrganizationId] = useState("")
   const [records, setRecords] = useState<MasterDataRecord[]>([])
   const [deleted, setDeleted] = useState<MasterDataRecord[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
@@ -747,6 +763,10 @@ export function MasterDataWorkspace({
     [router]
   )
   useEffect(() => {
+    const initialSync = window.setTimeout(
+      () => setOrganizationId(readSelectedOrganizationId()),
+      0
+    )
     const handler = (event: Event) =>
       setOrganizationId(
         event instanceof CustomEvent
@@ -754,8 +774,10 @@ export function MasterDataWorkspace({
           : readSelectedOrganizationId()
       )
     window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handler)
-    return () =>
+    return () => {
+      window.clearTimeout(initialSync)
       window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handler)
+    }
   }, [])
 
   const load = useCallback(async () => {

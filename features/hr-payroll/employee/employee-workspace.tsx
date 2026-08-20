@@ -1781,6 +1781,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         const fileRecord = await uploadEmployeeImageFile({
           apiUrl,
           accessToken: token,
+          organizationId: selectedOrganizationId,
           file,
         })
 
@@ -1812,7 +1813,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
         setImageUploading(false)
       }
     },
-    [apiUrl, handleAuthFailure],
+    [apiUrl, handleAuthFailure, selectedOrganizationId],
   )
 
   const submitEditor = useCallback(

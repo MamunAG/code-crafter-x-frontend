@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Bell, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -43,9 +44,10 @@ function resolveNavigationPath(link?: string | null) {
 
   try {
     const url = new URL(link, window.location.origin)
+    if (url.origin !== window.location.origin) return "/"
     return `${url.pathname}${url.search}${url.hash}` || "/"
   } catch {
-    return link
+    return link.startsWith("/") && !link.startsWith("//") ? link : "/"
   }
 }
 
@@ -60,6 +62,8 @@ export function NotificationBell() {
   const [hasNextPage, setHasNextPage] = useState(false)
   const [workingId, setWorkingId] = useState("")
   const [markingAll, setMarkingAll] = useState(false)
+  const [pushState, setPushState] = useState<"unsupported" | NotificationPermission>(() => typeof window === "undefined" || !("Notification" in window) ? "unsupported" : Notification.permission)
+  const [enablingPush, setEnablingPush] = useState(false)
 
   const hasUnread = unreadCount > 0
   const unreadLabel = useMemo(() => (unreadCount > 9 ? "9+" : String(unreadCount)), [unreadCount])
@@ -102,37 +106,34 @@ export function NotificationBell() {
   }, [])
 
   useEffect(() => {
-    void loadNotifications({ silent: true })
+    const initialLoad = window.setTimeout(() => void loadNotifications({ silent: true }), 0)
 
     const interval = window.setInterval(() => {
       void loadNotifications({ silent: true })
     }, 60_000)
 
-    return () => window.clearInterval(interval)
+    return () => { window.clearTimeout(initialLoad); window.clearInterval(interval) }
   }, [loadNotifications])
 
-  useEffect(() => {
+  async function enablePushNotifications() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     const accessToken = window.localStorage.getItem("access_token")
+    if (!apiUrl || !accessToken || !isFirebaseMessagingConfigured()) return
+    setEnablingPush(true)
+    try { const token = await requestFirebaseMessagingToken(); setPushState(Notification.permission); if (token) { await registerFirebaseToken({ apiUrl, accessToken, token }); toast.success("Push notifications enabled.") } }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Unable to enable push notifications.") }
+    finally { setEnablingPush(false) }
+  }
 
-    if (!apiUrl || !accessToken || !isFirebaseMessagingConfigured()) {
-      return
-    }
-
-    void requestFirebaseMessagingToken()
-      .then((token) => {
-        if (!token) {
-          return
-        }
-
-        return registerFirebaseToken({
-          apiUrl,
-          accessToken,
-          token,
-        })
-      })
-      .catch(() => undefined)
-  }, [])
+  useEffect(() => {
+    if (pushState !== "granted" || !isFirebaseMessagingConfigured()) return
+    const pending = window.setTimeout(async () => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL; const accessToken = window.localStorage.getItem("access_token")
+      if (!apiUrl || !accessToken) return
+      try { const token = await requestFirebaseMessagingToken(); if (token) await registerFirebaseToken({ apiUrl, accessToken, token }) } catch { /* retry on the next authenticated mount */ }
+    }, 0)
+    return () => window.clearTimeout(pending)
+  }, [pushState])
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
@@ -152,6 +153,7 @@ export function NotificationBell() {
           : undefined,
       })
       void loadNotifications({ silent: true })
+      if (payload.data?.type?.startsWith("LEAVE_")) window.dispatchEvent(new CustomEvent("leave-notification", { detail: payload.data }))
     }).then((cleanup) => {
       unsubscribe = cleanup
     })
@@ -287,6 +289,7 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[28rem] overflow-y-auto p-2">
+            {pushState !== "unsupported" && pushState !== "granted" && isFirebaseMessagingConfigured() ? <div className="mb-2 rounded-2xl border bg-slate-50 p-3 dark:bg-white/5"><p className="text-xs font-semibold">Browser notifications</p><p className="mt-1 text-xs text-slate-500">Enable push alerts for leave decisions and approvals.</p><button type="button" className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900" disabled={enablingPush || pushState === "denied"} onClick={() => void enablePushNotifications()}>{pushState === "denied" ? "Blocked in browser settings" : enablingPush ? "Enabling…" : "Enable notifications"}</button></div> : null}
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -349,6 +352,7 @@ export function NotificationBell() {
               </div>
             )}
           </div>
+          <div className="border-t p-2 dark:border-white/10"><Link href="/notifications" onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2 text-center text-xs font-semibold hover:bg-slate-100 dark:hover:bg-white/10">View all notifications</Link></div>
         </div>
       ) : null}
     </div>

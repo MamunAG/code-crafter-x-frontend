@@ -1,9 +1,12 @@
+import { requireSelectedOrganizationId } from "@/lib/organization-selection"
+
 import type { MasterDataConfig, MasterDataFormValues, MasterDataRecord, PaginatedMasterData } from "./master-data.types"
 
 type ApiResponse<T> = { success: boolean; message: string; data?: T }
 
 function headers(token: string, organizationId: string, json = false) {
-  return { Authorization: `Bearer ${token}`, Accept: "application/json", "x-organization-id": organizationId, ...(json ? { "Content-Type": "application/json" } : {}) }
+  const selectedOrganizationId = requireSelectedOrganizationId(organizationId)
+  return { Authorization: `Bearer ${token}`, Accept: "application/json", "x-organization-id": selectedOrganizationId, ...(json ? { "Content-Type": "application/json" } : {}) }
 }
 
 async function read<T>(response: Response, config: MasterDataConfig) {
