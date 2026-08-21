@@ -1,6 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react"
 import { Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -24,15 +30,21 @@ import {
   type AttendancePullDraft,
 } from "./attendance-pull-integration-dialog"
 
-export function AttendancePullIntegrationsSection({
-  context,
-  organizationId,
-  handleError,
-}: {
-  context: () => HrRequestContext
-  organizationId: string
-  handleError: (error: unknown, fallback: string, notify?: boolean) => string
-}) {
+export type AttendancePullIntegrationsSectionHandle = {
+  create: () => void
+}
+
+export const AttendancePullIntegrationsSection = forwardRef<
+  AttendancePullIntegrationsSectionHandle,
+  {
+    context: () => HrRequestContext
+    organizationId: string
+    handleError: (error: unknown, fallback: string, notify?: boolean) => string
+  }
+>(function AttendancePullIntegrationsSection(
+  { context, organizationId, handleError },
+  ref
+) {
   const [records, setRecords] = useState<AttendancePullIntegration[]>([])
   const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -49,7 +61,7 @@ export function AttendancePullIntegrationsSection({
     try {
       setRecords(await listAttendancePullIntegrations(context()))
     } catch (caught) {
-      handleError(caught, "Unable to load device API integrations.")
+      handleError(caught, "Unable to load attendance API integrations.")
     } finally {
       setLoading(false)
     }
@@ -58,12 +70,13 @@ export function AttendancePullIntegrationsSection({
     const pending = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(pending)
   }, [load])
-  const create = () => {
+  const create = useCallback(() => {
     setEditing(null)
     setInitialDraft(emptyPullDraft())
     setError("")
     setDialogOpen(true)
-  }
+  }, [])
+  useImperativeHandle(ref, () => ({ create }), [create])
   const edit = (record: AttendancePullIntegration) => {
     setEditing(record)
     setInitialDraft(draftFromIntegration(record))
@@ -80,13 +93,17 @@ export function AttendancePullIntegrationsSection({
         editing?.id
       )
       toast.success(
-        `Device API integration ${editing ? "updated" : "created"}.`
+        `Attendance API integration ${editing ? "updated" : "created"}.`
       )
       setDialogOpen(false)
       await load()
     } catch (caught) {
       setError(
-        handleError(caught, "Unable to save the device API integration.", false)
+        handleError(
+          caught,
+          "Unable to save the attendance API integration.",
+          false
+        )
       )
     } finally {
       setSaving(false)
@@ -132,10 +149,10 @@ export function AttendancePullIntegrationsSection({
       return
     try {
       await deleteAttendancePullIntegration(context(), record.id)
-      toast.success("Device API integration deleted.")
+      toast.success("Attendance API integration deleted.")
       await load()
     } catch (caught) {
-      handleError(caught, "Unable to delete the device API integration.")
+      handleError(caught, "Unable to delete the attendance API integration.")
     }
   }
   const columns = [
@@ -241,7 +258,7 @@ export function AttendancePullIntegrationsSection({
   return (
     <>
       <HrRecordsSection
-        title="External device API integrations"
+        title="External attendance API integrations"
         description="Pull attendance punches from vendor GET or POST endpoints on a recurring schedule."
         data={records}
         loading={loading}
@@ -251,10 +268,10 @@ export function AttendancePullIntegrationsSection({
         headerActions={
           <Button size="sm" variant="outline" onClick={create}>
             <Plus />
-            Add device API
+            Add attendance API
           </Button>
         }
-        emptyMessage="No external device APIs configured."
+        emptyMessage="No external attendance APIs configured."
         renderMobileItem={(record) => (
           <div className="space-y-3 rounded-xl border p-3">
             <div className="flex items-start justify-between gap-3">
@@ -319,4 +336,4 @@ export function AttendancePullIntegrationsSection({
       ) : null}
     </>
   )
-}
+})

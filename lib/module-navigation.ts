@@ -298,6 +298,12 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             description: "Queue bulk HR opening and migration imports.",
             permissionMenuName: "HR Imports",
           },
+          {
+            label: "HR Audit Log",
+            href: "/hr-payroll/audit-log",
+            description: "Review recent HR activity and scheduled job runs.",
+            permissionMenuName: "HR Audit Log",
+          },
         ],
       },
     ],

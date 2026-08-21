@@ -284,8 +284,8 @@ export function AttendancePullIntegrationDialog({
           <DialogHeader className="shrink-0 border-b px-4 py-5 pr-12 sm:px-6">
             <DialogTitle>
               {integration
-                ? "Edit device API integration"
-                : "Add device API integration"}
+                ? "Edit attendance API integration"
+                : "Add attendance API integration"}
             </DialogTitle>
             <DialogDescription>
               Pull attendance events from a vendor API and map its response to
