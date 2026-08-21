@@ -239,7 +239,8 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           {
             label: "Attendance Management",
             href: "/hr-payroll/attendance",
-            description: "Manage punches, attendance, corrections, and overtime.",
+            description:
+              "Manage punches, attendance, corrections, and overtime.",
             permissionMenuName: "Attendance Management",
           },
           {
@@ -248,24 +249,73 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             description: "End-to-end employee leave management.",
             permissionMenuName: "Leave Management",
             children: [
-              { label: "Dashboard", href: "/hr-payroll/leave?view=dashboard", permissionMenuName: "Leave Management" },
-              { label: "My Applications", href: "/hr-payroll/leave?view=applications", permissionMenuName: "Leave Management" },
-              { label: "My Leave Balance", href: "/hr-payroll/leave?view=balance", permissionMenuName: "Leave Management" },
-              { label: "Approval Inbox", href: "/hr-payroll/leave?view=approvals", permissionMenuName: "Leave Management" },
-              { label: "Team Leave Calendar", href: "/hr-payroll/leave?view=calendar", permissionMenuName: "Leave Management" },
-              { label: "Leave Administration", href: "/hr-payroll/leave?view=administration", permissionMenuName: "Leave Management" },
-              { label: "Leave Reports", href: "/hr-payroll/reports", permissionMenuName: "HR Reports" },
-              { label: "Leave Types", href: "/hr-payroll/leave/leave-type", permissionMenuName: "Leave Type Setup" },
-              { label: "Leave Policies", href: "/hr-payroll/leave/policies", permissionMenuName: "Leave Management" },
-              { label: "Policy Assignments", href: "/hr-payroll/leave/policy-assignments", permissionMenuName: "Leave Management" },
-              { label: "Approval Workflows", href: "/hr-payroll/leave/workflows", permissionMenuName: "Leave Management" },
-              { label: "Workflow Assignments", href: "/hr-payroll/leave/workflow-assignments", permissionMenuName: "Leave Management" },
+              {
+                label: "Dashboard",
+                href: "/hr-payroll/leave?view=dashboard",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "My Applications",
+                href: "/hr-payroll/leave?view=applications",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "My Leave Balance",
+                href: "/hr-payroll/leave?view=balance",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Approval Inbox",
+                href: "/hr-payroll/leave?view=approvals",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Team Leave Calendar",
+                href: "/hr-payroll/leave?view=calendar",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Leave Administration",
+                href: "/hr-payroll/leave?view=administration",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Leave Reports",
+                href: "/hr-payroll/reports",
+                permissionMenuName: "HR Reports",
+              },
+              {
+                label: "Leave Types",
+                href: "/hr-payroll/leave/leave-type",
+                permissionMenuName: "Leave Type Setup",
+              },
+              {
+                label: "Leave Policies",
+                href: "/hr-payroll/leave/policies",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Policy Assignments",
+                href: "/hr-payroll/leave/policy-assignments",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Approval Workflows",
+                href: "/hr-payroll/leave/workflows",
+                permissionMenuName: "Leave Management",
+              },
+              {
+                label: "Workflow Assignments",
+                href: "/hr-payroll/leave/workflow-assignments",
+                permissionMenuName: "Leave Management",
+              },
             ],
           },
           {
             label: "Compensation Setup",
             href: "/hr-payroll/compensation",
-            description: "Configure salary structures and employee assignments.",
+            description:
+              "Configure salary structures and employee assignments.",
             permissionMenuName: "Compensation Setup",
           },
           {
@@ -476,6 +526,18 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
           //     },
         ],
       },
+      {
+        label: "Monitoring",
+        description: "Operational history and accountability.",
+        items: [
+          {
+            label: "Audit Log",
+            href: "/merchandising/audit-log",
+            description: "Review merchandising activity for this organization.",
+            permissionMenuName: "Merchandising Audit Log",
+          },
+        ],
+      },
     ],
   },
   {
@@ -559,7 +621,11 @@ export const MODULE_NAVIGATION: ModuleNavigationItem[] = [
             label: "Audit logs",
             href: "/iam/security/audit-logs",
             children: [
-              { label: "Events", href: "/iam/security/audit-logs/events" },
+              {
+                label: "Events",
+                href: "/iam/security/audit-logs/events",
+                permissionMenuName: "IAM Audit Log",
+              },
               { label: "Exports", href: "/iam/security/audit-logs/exports" },
             ],
           },
@@ -697,11 +763,11 @@ export function filterModuleSidebarGroupsByPermissions(
 
     return items.length
       ? [
-        {
-          ...group,
-          items,
-        },
-      ]
+          {
+            ...group,
+            items,
+          },
+        ]
       : []
   })
 }

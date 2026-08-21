@@ -1,10 +1,20 @@
 "use client"
 
 import { type ReactNode } from "react"
-import { type ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table"
+import {
+  type ColumnDef,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
 
 import { AppDataTable } from "@/components/app-data-table"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export type AppDataSectionProps<TData> = {
@@ -33,6 +43,11 @@ export type AppDataSectionProps<TData> = {
   leadingColumnIds?: string[]
   trailingColumnIds?: string[]
   columnClassNames?: Record<string, string>
+  enableColumnResizing?: boolean
+  columnResizeStorageKey?: string
+  nonResizableColumnIds?: string[]
+  minColumnWidth?: number
+  maxColumnWidth?: number
 }
 
 export function AppDataSection<TData>({
@@ -61,10 +76,19 @@ export function AppDataSection<TData>({
   leadingColumnIds,
   trailingColumnIds,
   columnClassNames,
+  enableColumnResizing = true,
+  columnResizeStorageKey,
+  nonResizableColumnIds,
+  minColumnWidth,
+  maxColumnWidth,
 }: AppDataSectionProps<TData>) {
   // TanStack Table intentionally returns non-memoizable functions; the table stays local to this render boundary.
   // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() })
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
 
   return (
     <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
@@ -72,7 +96,9 @@ export function AppDataSection<TData>({
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle className="text-base">{title}</CardTitle>
-            {description ? <CardDescription>{description}</CardDescription> : null}
+            {description ? (
+              <CardDescription>{description}</CardDescription>
+            ) : null}
           </div>
           {headerBadges || headerActions ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -83,9 +109,17 @@ export function AppDataSection<TData>({
         </div>
       </CardHeader>
 
-      {filters ? <CardContent className="p-3 sm:p-0 sm:px-2">{filters}</CardContent> : null}
+      {filters ? (
+        <CardContent className="p-3 sm:p-0 sm:px-2">{filters}</CardContent>
+      ) : null}
 
-      <CardContent className={filters ? "border-t border-slate-200/70 p-0 dark:border-white/10" : "p-0"}>
+      <CardContent
+        className={
+          filters
+            ? "border-t border-slate-200/70 p-0 dark:border-white/10"
+            : "p-0"
+        }
+      >
         {renderMobileItem ? (
           <div className="lg:hidden">
             {loading ? (
@@ -97,7 +131,9 @@ export function AppDataSection<TData>({
             ) : data.length > 0 ? (
               <div className="space-y-3 p-4">
                 {data.map((item, index) => (
-                  <div key={getRowId?.(item, index) ?? index}>{renderMobileItem(item, index)}</div>
+                  <div key={getRowId?.(item, index) ?? index}>
+                    {renderMobileItem(item, index)}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -117,6 +153,11 @@ export function AppDataSection<TData>({
               onPageSizeChange={onPageSizeChange}
               loadingRows={0}
               hideTable
+              enableColumnResizing={enableColumnResizing}
+              columnResizeStorageKey={columnResizeStorageKey}
+              nonResizableColumnIds={nonResizableColumnIds}
+              minColumnWidth={minColumnWidth}
+              maxColumnWidth={maxColumnWidth}
             />
           </div>
         ) : null}
@@ -138,6 +179,11 @@ export function AppDataSection<TData>({
             leadingColumnIds={leadingColumnIds}
             trailingColumnIds={trailingColumnIds}
             columnClassNames={columnClassNames}
+            enableColumnResizing={enableColumnResizing}
+            columnResizeStorageKey={columnResizeStorageKey}
+            nonResizableColumnIds={nonResizableColumnIds}
+            minColumnWidth={minColumnWidth}
+            maxColumnWidth={maxColumnWidth}
           />
         </div>
       </CardContent>

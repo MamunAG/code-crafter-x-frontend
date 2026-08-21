@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   ArrowRight,
-  Fingerprint,
+  History,
   KeyRound,
   Lock,
   ShieldCheck,
@@ -88,23 +88,26 @@ const quickActions = [
     icon: ScrollText,
   },
   {
-    label: "Active sessions",
-    href: "/iam/security/sessions/active",
-    icon: Fingerprint,
+    label: "Audit log",
+    href: "/iam/security/audit-logs/events",
+    icon: History,
   },
 ]
 
 export function IamOverview() {
   const moduleData = getModuleNavigation("iam")
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3050"
-  const [pendingRequestCount, setPendingRequestCount] = useState<number | null>(null)
+  const [pendingRequestCount, setPendingRequestCount] = useState<number | null>(
+    null
+  )
 
   useEffect(() => {
     const accessToken = window.localStorage.getItem("access_token")
-    const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+    const storedUser = parseStoredAuthUser(
+      window.localStorage.getItem("auth_user")
+    )
 
     if (!accessToken || !storedUser?.id) {
-      setPendingRequestCount(null)
       return
     }
 
@@ -152,7 +155,7 @@ export function IamOverview() {
                 <div className="relative max-w-2xl">
                   <Badge
                     variant="outline"
-                    className="border-slate-200/80 bg-white/80 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                    className="border-slate-200/80 bg-white/80 text-[10px] font-semibold tracking-[0.22em] text-slate-600 uppercase dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
                   >
                     IAM
                   </Badge>
@@ -160,12 +163,16 @@ export function IamOverview() {
                     Identity, access, and trust controls in one place
                   </h1>
                   <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base dark:text-slate-300">
-                    Use this module to manage the people who can sign in, the roles they receive,
-                    the permissions behind each action, and the sessions you need to keep an eye on.
+                    Use this module to manage the people who can sign in, the
+                    roles they receive, the permissions behind each action, and
+                    the sessions you need to keep an eye on.
                   </p>
 
                   <div className="mt-7 flex flex-wrap gap-3">
-                    <Button asChild className="h-11 rounded-full px-5 text-sm font-medium">
+                    <Button
+                      asChild
+                      className="h-11 rounded-full px-5 text-sm font-medium"
+                    >
                       <Link href="/iam/identity/users">
                         Open users
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -182,21 +189,24 @@ export function IamOverview() {
                 </div>
               </div>
 
-              <div className="border-t border-slate-200/70 bg-slate-50/70 px-6 py-7 sm:px-8 xl:border-l xl:border-t-0 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="border-t border-slate-200/70 bg-slate-50/70 px-6 py-7 sm:px-8 xl:border-t-0 xl:border-l dark:border-white/10 dark:bg-white/[0.04]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
                       Control surface
                     </p>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                      A quick map of the IAM lanes we expect teams to use most often.
+                      A quick map of the IAM lanes we expect teams to use most
+                      often.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-right shadow-sm dark:border-white/10 dark:bg-slate-950/60">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <p className="text-[10px] font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
                       Zones
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">3</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                      3
+                    </p>
                   </div>
                 </div>
 
@@ -209,7 +219,7 @@ export function IamOverview() {
                         key={action.href}
                         href={action.href}
                         className={cn(
-                          "group flex min-h-[5.25rem] items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20",
+                          "group flex min-h-[5.25rem] items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-white/20"
                         )}
                       >
                         <div className="flex min-w-0 items-center gap-3">
@@ -221,20 +231,22 @@ export function IamOverview() {
                               <p
                                 className={cn(
                                   "text-sm font-medium text-slate-900 dark:text-slate-100",
-                                  action.href === "/iam/access/organization-requests" &&
-                                  "whitespace-nowrap",
+                                  action.href ===
+                                    "/iam/access/organization-requests" &&
+                                    "whitespace-nowrap"
                                 )}
                               >
                                 {action.label}
                               </p>
-                              {action.href === "/iam/access/organization-requests" &&
+                              {action.href ===
+                                "/iam/access/organization-requests" &&
                               pendingRequestCount !== null &&
                               pendingRequestCount > 0 ? (
                                 <Badge
                                   variant="outline"
                                   className={cn(
-                                    "h-5 rounded-full border-slate-200 bg-white px-2 text-[10px] font-semibold uppercase tracking-[0.18em] dark:border-white/10 dark:bg-white/5",
-                                    "text-amber-700 dark:text-amber-200",
+                                    "h-5 rounded-full border-slate-200 bg-white px-2 text-[10px] font-semibold tracking-[0.18em] uppercase dark:border-white/10 dark:bg-white/5",
+                                    "text-amber-700 dark:text-amber-200"
                                   )}
                                 >
                                   {pendingRequestCount}
@@ -242,8 +254,9 @@ export function IamOverview() {
                               ) : null}
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {action.href === "/iam/access/organization-requests" &&
-                                pendingRequestCount !== null
+                              {action.href ===
+                                "/iam/access/organization-requests" &&
+                              pendingRequestCount !== null
                                 ? pendingRequestCount > 0
                                   ? `${pendingRequestCount} pending request${pendingRequestCount === 1 ? "" : "s"}`
                                   : "No pending requests"
@@ -278,19 +291,21 @@ export function IamOverview() {
                 <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white dark:bg-white dark:text-slate-950">
                   {index + 1}
                 </div>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{item}</p>
+                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {item}
+                </p>
               </div>
             ))}
 
             <Separator className="bg-slate-200 dark:bg-white/10" />
 
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
                 Recommended workflow
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Start with people, map their role scope, then review the audit trail and any
-                active sessions before closing the change.
+                Start with people, map their role scope, then review the audit
+                trail and any active sessions before closing the change.
               </p>
             </div>
           </CardContent>
@@ -309,8 +324,8 @@ export function IamOverview() {
               <CardHeader>
                 <div
                   className={cn(
-                    "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ring-1 ring-inset ring-slate-200 dark:ring-white/10",
-                    area.accent,
+                    "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ring-1 ring-slate-200 ring-inset dark:ring-white/10",
+                    area.accent
                   )}
                 >
                   <Icon className="h-5 w-5 text-slate-900 dark:text-white" />
@@ -346,8 +361,8 @@ export function IamOverview() {
               Navigation launchpad
             </CardTitle>
             <CardDescription className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-              These sections mirror the IAM navigation tree so it is easy to move from the
-              overview into the next screen.
+              These sections mirror the IAM navigation tree so it is easy to
+              move from the overview into the next screen.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-3">
@@ -367,7 +382,10 @@ export function IamOverview() {
                       </p>
                     ) : null}
                   </div>
-                  <Badge variant="outline" className="border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <Badge
+                    variant="outline"
+                    className="border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  >
                     {group.items.length} items
                   </Badge>
                 </div>
@@ -417,7 +435,7 @@ export function IamOverview() {
         <Card className="border-slate-200/80 bg-slate-950 text-white shadow-[0_24px_60px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/10">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10 ring-inset">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
@@ -425,38 +443,41 @@ export function IamOverview() {
                   Trust posture
                 </CardTitle>
                 <CardDescription className="text-sm leading-6 text-slate-300">
-                  A compact summary of how the IAM space should feel to operators.
+                  A compact summary of how the IAM space should feel to
+                  operators.
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+              <p className="text-xs font-semibold tracking-[0.18em] text-slate-300 uppercase">
                 Signal
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-200">
-                Keep access decisions visible, keep session state current, and keep audit trails
-                close to the workflow.
+                Keep access decisions visible, keep session state current, and
+                keep audit trails close to the workflow.
               </p>
             </div>
 
             <div className="grid gap-3">
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                 <span className="text-sm text-slate-200">Identity review</span>
-                <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-emerald-300 uppercase">
                   Ready
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <span className="text-sm text-slate-200">Permission coverage</span>
-                <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                <span className="text-sm text-slate-200">
+                  Permission coverage
+                </span>
+                <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-sky-300 uppercase">
                   Drafted
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                 <span className="text-sm text-slate-200">Session hygiene</span>
-                <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-amber-300 uppercase">
                   Monitor
                 </span>
               </div>

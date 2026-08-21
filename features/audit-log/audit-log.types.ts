@@ -1,6 +1,8 @@
-export type HrAuditEvent = {
+import type { AuditModuleName } from "./audit-log.config"
+
+export type AuditEvent = {
   id: string
-  moduleName: "HR_PAYROLL"
+  moduleName: AuditModuleName
   category: "API" | "BUSINESS" | "CRON"
   status: "STARTED" | "SUCCESS" | "ERROR" | "ABORTED"
   organizationId: string | null
@@ -29,7 +31,7 @@ export type HrAuditEvent = {
   createdAt: string
 }
 
-export type HrAuditFeed = {
+export type AuditFeed = {
   generatedAt: string
   page: number
   limit: number
@@ -41,13 +43,15 @@ export type HrAuditFeed = {
     cronOnSchedule: number
     issues: number
   }
-  events: HrAuditEvent[]
+  events: AuditEvent[]
 }
 
-export type HrAuditFilters = {
+export type AuditFilters = {
   page: number
   limit: number
-  category?: HrAuditEvent["category"]
-  status?: HrAuditEvent["status"]
-  scheduleStatus?: Exclude<HrAuditEvent["scheduleStatus"], null>
+  category?: AuditEvent["category"]
+  status?: AuditEvent["status"]
+  scheduleStatus?: Exclude<AuditEvent["scheduleStatus"], null>
+  fromDate?: string
+  toDate?: string
 }
