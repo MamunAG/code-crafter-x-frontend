@@ -129,6 +129,7 @@ function renderNavItem({
       ) : (
         <Link
           href={item.href}
+          prefetch={false}
           onClick={onNavigate}
           className={cn(
             "block rounded-lg px-3 py-2 transition",
