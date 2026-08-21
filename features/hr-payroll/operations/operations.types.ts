@@ -115,6 +115,16 @@ export type StatutoryRuleRecord = HrBaseRecord & {
 export type PayrollRunRecord = HrBaseRecord & {
   factoryId: string
   payGroupId: string
+  processingMode: "INDIVIDUAL" | "BULK"
+  selectionCriteria: {
+    employeeIds?: string[]
+    departmentIds?: string[]
+    designationIds?: string[]
+    sectionNames?: string[]
+    includeAllEligible?: boolean
+  }
+  formulaInputs?: Record<string, number>
+  snapshotMetadata?: Record<string, unknown>
   frequency: string
   runType: string
   sequence: number
@@ -126,6 +136,56 @@ export type PayrollRunRecord = HrBaseRecord & {
   rulePackId?: string | null
   paidStatus: string
   factory?: { name?: string; displayName?: string; code?: string }
+  totals?: {
+    employees: string
+    gross: string
+    deductions: string
+    net: string
+    failed: string
+  }
+}
+
+export type PayrollScopeEmployee = {
+  id: string
+  employeeCode: string
+  employeeName: string
+  departmentId?: string | null
+  departmentName?: string | null
+  designationId?: string | null
+  designationName?: string | null
+  sectionName?: string | null
+}
+
+export type PayrollScopeOptions = {
+  employees: PayrollScopeEmployee[]
+  departments: Array<{ id: string; name: string }>
+  designations: Array<{ id: string; name: string }>
+  sections: string[]
+  formulaVariables: string[]
+}
+
+export type PayrollLineRecord = {
+  id: string
+  componentCode: string
+  componentName: string
+  type: string
+  amount: string
+  formula: string
+  calculationTrace?: Record<string, unknown>
+}
+
+export type PayrollEmployeeRecord = {
+  id: string
+  employeeId: string
+  employeeSnapshot: Record<string, unknown>
+  inputSnapshot: Record<string, unknown>
+  grossAmount: string
+  deductionAmount: string
+  employerContributionAmount: string
+  netAmount: string
+  warnings: string[]
+  error?: string | null
+  lines: PayrollLineRecord[]
 }
 
 export type HrJobRecord = {

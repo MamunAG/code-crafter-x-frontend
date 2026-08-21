@@ -1,7 +1,7 @@
 import { hrDownload, hrRequest, type HrRequestContext } from "../shared/hr-api"
 import type { HrPaginatedResponse } from "../shared/hr.types"
 import type {
-  AttendanceResult, HrJobRecord, LeaveBalanceRecord, LeaveDashboard, LeaveLedgerRecord, LeavePreview, LeaveRequestRecord, LoanRecord, LookupRecord, PayrollRunRecord,
+  AttendanceResult, HrJobRecord, LeaveBalanceRecord, LeaveDashboard, LeaveLedgerRecord, LeavePreview, LeaveRequestRecord, LoanRecord, LookupRecord, PayrollEmployeeRecord, PayrollRunRecord, PayrollScopeOptions,
   ReportResult, RosterRecord, SalaryAssignmentRecord, SalaryStructureRecord, ShiftRecord, StatutoryRuleRecord,
 } from "./operations.types"
 
@@ -123,6 +123,14 @@ export function listPayrollRuns(context: HrRequestContext, page: number, limit: 
 
 export function getPayrollRun(context: HrRequestContext, id: string) {
   return hrRequest<PayrollRunRecord>(context, `/api/v1/hr/payroll-runs/${id}`)
+}
+
+export function getPayrollScopeOptions(context: HrRequestContext, factoryId: string, payGroupId: string) {
+  return hrRequest<PayrollScopeOptions>(context, "/api/v1/hr/payroll-runs/scope-options", { query: { factoryId, payGroupId } })
+}
+
+export function getPayrollDetails(context: HrRequestContext, id: string, page = 1, limit = 100, search = "") {
+  return hrRequest<HrPaginatedResponse<PayrollEmployeeRecord>>(context, `/api/v1/hr/payroll-runs/${id}/details`, { query: { page, limit, search } })
 }
 
 export function createPayrollRun(context: HrRequestContext, payload: Record<string, unknown>, idempotencyKey: string) {
