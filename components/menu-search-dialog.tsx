@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils"
 
 type SearchEntry = {
+  id: string
   href: string
   label: string
   searchValue: string
@@ -41,13 +42,20 @@ type SearchEntry = {
 function flattenModuleEntries(module: ModuleNavigationItem): SearchEntry[] {
   return module.groups.flatMap((group) =>
     group.items.flatMap((item) => {
-      const baseSearchValue = [module.label, group.label, item.label, item.description, item.permissionMenuName]
+      const baseSearchValue = [
+        module.label,
+        group.label,
+        item.label,
+        item.description,
+        item.permissionMenuName,
+      ]
         .filter(Boolean)
         .join(" ")
 
       const parentEntry: SearchEntry[] = item.href
         ? [
             {
+              id: `${module.key}:${group.label}:item:${item.label}:${item.href}`,
               href: item.href,
               label: item.label,
               searchValue: baseSearchValue,
@@ -58,19 +66,28 @@ function flattenModuleEntries(module: ModuleNavigationItem): SearchEntry[] {
           ]
         : []
 
-      const childEntries = item.children?.map((child) => ({
-        href: child.href,
-        label: child.label,
-        searchValue: [module.label, group.label, item.label, child.label, child.description, child.permissionMenuName]
-          .filter(Boolean)
-          .join(" "),
-        moduleLabel: module.label,
-        groupLabel: group.label,
-        description: child.description,
-      })) ?? []
+      const childEntries =
+        item.children?.map((child) => ({
+          id: `${module.key}:${group.label}:child:${item.label}:${child.label}:${child.href}`,
+          href: child.href,
+          label: child.label,
+          searchValue: [
+            module.label,
+            group.label,
+            item.label,
+            child.label,
+            child.description,
+            child.permissionMenuName,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          moduleLabel: module.label,
+          groupLabel: group.label,
+          description: child.description,
+        })) ?? []
 
       return [...parentEntry, ...childEntries]
-    }),
+    })
   )
 }
 
@@ -78,8 +95,11 @@ export function MenuSearchDialog() {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
-  const [visibleModules, setVisibleModules] = React.useState<ModuleNavigationItem[]>([])
-  const [isLoadingVisibleModules, setIsLoadingVisibleModules] = React.useState(true)
+  const [visibleModules, setVisibleModules] = React.useState<
+    ModuleNavigationItem[]
+  >([])
+  const [isLoadingVisibleModules, setIsLoadingVisibleModules] =
+    React.useState(true)
 
   React.useEffect(() => {
     let active = true
@@ -88,7 +108,9 @@ export function MenuSearchDialog() {
     async function loadVisibleModules() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
       const accessToken = window.localStorage.getItem("access_token")
-      const storedUser = parseStoredAuthUser(window.localStorage.getItem("auth_user"))
+      const storedUser = parseStoredAuthUser(
+        window.localStorage.getItem("auth_user")
+      )
       const selectedOrganizationId = readSelectedOrganizationId()
       const isAdmin = isGlobalAdmin(storedUser)
 
@@ -133,7 +155,11 @@ export function MenuSearchDialog() {
         }
 
         setVisibleModules(
-          filterModuleNavigationByPermissions(MODULE_NAVIGATION, permissions, false),
+          filterModuleNavigationByPermissions(
+            MODULE_NAVIGATION,
+            permissions,
+            false
+          )
         )
       } catch {
         if (active) {
@@ -151,13 +177,19 @@ export function MenuSearchDialog() {
     }
 
     void loadVisibleModules()
-    window.addEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+    window.addEventListener(
+      SELECTED_ORGANIZATION_CHANGED_EVENT,
+      handleOrganizationChange
+    )
     window.addEventListener("storage", handleOrganizationChange)
     window.addEventListener(MENU_SEARCH_OPEN_EVENT, handleOpenSearch)
 
     return () => {
       active = false
-      window.removeEventListener(SELECTED_ORGANIZATION_CHANGED_EVENT, handleOrganizationChange)
+      window.removeEventListener(
+        SELECTED_ORGANIZATION_CHANGED_EVENT,
+        handleOrganizationChange
+      )
       window.removeEventListener("storage", handleOrganizationChange)
       window.removeEventListener(MENU_SEARCH_OPEN_EVENT, handleOpenSearch)
     }
@@ -165,7 +197,7 @@ export function MenuSearchDialog() {
 
   const entries = React.useMemo(
     () => visibleModules.flatMap((module) => flattenModuleEntries(module)),
-    [visibleModules],
+    [visibleModules]
   )
 
   const filteredEntries = React.useMemo(() => {
@@ -175,20 +207,25 @@ export function MenuSearchDialog() {
       return entries
     }
 
-    return entries.filter((entry) => entry.searchValue.toLowerCase().includes(normalizedQuery))
+    return entries.filter((entry) =>
+      entry.searchValue.toLowerCase().includes(normalizedQuery)
+    )
   }, [entries, query])
 
   const groupedEntries = React.useMemo(() => {
-    return filteredEntries.reduce<Record<string, SearchEntry[]>>((accumulator, entry) => {
-      accumulator[entry.moduleLabel] ??= []
-      accumulator[entry.moduleLabel].push(entry)
-      return accumulator
-    }, {})
+    return filteredEntries.reduce<Record<string, SearchEntry[]>>(
+      (accumulator, entry) => {
+        accumulator[entry.moduleLabel] ??= []
+        accumulator[entry.moduleLabel].push(entry)
+        return accumulator
+      },
+      {}
+    )
   }, [filteredEntries])
 
   const groupedModuleEntries = React.useMemo(
     () => Object.entries(groupedEntries),
-    [groupedEntries],
+    [groupedEntries]
   )
 
   const resultCount = filteredEntries.length
@@ -203,7 +240,7 @@ export function MenuSearchDialog() {
         aria-label="Search menus"
         title="Search menus"
         className={cn(
-          "size-9 rounded-full border border-slate-200 bg-white p-0 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white",
+          "size-9 rounded-full border border-slate-200 bg-white p-0 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
         )}
       >
         <Search className="size-3.5" aria-hidden="true" />
@@ -228,11 +265,13 @@ export function MenuSearchDialog() {
                 <p className="text-sm font-semibold text-slate-950 dark:text-white">
                   Search menus
                 </p>
-                <p className="mt-1 max-w-[28rem] whitespace-nowrap text-xs leading-5 text-slate-500 dark:text-slate-400">
+                <p className="mt-1 max-w-[28rem] text-xs leading-5 whitespace-nowrap text-slate-500 dark:text-slate-400">
                   Jump to any page or submenu.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                  <span className="text-slate-400 dark:text-slate-500">Shortcuts:</span>
+                  <span className="text-slate-400 dark:text-slate-500">
+                    Shortcuts:
+                  </span>
                   <Badge
                     variant="outline"
                     className="h-4 border-slate-200 bg-white px-1.5 text-[9px] text-slate-600 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
@@ -249,10 +288,16 @@ export function MenuSearchDialog() {
                 </div>
               </div>
               <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                <Badge variant="outline" className="border-slate-200 bg-white text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-slate-400">
+                <Badge
+                  variant="outline"
+                  className="border-slate-200 bg-white text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-slate-400"
+                >
                   {resultCount} results
                 </Badge>
-                <Badge variant="outline" className="border-slate-200 bg-white text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-slate-400">
+                <Badge
+                  variant="outline"
+                  className="border-slate-200 bg-white text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-950 dark:text-slate-400"
+                >
                   ESC
                 </Badge>
               </div>
@@ -261,7 +306,11 @@ export function MenuSearchDialog() {
 
           <div className="border-b border-slate-200 px-3 py-3 dark:border-white/10">
             <CommandInput
-              placeholder={isLoadingVisibleModules ? "Loading menus..." : "Search by menu name, module, or page..."}
+              placeholder={
+                isLoadingVisibleModules
+                  ? "Loading menus..."
+                  : "Search by menu name, module, or page..."
+              }
               value={query}
               onValueChange={setQuery}
               disabled={isLoadingVisibleModules}
@@ -271,7 +320,9 @@ export function MenuSearchDialog() {
 
           <CommandList className="max-h-[30rem] p-2">
             <CommandEmpty className="rounded-2xl border border-dashed border-slate-200 py-10 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-              {isLoadingVisibleModules ? "Loading menus..." : "No menu matched your search."}
+              {isLoadingVisibleModules
+                ? "Loading menus..."
+                : "No menu matched your search."}
             </CommandEmpty>
 
             {!isLoadingVisibleModules ? (
@@ -279,11 +330,11 @@ export function MenuSearchDialog() {
                 <CommandGroup
                   key={moduleLabel}
                   heading={moduleLabel}
-                  className="px-1 pb-2 pt-1 first:pt-0"
+                  className="px-1 pt-1 pb-2 first:pt-0"
                 >
                   {moduleEntries.map((entry) => (
                     <CommandItem
-                      key={entry.href}
+                      key={entry.id}
                       value={entry.searchValue}
                       onSelect={() => {
                         setOpen(false)
@@ -302,7 +353,10 @@ export function MenuSearchDialog() {
                           {entry.description ? ` - ${entry.description}` : ""}
                         </span>
                       </span>
-                      <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+                      <ChevronRight
+                        className="mt-0.5 size-3.5 shrink-0 text-slate-400"
+                        aria-hidden="true"
+                      />
                     </CommandItem>
                   ))}
                 </CommandGroup>

@@ -49,6 +49,7 @@ export type AuditFeed = {
 export type AuditFilters = {
   page: number
   limit: number
+  moduleName?: AuditEvent["moduleName"]
   category?: AuditEvent["category"]
   status?: AuditEvent["status"]
   scheduleStatus?: Exclude<AuditEvent["scheduleStatus"], null>

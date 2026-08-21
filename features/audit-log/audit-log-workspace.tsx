@@ -353,16 +353,39 @@ function AuditMobileCard({
 function AuditFilters({
   filters,
   disabled,
+  showModuleFilter,
   onChange,
 }: {
   filters: AuditFilters
   disabled: boolean
+  showModuleFilter: boolean
   onChange: (filters: AuditFilters) => void
 }) {
   const update = (values: Partial<AuditFilters>) =>
     onChange({ ...filters, ...values, page: 1 })
   return (
     <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-start">
+      {showModuleFilter ? (
+        <Select
+          value={filters.moduleName ?? "ALL"}
+          onValueChange={(value) =>
+            update({ moduleName: value === "ALL" ? undefined : value })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="All modules" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All modules</SelectItem>
+            <SelectItem value="HR_PAYROLL">HR &amp; Payroll</SelectItem>
+            <SelectItem value="MERCHANDISING">Merchandising</SelectItem>
+            <SelectItem value="IAM">IAM</SelectItem>
+            <SelectItem value="APP_CONFIG">App Config</SelectItem>
+            <SelectItem value="SYSTEM">System</SelectItem>
+          </SelectContent>
+        </Select>
+      ) : null}
       <Select
         value={filters.category ?? "ALL"}
         onValueChange={(value) =>
@@ -488,7 +511,9 @@ export function AuditLogWorkspace({ apiUrl, config }: AuditLogWorkspaceProps) {
     pageIds.length > 0 && selectedOnPage === pageIds.length
   const somePageSelected = selectedOnPage > 0 && !allPageSelected
   const loading = loadingOrganization === organizationId
-  const moduleName = config.moduleName === "ALL" ? undefined : config.moduleName
+  const moduleName =
+    filters.moduleName ??
+    (config.moduleName === "ALL" ? undefined : config.moduleName)
   const toggleSelected = useCallback((id: string, selected: boolean) => {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -718,6 +743,7 @@ export function AuditLogWorkspace({ apiUrl, config }: AuditLogWorkspaceProps) {
           <AuditFilters
             filters={filters}
             disabled={loading}
+            showModuleFilter={config.showModuleFilter === true}
             onChange={setFilters}
           />
         }

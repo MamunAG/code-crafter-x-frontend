@@ -9,6 +9,7 @@ export type AuditLogModuleConfig = {
   description: string
   activityDescription: string
   showModuleColumn?: boolean
+  showModuleFilter?: boolean
 }
 
 export const AUDIT_LOG_MODULES = {
@@ -45,5 +46,6 @@ export const AUDIT_LOG_MODULES = {
     activityDescription:
       "API requests, business actions, and scheduled jobs across all modules.",
     showModuleColumn: true,
+    showModuleFilter: true,
   },
 } as const satisfies Record<string, AuditLogModuleConfig>
