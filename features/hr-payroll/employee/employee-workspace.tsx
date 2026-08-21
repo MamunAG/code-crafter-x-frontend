@@ -138,7 +138,6 @@ const DEFAULT_FORM_VALUES: EmployeeFormValues = {
   supervisorId: "",
   dateOfBirth: "",
   maritalStatus: "",
-  employmentStatus: "ACTIVE",
   taxStatus: "",
   taxIdentifier: "",
   bankDetails: "",
@@ -1674,7 +1673,6 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
           supervisorId: record.supervisorId ?? "",
           dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth).slice(0, 10) : "",
           maritalStatus: record.maritalStatus ?? "",
-          employmentStatus: record.employmentStatus ?? "ACTIVE",
           taxStatus: record.taxStatus ?? "",
           taxIdentifier: record.taxIdentifier ?? "",
           bankDetails: record.bankDetails ?? "",
@@ -1894,7 +1892,7 @@ export function EmployeeWorkspace({ apiUrl }: { apiUrl: string }) {
       }
 
       if (!values.employeeName.trim()) {
-        setEditorError("Employee name is required.")
+        setEditorError("Enter the employee's first, middle, or last name in the Personal section.")
         return
       }
 

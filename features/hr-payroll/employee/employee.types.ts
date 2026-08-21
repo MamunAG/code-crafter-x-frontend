@@ -105,7 +105,6 @@ export type EmployeeRecord = {
   supervisorId?: string | null
   dateOfBirth?: string | null
   maritalStatus?: string | null
-  employmentStatus?: string | null
   taxStatus?: string | null
   taxIdentifier?: string | null
   bankDetails?: string | null
@@ -158,7 +157,6 @@ export type EmployeeFormValues = {
   supervisorId: string
   dateOfBirth: string
   maritalStatus: string
-  employmentStatus: string
   taxStatus: string
   taxIdentifier: string
   bankDetails: string

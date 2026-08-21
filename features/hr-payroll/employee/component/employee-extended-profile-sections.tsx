@@ -275,11 +275,25 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
     section: "general" | "official" | "rules" | "custom",
     key: string,
     nextValue: unknown,
-  ) =>
-    updateProfile({
+  ) => {
+    const nextSection = { ...(profile[section] ?? {}), [key]: nextValue }
+    const nextProfile = {
       ...profile,
-      [section]: { ...(profile[section] ?? {}), [key]: nextValue },
-    })
+      [section]: nextSection,
+    }
+
+    if (section === "general" && ["firstName", "middleName", "lastName"].includes(key)) {
+      const employeeName = ["firstName", "middleName", "lastName"]
+        .map((nameKey) => String(nextSection[nameKey] ?? "").trim())
+        .filter(Boolean)
+        .join(" ")
+
+      onChange({ ...value, employeeName, profile: nextProfile })
+      return
+    }
+
+    updateProfile(nextProfile)
+  }
 
   const personalFields: Field[] = [
     { key: "salutation", label: "Salutation" },
@@ -403,7 +417,6 @@ export function EmployeeExtendedProfileSections({ value, setupOptions, disabled,
             </label>
           ))}
           {coreOfficialFields.filter((field) => !["employmentTypeId", "gradeId", "payGroupId", "workLocationId"].includes(String(field.key))).map((field) => <FormField key={String(field.key)} field={{ key: String(field.key), label: field.label, type: field.type as Field["type"] }} value={value[field.key]} disabled={disabled} onChange={(next) => onChange({ ...value, [field.key]: String(next) })} />)}
-          <FormField field={{ key: "employmentStatus", label: "Employment status" }} value={value.employmentStatus} disabled={disabled} onChange={(next) => onChange({ ...value, employmentStatus: String(next) })} />
           {officialFields.map((field) => <FormField key={field.key} field={field} value={profile.official?.[field.key]} disabled={disabled} onChange={(next) => updateSection("official", field.key, next)} />)}
         </div>
       ) : null}

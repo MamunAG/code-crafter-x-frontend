@@ -234,7 +234,6 @@ function buildEmployeePayload(payload: EmployeeFormValues) {
     supervisorId: optionalString(payload.supervisorId),
     dateOfBirth: optionalString(payload.dateOfBirth),
     maritalStatus: optionalString(payload.maritalStatus),
-    employmentStatus: optionalString(payload.employmentStatus),
     taxStatus: optionalString(payload.taxStatus),
     taxIdentifier: optionalString(payload.taxIdentifier),
     bankDetails: optionalString(payload.bankDetails),

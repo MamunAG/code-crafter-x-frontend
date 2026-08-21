@@ -261,10 +261,15 @@ export function EmployeeFormDialog({
                 <FieldLabel required>Employee name</FieldLabel>
                 <Input
                   value={draft.employeeName}
-                  onChange={(event) => update("employeeName", event.target.value)}
-                  placeholder="Input employee name"
+                  readOnly
+                  aria-readonly="true"
+                  placeholder="Generated from first, middle, and last name"
+                  className="cursor-default bg-muted/50"
                   disabled={loading || submitting}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Automatically generated from the name fields in the Personal section below.
+                </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
